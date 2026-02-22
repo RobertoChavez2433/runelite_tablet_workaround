@@ -1,68 +1,69 @@
 # Session State
 
-**Last Updated**: 2026-02-22 | **Session**: 4
+**Last Updated**: 2026-02-22 | **Session**: 6
 
 ## Current Phase
-- **Phase**: Implementation Planning — COMPLETE
-- **Status**: MVP implementation plan approved and committed. Ready to begin Slice 1 development.
+- **Phase**: MVP Development — Slice 1 IMPLEMENTED
+- **Status**: All code written, compiled, APK built. Needs end-to-end tablet test.
 
 ## HOT CONTEXT - Resume Here
 
 ### EXACTLY WHERE WE LEFT OFF
 
-Implementation plan brainstorming is **complete**. The plan is committed at `.claude/plans/2026-02-22-mvp-implementation-plan.md`.
+Slice 1 ("It launches") is **fully implemented and compiling**. The debug APK is at `runelite-tablet/app/build/outputs/apk/debug/app-debug.apk` (16.4 MB).
 
-**Approach chosen**: Vertical Slices — 5 slices, 23 tasks total.
+**15 Kotlin files + 2 shell scripts + full Gradle build** — all written, code-reviewed, and fixes applied.
 
-| Slice | Name | Focus |
-|-------|------|-------|
-| 1 | "It launches" | Scaffold + Termux integration + shell scripts + minimal 2-button UI → RuneLite on screen |
-| 2 | "Setup is smooth" | Setup Wizard with stepper UI, progress, retry, resume, state persistence |
-| 3 | "Auth works" | Credential import, parsing, secure storage, env var injection |
-| 4 | "Stays up to date" | GitHub releases API check, version compare, auto-download .jar |
-| 5 | "It's an app" | Main screen, settings, error handling, health checks |
+**Project location**: `runelite-tablet/` (Android project root)
 
-### Key Decisions Made This Session
-- **Full MVP plan** (not just first milestone)
-- **Skip manual PoC** — build directly (user confident from community reports)
-- **Vertical slices** approach (not component-by-component or script-first)
-- **Termux RUN_COMMAND intent** for communication (official API, requires `allow-external-apps` toggle)
-- **Shell scripts bundled in APK assets** — readable, testable independently, modifiable without recompiling
-- **Libraries**: Jetpack Compose + Material3, AndroidX Security, Ktor/OkHttp, Jetpack Navigation, DataStore
+### What Was Done This Session
 
-### User's Answers to Clarifying Questions
-1. **Approach**: Wants to run the REAL RuneLite (not a clone/port) on a Samsung Tab S10 Ultra
-2. **Direction**: Chose "Installer app" — an Android APK that automates Linux+RuneLite setup
-3. **Auth**: Interested in running Jagex Launcher in Linux, but open to alternatives (research found better options)
-4. **Input**: Primary = physical mouse + keyboard via DeX; fallback = touch-as-trackpad
-5. **Audience**: Start personal, grow later (for him first, then distributable)
-6. **Graphics**: Start with software rendering; GPU plugin later (Zink research saved)
-7. **Updates**: Auto-update RuneLite on launch
-8. **Plugins**: Wants all plugins; GPU plugin and 117HD are the only constraints
-9. **Tech level**: Moderate — can follow guides but prefers automation
+1. Created full Android project scaffold (Gradle, manifest, theme, resources, icons)
+2. Implemented Termux communication layer (TermuxPackageHelper, TermuxCommandRunner, TermuxResultService)
+3. Implemented APK install pipeline (ApkDownloader, ApkInstaller, InstallResultReceiver)
+4. Implemented setup orchestration (SetupStep, ScriptManager, SetupOrchestrator, SetupViewModel)
+5. Implemented UI (StepItem component, SetupScreen with permissions bottom sheet)
+6. Wrote shell scripts (setup-environment.sh, launch-runelite.sh)
+7. Ran code review agent — found 10 issues across 3 severity levels
+8. Fixed all critical issues: ViewModelProvider.Factory, NeedsUserAction recovery, Activity leak
+9. Fixed all medium issues: AtomicInteger IDs, recheckPermissions(), outputStream safety, setupScriptRan guard
+10. Added signing key conflict detection and skipToStep() method
+11. Build passes clean — zero errors, zero warnings
 
-### Approved Architecture
+### File Map (quick reference)
 
-```
-Android App (Kotlin/Jetpack Compose)
-  ├── Setup Wizard (one-time): Installs Termux, proot-distro, Ubuntu ARM64,
-  │   OpenJDK 11, RuneLite .jar, PulseAudio, Termux:X11
-  ├── Auth Manager
-  │   ├── Phase 1 (MVP): Import credentials.properties from desktop
-  │   └── Phase 2: Native Jagex OAuth2 via Android Trusted Web Activity
-  ├── Launch Manager: Starts proot → sets JX_* env vars → launches RuneLite .jar
-  │   → displays via Termux:X11
-  ├── Update Manager: Checks/downloads latest RuneLite .jar on launch
-  └── Input Layer
-      ├── Primary: Physical mouse + keyboard (DeX)
-      └── Fallback: Touch-as-trackpad overlay
-```
+| Package | Files |
+|---------|-------|
+| root | `RuneLiteTabletApp.kt`, `MainActivity.kt` |
+| termux/ | `TermuxPackageHelper.kt`, `TermuxCommandRunner.kt`, `TermuxResultService.kt` |
+| installer/ | `ApkDownloader.kt`, `ApkInstaller.kt`, `InstallResultReceiver.kt` |
+| setup/ | `SetupStep.kt`, `ScriptManager.kt`, `SetupOrchestrator.kt`, `SetupViewModel.kt` |
+| ui/ | `Theme.kt`, `StepItem.kt`, `SetupScreen.kt` |
+| assets/scripts/ | `setup-environment.sh`, `launch-runelite.sh` |
+
+### Code Review Fixes Applied
+- **ViewModelProvider.Factory** + `by viewModels{}` delegate (survives config changes)
+- **SetupActions interface** with bind/unbind in onResume/onPause (no Activity leak)
+- **NeedsUserAction** now sets Failed status with "Tap Retry after confirming"
+- **AtomicInteger** for execution IDs (no collision risk)
+- **recheckPermissions()** implemented (retries failed install steps on resume)
+- **session.fsync()** before commit in ApkInstaller
+- **setupScriptRan** flag prevents triple script execution for steps 4-6
+- **Signing conflict detection** for F-Droid vs GitHub APK mismatch
+- **Verification timeout** increased to 60s (proot commands are slow)
+- **skipToStep()** method added to SetupOrchestrator
+
+### Known Low-Priority Items (deferred, acceptable for Slice 1)
+- OkHttp `.execute()` blocking on IO dispatcher (works, not cancellation-aware)
+- OutputCard has both maxLines=10 and verticalScroll (minor UI conflict)
+- setup-environment.sh step 3 always re-runs apt-get update on retry (functionally idempotent)
+- evaluateCompletedSteps() only checks steps 1-2 (acceptable — no persistent state in Slice 1)
 
 ### What Needs to Happen Next Session
 
-1. **Begin Slice 1** — scaffold Android project (Kotlin, Compose, Material3, min SDK 26)
-2. **Create Termux integration layer** — RUN_COMMAND intent wrapper
-3. **Write setup & launch shell scripts** — bundled in `assets/scripts/`
+1. **End-to-end test on tablet** — install APK, verify full setup flow works on Samsung Tab S10 Ultra
+2. **Fix any issues found during tablet testing** — real device will expose edge cases
+3. **Begin Slice 2 planning** — if Slice 1 passes, design auth/credential import
 
 ## Blockers
 
@@ -70,10 +71,20 @@ Android App (Kotlin/Jetpack Compose)
 
 ## Recent Sessions
 
+### Session 6 (2026-02-22)
+**Work**: Full Slice 1 implementation. 15 Kotlin files + 2 shell scripts + Gradle build. Code review found 10 issues (2 critical, 5 medium, 3 low). All critical/medium fixed. Build successful, APK produced.
+**Decisions**: SetupActions callback (no Activity leak), ViewModelProvider.Factory, AtomicInteger IDs, 60s verification timeout, signing conflict detection.
+**Next**: End-to-end tablet test, fix real-device issues, begin Slice 2 planning.
+
+### Session 5 (2026-02-22)
+**Work**: Brainstormed Slice 1 detailed implementation design. 2 research agents investigated Termux RUN_COMMAND API and APK auto-install. Chose Approach B (auto-install). Designed 9 sections (structure, steps, Termux layer, APK pipeline, scripts, UI, errors, deps, task order). All approved. Wrote and committed design doc.
+**Decisions**: Approach B, allow-external-apps manual, GitHub Releases API, PackageInstaller session, background mode for scripts, OkHttp+kotlinx-serialization, manual DI, no Navigation.
+**Next**: Begin coding — scaffold project, Termux comms, APK pipeline (Phases A-C). (Completed in Session 6)
+
 ### Session 4 (2026-02-22)
 **Work**: Brainstormed MVP implementation plan. Reviewed research docs for feasibility. Chose vertical slices approach (5 slices, 23 tasks). Designed technical architecture (Termux RUN_COMMAND, project structure, bundled shell scripts, key libraries). Wrote and committed implementation plan.
 **Decisions**: Full MVP plan, skip manual PoC, vertical slices, RUN_COMMAND intent, shell scripts in APK assets.
-**Next**: Begin Slice 1 — scaffold project, Termux integration, shell scripts.
+**Next**: Begin Slice 1 — scaffold project, Termux integration, shell scripts. (Design completed in Session 5)
 
 ### Session 3 (2026-02-21)
 **Work**: Completed brainstorming. Presented and approved all remaining design sections (UX Flow, Component Details, Phasing, Error Handling, Testing). Wrote and committed design doc. Cleaned stale writing-plans skill reference from brainstorming SKILL.md.
@@ -85,18 +96,17 @@ Android App (Kotlin/Jetpack Compose)
 **Decisions**: Installer app approach (Termux+proot+RuneLite.jar). Auth via credential import (MVP) then native OAuth2 (Phase 2). Software rendering first, Zink GPU later.
 **Next**: Continue design presentation (UX flow, components, phasing), write design doc. (Completed in Session 3)
 
-### Session 1 (2026-02-21)
-**Work**: Initial project setup. Created .claude directory with full state management system.
-**Decisions**: Adopted Field Guide App's state management pattern.
-**Next**: Define project scope, research RuneLite. (Completed in Session 2)
-
 ## Active Plans
 
 - **Brainstorming PRD** — COMPLETE. Design doc at `.claude/plans/2026-02-21-runelite-tablet-design.md`
 - **MVP Implementation Plan** — COMPLETE. Plan at `.claude/plans/2026-02-22-mvp-implementation-plan.md`
+- **Slice 1 Implementation Design** — COMPLETE. Design at `.claude/plans/2026-02-22-slice1-implementation-design.md`
+- **Slice 1 Code** — COMPLETE. Source at `runelite-tablet/`. APK builds successfully.
 
 ## Reference
 - **Design doc**: `.claude/plans/2026-02-21-runelite-tablet-design.md`
 - **Implementation plan**: `.claude/plans/2026-02-22-mvp-implementation-plan.md`
+- **Slice 1 design**: `.claude/plans/2026-02-22-slice1-implementation-design.md`
+- **Source code**: `runelite-tablet/app/src/main/java/com/runelitetablet/`
 - **Research**: `.claude/research/` (6 files + README)
 - **Archive**: `.claude/logs/state-archive.md`
