@@ -1,22 +1,34 @@
 # Session State
 
-**Last Updated**: 2026-02-21 | **Session**: 3
+**Last Updated**: 2026-02-22 | **Session**: 4
 
 ## Current Phase
-- **Phase**: Brainstorming / PRD Design — COMPLETE
-- **Status**: Design doc approved and committed. Ready for implementation planning.
+- **Phase**: Implementation Planning — COMPLETE
+- **Status**: MVP implementation plan approved and committed. Ready to begin Slice 1 development.
 
 ## HOT CONTEXT - Resume Here
 
 ### EXACTLY WHERE WE LEFT OFF
 
-Brainstorming is **complete**. The full design document is committed at `docs/plans/2026-02-21-runelite-tablet-design.md`. All 6 design sections were presented and approved:
-1. Architecture
-2. UX Flow
-3. Component Details
-4. Phasing Plan (MVP → Phase 2 → Phase 3)
-5. Error Handling & Recovery
-6. Testing Strategy
+Implementation plan brainstorming is **complete**. The plan is committed at `.claude/plans/2026-02-22-mvp-implementation-plan.md`.
+
+**Approach chosen**: Vertical Slices — 5 slices, 23 tasks total.
+
+| Slice | Name | Focus |
+|-------|------|-------|
+| 1 | "It launches" | Scaffold + Termux integration + shell scripts + minimal 2-button UI → RuneLite on screen |
+| 2 | "Setup is smooth" | Setup Wizard with stepper UI, progress, retry, resume, state persistence |
+| 3 | "Auth works" | Credential import, parsing, secure storage, env var injection |
+| 4 | "Stays up to date" | GitHub releases API check, version compare, auto-download .jar |
+| 5 | "It's an app" | Main screen, settings, error handling, health checks |
+
+### Key Decisions Made This Session
+- **Full MVP plan** (not just first milestone)
+- **Skip manual PoC** — build directly (user confident from community reports)
+- **Vertical slices** approach (not component-by-component or script-first)
+- **Termux RUN_COMMAND intent** for communication (official API, requires `allow-external-apps` toggle)
+- **Shell scripts bundled in APK assets** — readable, testable independently, modifiable without recompiling
+- **Libraries**: Jetpack Compose + Material3, AndroidX Security, Ktor/OkHttp, Jetpack Navigation, DataStore
 
 ### User's Answers to Clarifying Questions
 1. **Approach**: Wants to run the REAL RuneLite (not a clone/port) on a Samsung Tab S10 Ultra
@@ -46,20 +58,11 @@ Android App (Kotlin/Jetpack Compose)
       └── Fallback: Touch-as-trackpad overlay
 ```
 
-### Key Technical Decisions Made
-- RuneLite runs as `.jar` in proot (NOT AppImage — FUSE doesn't work in proot)
-- Auth uses environment variables (`JX_SESSION_ID`, `JX_CHARACTER_ID`, `JX_DISPLAY_NAME`)
-- `JX_SESSION_ID` does NOT expire — authenticate once, play forever
-- RuneLite has built-in `--insecure-write-credentials` flag for credential caching
-- Jagex designed OAuth2 for mobile (Android Trusted Web Activity)
-- GPU plugin Phase 2: Mesa Zink (OpenGL 4.6 via Vulkan) + Turnip driver
-- Exact OAuth2 endpoints documented in research (from rislah/jagex-launcher Go source)
-
 ### What Needs to Happen Next Session
 
-1. **Create implementation plan** — break MVP into ordered, actionable development tasks
-2. **Scaffold Android project** — Kotlin/Jetpack Compose project structure
-3. **Begin MVP development** — start with Setup Wizard component
+1. **Begin Slice 1** — scaffold Android project (Kotlin, Compose, Material3, min SDK 26)
+2. **Create Termux integration layer** — RUN_COMMAND intent wrapper
+3. **Write setup & launch shell scripts** — bundled in `assets/scripts/`
 
 ## Blockers
 
@@ -67,10 +70,15 @@ Android App (Kotlin/Jetpack Compose)
 
 ## Recent Sessions
 
+### Session 4 (2026-02-22)
+**Work**: Brainstormed MVP implementation plan. Reviewed research docs for feasibility. Chose vertical slices approach (5 slices, 23 tasks). Designed technical architecture (Termux RUN_COMMAND, project structure, bundled shell scripts, key libraries). Wrote and committed implementation plan.
+**Decisions**: Full MVP plan, skip manual PoC, vertical slices, RUN_COMMAND intent, shell scripts in APK assets.
+**Next**: Begin Slice 1 — scaffold project, Termux integration, shell scripts.
+
 ### Session 3 (2026-02-21)
 **Work**: Completed brainstorming. Presented and approved all remaining design sections (UX Flow, Component Details, Phasing, Error Handling, Testing). Wrote and committed design doc. Cleaned stale writing-plans skill reference from brainstorming SKILL.md.
 **Decisions**: All design sections approved as presented. Removed nonexistent writing-plans skill reference.
-**Next**: Create implementation plan, scaffold Android project, begin MVP development.
+**Next**: Create implementation plan, scaffold Android project, begin MVP development. (Implementation plan completed in Session 4)
 
 ### Session 2 (2026-02-21)
 **Work**: Deep research phase for PRD. 8 agents researched auth flow, architecture, existing projects, Android approaches, GPU options. All research saved to `.claude/research/`. Brainstorming in progress — architecture approved, presenting design sections.
@@ -84,9 +92,11 @@ Android App (Kotlin/Jetpack Compose)
 
 ## Active Plans
 
-- **Brainstorming PRD** — COMPLETE. Design doc at `docs/plans/2026-02-21-runelite-tablet-design.md`
+- **Brainstorming PRD** — COMPLETE. Design doc at `.claude/plans/2026-02-21-runelite-tablet-design.md`
+- **MVP Implementation Plan** — COMPLETE. Plan at `.claude/plans/2026-02-22-mvp-implementation-plan.md`
 
 ## Reference
-- **Design doc**: `docs/plans/2026-02-21-runelite-tablet-design.md`
+- **Design doc**: `.claude/plans/2026-02-21-runelite-tablet-design.md`
+- **Implementation plan**: `.claude/plans/2026-02-22-mvp-implementation-plan.md`
 - **Research**: `.claude/research/` (6 files + README)
 - **Archive**: `.claude/logs/state-archive.md`
