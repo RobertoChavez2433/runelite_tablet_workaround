@@ -1,7 +1,9 @@
 package com.runelitetablet.installer
 
 import android.content.Context
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -10,6 +12,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.IOException
+import kotlin.coroutines.coroutineContext
 
 @Serializable
 data class GitHubRelease(
@@ -65,25 +68,50 @@ class ApkDownloader(
             .url(asset.downloadUrl)
             .build()
 
-        val response = httpClient.newCall(request).execute()
-        if (!response.isSuccessful) {
-            throw IOException("Download failed: HTTP ${response.code}")
-        }
-
-        val body = response.body ?: throw IOException("Empty response body")
-        val totalBytes = body.contentLength()
-
-        body.byteStream().use { input ->
-            apkFile.outputStream().use { output ->
-                val buffer = ByteArray(8192)
-                var bytesRead: Long = 0
-                var read: Int
-
-                while (input.read(buffer).also { read = it } != -1) {
-                    output.write(buffer, 0, read)
-                    bytesRead += read
-                    onProgress(bytesRead, totalBytes)
+        val call = httpClient.newCall(request)
+        try {
+            val response = call.execute()
+            response.use { resp ->
+                if (!resp.isSuccessful) {
+                    throw IOException("Download failed: HTTP ${resp.code}")
                 }
+
+                val body = resp.body ?: throw IOException("Empty response body")
+                val totalBytes = body.contentLength()
+
+                body.byteStream().use { input ->
+                    apkFile.outputStream().use { output ->
+                        val buffer = ByteArray(65536)
+                        var totalRead: Long = 0
+                        var read: Int
+                        var lastProgressUpdate = 0L
+
+                        while (input.read(buffer).also { read = it } != -1) {
+                            if (!coroutineContext.isActive) {
+                                call.cancel()
+                                apkFile.delete()
+                                throw CancellationException("Download cancelled")
+                            }
+                            output.write(buffer, 0, read)
+                            totalRead += read
+                            val now = System.currentTimeMillis()
+                            if (now - lastProgressUpdate >= 100) {
+                                onProgress(totalRead, totalBytes)
+                                lastProgressUpdate = now
+                            }
+                        }
+
+                        // Report final progress (100%)
+                        onProgress(totalRead, totalBytes)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            throw e
+        } finally {
+            if (!coroutineContext.isActive) {
+                call.cancel()
             }
         }
 
@@ -102,15 +130,27 @@ class ApkDownloader(
             .header("Accept", "application/vnd.github.v3+json")
             .build()
 
-        val response = httpClient.newCall(request).execute()
-        if (!response.isSuccessful) {
-            throw IOException("GitHub API request failed: HTTP ${response.code}")
+        val call = httpClient.newCall(request)
+        try {
+            val response = call.execute()
+            response.use { resp ->
+                if (!resp.isSuccessful) {
+                    throw IOException("GitHub API request failed: HTTP ${resp.code}")
+                }
+
+                val responseBody = resp.body?.string()
+                    ?: throw IOException("Empty GitHub API response")
+
+                json.decodeFromString<GitHubRelease>(responseBody)
+            }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            throw e
+        } finally {
+            if (!coroutineContext.isActive) {
+                call.cancel()
+            }
         }
-
-        val responseBody = response.body?.string()
-            ?: throw IOException("Empty GitHub API response")
-
-        json.decodeFromString<GitHubRelease>(responseBody)
     }
 
     private fun selectAsset(assets: List<ReleaseAsset>, pattern: Regex): ReleaseAsset? {

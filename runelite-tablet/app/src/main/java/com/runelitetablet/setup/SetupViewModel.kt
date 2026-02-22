@@ -12,10 +12,14 @@ import com.runelitetablet.installer.ApkInstaller
 import com.runelitetablet.termux.TermuxCommandRunner
 import com.runelitetablet.termux.TermuxPackageHelper
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
+import java.util.concurrent.atomic.AtomicBoolean
 
 class SetupViewModel(
     private val orchestrator: SetupOrchestrator,
@@ -26,8 +30,9 @@ class SetupViewModel(
     val steps: StateFlow<List<StepState>> = orchestrator.steps
     val currentOutput: StateFlow<String?> = orchestrator.currentOutput
 
-    private val _canLaunch = MutableStateFlow(false)
-    val canLaunch: StateFlow<Boolean> = _canLaunch.asStateFlow()
+    val canLaunch: StateFlow<Boolean> = orchestrator.steps
+        .map { steps -> steps.all { it.status is StepStatus.Completed } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _showPermissionsSheet = MutableStateFlow(false)
     val showPermissionsSheet: StateFlow<Boolean> = _showPermissionsSheet.asStateFlow()
@@ -35,15 +40,10 @@ class SetupViewModel(
     private val _permissionInstructions = MutableStateFlow<List<String>>(emptyList())
     val permissionInstructions: StateFlow<List<String>> = _permissionInstructions.asStateFlow()
 
-    init {
-        viewModelScope.launch {
-            orchestrator.steps.collect { stepsList ->
-                _canLaunch.value = stepsList.all { it.status is StepStatus.Completed }
-            }
-        }
-    }
+    private val setupStarted = AtomicBoolean(false)
 
     fun startSetup() {
+        if (!setupStarted.compareAndSet(false, true)) return
         viewModelScope.launch {
             orchestrator.runSetup()
         }
@@ -56,10 +56,13 @@ class SetupViewModel(
     }
 
     fun launch() {
-        commandRunner.launch(
+        val success = commandRunner.launch(
             commandPath = scriptManager.getScriptPath("launch-runelite.sh"),
             sessionAction = TermuxCommandRunner.SESSION_ACTION_SWITCH_NEW
         )
+        if (!success) {
+            // Could update a state to show error, for now just log
+        }
     }
 
     fun onManualStepClick(stepState: StepState) {

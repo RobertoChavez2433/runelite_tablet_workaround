@@ -4,8 +4,13 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
-import android.os.Build
+import com.runelitetablet.PendingIntentCompat
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.io.IOException
 
@@ -27,35 +32,59 @@ class ApkInstaller(private val context: Context) {
         }
 
         val deferred = CompletableDeferred<InstallResult>()
-        InstallResultReceiver.pendingResult = deferred
+        var sessionId = -1
 
         try {
             val packageInstaller = context.packageManager.packageInstaller
+
+            // Clean up any abandoned sessions
+            packageInstaller.mySessions.forEach { sessionInfo ->
+                try {
+                    packageInstaller.abandonSession(sessionInfo.sessionId)
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                }
+            }
+
             val params = PackageInstaller.SessionParams(
                 PackageInstaller.SessionParams.MODE_FULL_INSTALL
             )
 
-            val sessionId = packageInstaller.createSession(params)
+            sessionId = packageInstaller.createSession(params)
             val session = packageInstaller.openSession(sessionId)
 
-            session.use {
-                it.openWrite("apk", 0, apkFile.length()).use { outputStream ->
-                    apkFile.inputStream().use { input ->
-                        input.copyTo(outputStream)
-                    }
-                    it.fsync(outputStream)
-                }
+            InstallResultReceiver.pendingResults[sessionId] = deferred
 
-                val pendingIntent = createInstallIntent(sessionId)
-                it.commit(pendingIntent.intentSender)
+            withContext(Dispatchers.IO) {
+                session.use { s ->
+                    s.openWrite("apk", 0, apkFile.length()).use { outputStream ->
+                        apkFile.inputStream().use { input ->
+                            input.copyTo(outputStream)
+                        }
+                        s.fsync(outputStream)
+                    }
+
+                    val pendingIntent = createInstallIntent(sessionId)
+                    s.commit(pendingIntent.intentSender)
+                }
             }
 
-            return deferred.await()
+            return try {
+                withTimeout(120_000L) {
+                    deferred.await()
+                }
+            } catch (e: TimeoutCancellationException) {
+                InstallResultReceiver.pendingResults.remove(sessionId)
+                InstallResult.Failure("Installation timed out after 2 minutes")
+            }
+        } catch (e: CancellationException) {
+            InstallResultReceiver.pendingResults.remove(sessionId)
+            throw e
         } catch (e: IOException) {
-            InstallResultReceiver.pendingResult = null
+            InstallResultReceiver.pendingResults.remove(sessionId)
             return InstallResult.Failure("Install failed: ${e.message}")
         } catch (e: SecurityException) {
-            InstallResultReceiver.pendingResult = null
+            InstallResultReceiver.pendingResults.remove(sessionId)
             return InstallResult.Failure("Install permission denied: ${e.message}")
         }
     }
@@ -65,12 +94,6 @@ class ApkInstaller(private val context: Context) {
             action = "com.runelitetablet.INSTALL_RESULT"
             putExtra("session_id", sessionId)
         }
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                PendingIntent.FLAG_MUTABLE
-            } else {
-                0
-            }
-        return PendingIntent.getBroadcast(context, sessionId, intent, flags)
+        return PendingIntent.getBroadcast(context, sessionId, intent, PendingIntentCompat.FLAGS)
     }
 }

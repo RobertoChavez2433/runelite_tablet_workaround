@@ -6,14 +6,19 @@ import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.os.Build
 import kotlinx.coroutines.CompletableDeferred
+import java.util.concurrent.ConcurrentHashMap
 
 class InstallResultReceiver : BroadcastReceiver() {
 
     companion object {
-        var pendingResult: CompletableDeferred<InstallResult>? = null
+        val pendingResults = ConcurrentHashMap<Int, CompletableDeferred<InstallResult>>()
     }
 
-    override fun onReceive(context: Context, intent: Intent) {
+    override fun onReceive(context: Context, intent: Intent?) {
+        if (intent == null) return
+        val sessionId = intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1)
+        val deferred = pendingResults.remove(sessionId) ?: return
+
         val status = intent.getIntExtra(
             PackageInstaller.EXTRA_STATUS,
             PackageInstaller.STATUS_FAILURE
@@ -43,7 +48,6 @@ class InstallResultReceiver : BroadcastReceiver() {
             }
         }
 
-        pendingResult?.complete(result)
-        pendingResult = null
+        deferred.complete(result)
     }
 }

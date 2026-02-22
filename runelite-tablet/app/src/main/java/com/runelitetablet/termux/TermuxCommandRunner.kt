@@ -4,8 +4,10 @@ import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.os.Build
+import com.runelitetablet.PendingIntentCompat
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 
 data class TermuxResult(
@@ -20,7 +22,6 @@ data class TermuxResult(
 class TermuxCommandRunner(private val context: Context) {
 
     companion object {
-        private const val TERMUX_PACKAGE = "com.termux"
         private const val RUN_COMMAND_SERVICE = "com.termux.app.RunCommandService"
         private const val ACTION_RUN_COMMAND = "com.termux.RUN_COMMAND"
 
@@ -57,7 +58,7 @@ class TermuxCommandRunner(private val context: Context) {
         val pendingIntent = createPendingIntent(executionId)
 
         val intent = Intent(ACTION_RUN_COMMAND).apply {
-            component = ComponentName(TERMUX_PACKAGE, RUN_COMMAND_SERVICE)
+            component = ComponentName(TermuxPackageHelper.TERMUX_PACKAGE, RUN_COMMAND_SERVICE)
             putExtra(EXTRA_COMMAND_PATH, commandPath)
             if (arguments != null) putExtra(EXTRA_ARGUMENTS, arguments)
             if (workdir != null) putExtra(EXTRA_WORKDIR, workdir)
@@ -69,6 +70,7 @@ class TermuxCommandRunner(private val context: Context) {
         try {
             context.startService(intent)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             TermuxResultService.pendingResults.remove(executionId)
             return TermuxResult(
                 stdout = null,
@@ -79,16 +81,25 @@ class TermuxCommandRunner(private val context: Context) {
         }
 
         return try {
-            withTimeout(timeoutMs) {
-                deferred.await()
-            }
+            withTimeout(timeoutMs) { deferred.await() }
+        } catch (e: TimeoutCancellationException) {
+            TermuxResultService.pendingResults.remove(executionId)
+            TermuxResult(
+                stdout = null,
+                stderr = null,
+                exitCode = -1,
+                error = "Command timed out after ${timeoutMs}ms"
+            )
+        } catch (e: CancellationException) {
+            TermuxResultService.pendingResults.remove(executionId)
+            throw e
         } catch (e: Exception) {
             TermuxResultService.pendingResults.remove(executionId)
             TermuxResult(
                 stdout = null,
                 stderr = null,
                 exitCode = -1,
-                error = "Command timed out or was interrupted: ${e.message}"
+                error = e.message ?: "Unknown error"
             )
         }
     }
@@ -97,27 +108,27 @@ class TermuxCommandRunner(private val context: Context) {
         commandPath: String,
         arguments: Array<String>? = null,
         sessionAction: String = SESSION_ACTION_SWITCH_NEW
-    ) {
-        val intent = Intent(ACTION_RUN_COMMAND).apply {
-            component = ComponentName(TERMUX_PACKAGE, RUN_COMMAND_SERVICE)
-            putExtra(EXTRA_COMMAND_PATH, commandPath)
-            if (arguments != null) putExtra(EXTRA_ARGUMENTS, arguments)
-            putExtra(EXTRA_BACKGROUND, false)
-            putExtra(EXTRA_SESSION_ACTION, sessionAction)
+    ): Boolean {
+        return try {
+            val intent = Intent(ACTION_RUN_COMMAND).apply {
+                component = ComponentName(TermuxPackageHelper.TERMUX_PACKAGE, RUN_COMMAND_SERVICE)
+                putExtra(EXTRA_COMMAND_PATH, commandPath)
+                if (arguments != null) putExtra(EXTRA_ARGUMENTS, arguments)
+                putExtra(EXTRA_BACKGROUND, false)
+                putExtra(EXTRA_SESSION_ACTION, sessionAction)
+            }
+            context.startService(intent)
+            true
+        } catch (e: Exception) {
+            false
         }
-        context.startService(intent)
     }
 
     private fun createPendingIntent(executionId: Int): PendingIntent {
         val intent = Intent(context, TermuxResultService::class.java).apply {
             putExtra("execution_id", executionId)
         }
-        val flags = PendingIntent.FLAG_ONE_SHOT or
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                PendingIntent.FLAG_MUTABLE
-            } else {
-                0
-            }
+        val flags = PendingIntent.FLAG_ONE_SHOT or PendingIntentCompat.FLAGS
         return PendingIntent.getService(context, executionId, intent, flags)
     }
 }

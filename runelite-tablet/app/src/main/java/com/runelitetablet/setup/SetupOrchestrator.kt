@@ -8,6 +8,7 @@ import com.runelitetablet.installer.GitHubRepo
 import com.runelitetablet.installer.InstallResult
 import com.runelitetablet.termux.TermuxCommandRunner
 import com.runelitetablet.termux.TermuxPackageHelper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,7 +31,7 @@ class SetupOrchestrator(
     private val commandRunner: TermuxCommandRunner,
     private val scriptManager: ScriptManager
 ) {
-    var actions: SetupActions? = null
+    @Volatile var actions: SetupActions? = null
 
     private val _steps = MutableStateFlow(
         SetupStep.allSteps.map { StepState(it) }
@@ -43,37 +44,12 @@ class SetupOrchestrator(
     private val _currentOutput = MutableStateFlow<String?>(null)
     val currentOutput: StateFlow<String?> = _currentOutput.asStateFlow()
 
-    private var failedStepIndex: Int = -1
-    private var setupScriptRan: Boolean = false
+    @Volatile private var failedStepIndex: Int = -1
+    @Volatile private var setupScriptRan: Boolean = false
 
     suspend fun runSetup() {
         evaluateCompletedSteps()
-
-        for ((index, stepState) in _steps.value.withIndex()) {
-            if (stepState.status is StepStatus.Completed) continue
-
-            _currentStep.value = stepState.step
-            updateStepStatus(index, StepStatus.InProgress)
-            _currentOutput.value = null
-
-            try {
-                val success = executeStep(stepState.step)
-                if (success) {
-                    updateStepStatus(index, StepStatus.Completed)
-                } else {
-                    failedStepIndex = index
-                    return
-                }
-            } catch (e: Exception) {
-                updateStepStatus(index, StepStatus.Failed(e.message ?: "Unknown error"))
-                _currentOutput.value = e.message
-                failedStepIndex = index
-                return
-            }
-        }
-
-        _currentStep.value = null
-        _currentOutput.value = null
+        runSetupFrom(0)
     }
 
     suspend fun retryCurrentStep() {
@@ -93,6 +69,7 @@ class SetupOrchestrator(
                 runSetupFrom(index + 1)
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             updateStepStatus(index, StepStatus.Failed(e.message ?: "Unknown error"))
             _currentOutput.value = e.message
             failedStepIndex = index
@@ -134,6 +111,7 @@ class SetupOrchestrator(
                     return
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 updateStepStatus(index, StepStatus.Failed(e.message ?: "Unknown error"))
                 _currentOutput.value = e.message
                 failedStepIndex = index
@@ -250,14 +228,17 @@ class SetupOrchestrator(
         if (result.isSuccess) {
             setupScriptRan = true
             _currentOutput.value = result.stdout
-            // Mark all three sub-steps as completed
-            val prootIndex = _steps.value.indexOfFirst { it.step == SetupStep.InstallProot }
-            val javaIndex = _steps.value.indexOfFirst { it.step == SetupStep.InstallJava }
-            val runeliteIndex =
-                _steps.value.indexOfFirst { it.step == SetupStep.DownloadRuneLite }
-            updateStepStatus(prootIndex, StepStatus.Completed)
-            updateStepStatus(javaIndex, StepStatus.Completed)
-            updateStepStatus(runeliteIndex, StepStatus.Completed)
+            // Mark all three sub-steps as completed in one emission
+            _steps.update { currentSteps ->
+                currentSteps.toMutableList().also { list ->
+                    listOf(SetupStep.InstallProot, SetupStep.InstallJava, SetupStep.DownloadRuneLite).forEach { step ->
+                        val index = list.indexOfFirst { it.step == step }
+                        if (index >= 0) {
+                            list[index] = list[index].copy(status = StepStatus.Completed)
+                        }
+                    }
+                }
+            }
             return true
         } else {
             val errorOutput = result.stderr ?: result.error ?: "Unknown error"

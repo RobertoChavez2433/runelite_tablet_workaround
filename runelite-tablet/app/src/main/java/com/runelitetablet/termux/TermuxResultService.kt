@@ -15,6 +15,11 @@ class TermuxResultService : Service() {
         val pendingResults = ConcurrentHashMap<Int, CompletableDeferred<TermuxResult>>()
 
         private const val EXTRA_EXECUTION_ID = "execution_id"
+        private const val EXTRA_STDOUT = "stdout"
+        private const val EXTRA_STDERR = "stderr"
+        private const val EXTRA_EXIT_CODE = "exitCode"
+        private const val EXTRA_ERROR = "err"
+        private const val EXTRA_ERROR_MSG = "errmsg"
         private val counter = AtomicInteger(0)
 
         fun createExecutionId(): Int = counter.incrementAndGet()
@@ -51,10 +56,10 @@ class TermuxResultService : Service() {
         }
 
         val result = TermuxResult(
-            stdout = intent.getStringExtra("stdout"),
-            stderr = intent.getStringExtra("stderr"),
-            exitCode = intent.getIntExtra("exitCode", -1),
-            error = intent.getStringExtra("err") ?: intent.getStringExtra("errmsg")
+            stdout = intent.getStringExtra(EXTRA_STDOUT),
+            stderr = intent.getStringExtra(EXTRA_STDERR),
+            exitCode = intent.getIntExtra(EXTRA_EXIT_CODE, -1),
+            error = intent.getStringExtra(EXTRA_ERROR) ?: intent.getStringExtra(EXTRA_ERROR_MSG)
         )
 
         pendingResults.remove(executionId)?.complete(result)
@@ -65,6 +70,10 @@ class TermuxResultService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        pendingResults.values.forEach {
+            it.completeExceptionally(IllegalStateException("Service destroyed"))
+        }
+        pendingResults.clear()
         handlerThread.quitSafely()
     }
 }

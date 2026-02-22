@@ -2,6 +2,8 @@ package com.runelitetablet.setup
 
 import android.content.Context
 import com.runelitetablet.termux.TermuxCommandRunner
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class ScriptManager(
     private val context: Context,
@@ -24,9 +26,11 @@ class ScriptManager(
     fun getScriptPath(name: String): String = "$SCRIPTS_DIR/$name"
 
     private suspend fun deployScript(scriptName: String): Boolean {
-        val scriptContent = context.assets.open("scripts/$scriptName")
-            .bufferedReader()
-            .use { it.readText() }
+        val scriptContent = withContext(Dispatchers.IO) {
+            context.assets.open("scripts/$scriptName").use {
+                it.bufferedReader().readText()
+            }
+        }
 
         val deployCommand =
             "mkdir -p $SCRIPTS_DIR && cat > $SCRIPTS_DIR/$scriptName && chmod +x $SCRIPTS_DIR/$scriptName"

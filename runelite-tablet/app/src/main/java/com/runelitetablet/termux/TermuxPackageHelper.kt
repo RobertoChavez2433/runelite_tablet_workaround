@@ -1,6 +1,7 @@
 package com.runelitetablet.termux
 
 import android.content.Context
+import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
 
@@ -11,6 +12,8 @@ class TermuxPackageHelper(private val context: Context) {
         const val TERMUX_X11_PACKAGE = "com.termux.x11"
     }
 
+    private val packageManager: PackageManager get() = context.packageManager
+
     fun isTermuxInstalled(): Boolean = isPackageInstalled(TERMUX_PACKAGE)
 
     fun isTermuxX11Installed(): Boolean = isPackageInstalled(TERMUX_X11_PACKAGE)
@@ -19,42 +22,28 @@ class TermuxPackageHelper(private val context: Context) {
 
     fun getTermuxX11VersionCode(): Long? = getVersionCode(TERMUX_X11_PACKAGE)
 
-    private fun getVersionCode(packageName: String): Long? {
-        return try {
-            val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                context.packageManager.getPackageInfo(
-                    packageName,
-                    PackageManager.PackageInfoFlags.of(0)
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                context.packageManager.getPackageInfo(packageName, 0)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                info.longVersionCode
-            } else {
-                @Suppress("DEPRECATION")
-                info.versionCode.toLong()
-            }
-        } catch (e: PackageManager.NameNotFoundException) {
-            null
+    fun isPackageInstalled(packageName: String): Boolean = getPackageInfoOrNull(packageName) != null
+
+    fun getVersionCode(packageName: String): Long? {
+        val info = getPackageInfoOrNull(packageName) ?: return null
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            info.longVersionCode
+        } else {
+            @Suppress("DEPRECATION")
+            info.versionCode.toLong()
         }
     }
 
-    private fun isPackageInstalled(packageName: String): Boolean {
+    private fun getPackageInfoOrNull(packageName: String): PackageInfo? {
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                context.packageManager.getPackageInfo(
-                    packageName,
-                    PackageManager.PackageInfoFlags.of(0)
-                )
+                packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
             } else {
                 @Suppress("DEPRECATION")
-                context.packageManager.getPackageInfo(packageName, 0)
+                packageManager.getPackageInfo(packageName, 0)
             }
-            true
         } catch (e: PackageManager.NameNotFoundException) {
-            false
+            null
         }
     }
 }

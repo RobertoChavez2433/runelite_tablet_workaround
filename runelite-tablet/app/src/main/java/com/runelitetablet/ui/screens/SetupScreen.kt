@@ -70,10 +70,10 @@ fun SetupScreen(viewModel: SetupViewModel) {
                 )
             }
 
-            if (currentOutput != null) {
+            currentOutput?.let { output ->
                 Spacer(modifier = Modifier.height(16.dp))
                 OutputCard(
-                    text = currentOutput!!,
+                    text = output,
                     isError = steps.any { it.status is StepStatus.Failed }
                 )
             }
@@ -130,8 +130,7 @@ private fun OutputCard(text: String, isError: Boolean) {
             },
             modifier = Modifier
                 .padding(12.dp)
-                .verticalScroll(rememberScrollState()),
-            maxLines = 10
+                .verticalScroll(rememberScrollState())
         )
     }
 }
