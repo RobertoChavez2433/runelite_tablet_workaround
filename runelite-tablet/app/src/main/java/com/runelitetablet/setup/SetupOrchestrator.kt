@@ -2,10 +2,12 @@ package com.runelitetablet.setup
 
 import android.content.Context
 import android.content.Intent
+import com.runelitetablet.cleanup.CleanupManager
 import com.runelitetablet.installer.ApkDownloader
 import com.runelitetablet.installer.ApkInstaller
 import com.runelitetablet.installer.GitHubRepo
 import com.runelitetablet.installer.InstallResult
+import com.runelitetablet.logging.AppLog
 import com.runelitetablet.termux.TermuxCommandRunner
 import com.runelitetablet.termux.TermuxPackageHelper
 import kotlinx.coroutines.CancellationException
@@ -29,7 +31,8 @@ class SetupOrchestrator(
     private val apkDownloader: ApkDownloader,
     private val apkInstaller: ApkInstaller,
     private val commandRunner: TermuxCommandRunner,
-    private val scriptManager: ScriptManager
+    private val scriptManager: ScriptManager,
+    private val cleanupManager: CleanupManager
 ) {
     @Volatile var actions: SetupActions? = null
 
@@ -48,7 +51,11 @@ class SetupOrchestrator(
     @Volatile private var setupScriptRan: Boolean = false
 
     suspend fun runSetup() {
+        AppLog.cleanup("runSetup: starting — delegating to CleanupManager")
+        cleanupManager.cleanup()
+        AppLog.step("setup", "runSetup: cleanup complete, evaluating pre-checks")
         evaluateCompletedSteps()
+        AppLog.step("setup", "runSetup: pre-checks done, starting from index 0")
         runSetupFrom(0)
     }
 
@@ -56,20 +63,30 @@ class SetupOrchestrator(
         if (failedStepIndex < 0) return
         val index = failedStepIndex
         val stepState = _steps.value[index]
+        AppLog.step(stepState.step.id, "retryCurrentStep: index=$index stepId=${stepState.step.id}")
 
+        val oldStatus = _currentStep.value
         _currentStep.value = stepState.step
+        AppLog.state("retryCurrentStep: currentStep ${oldStatus?.id} -> ${stepState.step.id}")
+
         updateStepStatus(index, StepStatus.InProgress)
+        val oldOutput = _currentOutput.value
         _currentOutput.value = null
+        AppLog.state("retryCurrentStep: currentOutput '$oldOutput' -> null")
         failedStepIndex = -1
 
         try {
+            val startMs = System.currentTimeMillis()
             val success = executeStep(stepState.step)
+            val durationMs = System.currentTimeMillis() - startMs
+            AppLog.step(stepState.step.id, "retryCurrentStep: executeStep done success=$success durationMs=$durationMs")
             if (success) {
                 updateStepStatus(index, StepStatus.Completed)
                 runSetupFrom(index + 1)
             }
         } catch (e: Exception) {
             if (e is CancellationException) throw e
+            AppLog.e("STEP", "retryCurrentStep: exception in step=${stepState.step.id} message=${e.message}", e)
             updateStepStatus(index, StepStatus.Failed(e.message ?: "Unknown error"))
             _currentOutput.value = e.message
             failedStepIndex = index
@@ -94,35 +111,56 @@ class SetupOrchestrator(
     }
 
     private suspend fun runSetupFrom(startIndex: Int) {
+        AppLog.step("setup", "runSetupFrom: loop entry startIndex=$startIndex totalSteps=${_steps.value.size}")
         for (index in startIndex until _steps.value.size) {
             val stepState = _steps.value[index]
-            if (stepState.status is StepStatus.Completed) continue
+            if (stepState.status is StepStatus.Completed) {
+                AppLog.step(stepState.step.id, "runSetupFrom: skipping index=$index stepId=${stepState.step.id} reason=already_completed")
+                continue
+            }
 
+            AppLog.step(stepState.step.id, "runSetupFrom: dispatching index=$index stepId=${stepState.step.id}")
+            val oldCurrentStep = _currentStep.value
             _currentStep.value = stepState.step
+            AppLog.state("runSetupFrom: currentStep ${oldCurrentStep?.id} -> ${stepState.step.id}")
+
             updateStepStatus(index, StepStatus.InProgress)
+            val oldOutput = _currentOutput.value
             _currentOutput.value = null
+            AppLog.state("runSetupFrom: currentOutput '$oldOutput' -> null")
 
             try {
+                val startMs = System.currentTimeMillis()
                 val success = executeStep(stepState.step)
+                val durationMs = System.currentTimeMillis() - startMs
+                AppLog.step(stepState.step.id, "runSetupFrom: step complete success=$success durationMs=$durationMs index=$index")
                 if (success) {
                     updateStepStatus(index, StepStatus.Completed)
                 } else {
+                    AppLog.step(stepState.step.id, "runSetupFrom: step returned false, halting at index=$index")
                     failedStepIndex = index
                     return
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
+                AppLog.e("STEP", "runSetupFrom: exception at index=$index stepId=${stepState.step.id}: ${e.message}", e)
                 updateStepStatus(index, StepStatus.Failed(e.message ?: "Unknown error"))
                 _currentOutput.value = e.message
                 failedStepIndex = index
                 return
             }
         }
+        AppLog.step("setup", "runSetupFrom: loop complete, all steps done")
+        val oldCurrentStep = _currentStep.value
         _currentStep.value = null
+        AppLog.state("runSetupFrom: currentStep ${oldCurrentStep?.id} -> null")
+        val oldOutput = _currentOutput.value
         _currentOutput.value = null
+        AppLog.state("runSetupFrom: currentOutput '$oldOutput' -> null (cleanup)")
     }
 
     private suspend fun executeStep(step: SetupStep): Boolean {
+        AppLog.step(step.id, "executeStep: dispatching stepId=${step.id}")
         return when (step) {
             SetupStep.InstallTermux -> installPackage(GitHubRepo.TERMUX) {
                 termuxHelper.isTermuxInstalled()
@@ -229,6 +267,7 @@ class SetupOrchestrator(
             setupScriptRan = true
             _currentOutput.value = result.stdout
             // Mark all three sub-steps as completed in one emission
+            val oldSteps = _steps.value
             _steps.update { currentSteps ->
                 currentSteps.toMutableList().also { list ->
                     listOf(SetupStep.InstallProot, SetupStep.InstallJava, SetupStep.DownloadRuneLite).forEach { step ->
@@ -239,9 +278,15 @@ class SetupOrchestrator(
                     }
                 }
             }
+            AppLog.state(
+                "runSetupScript: batch-completed proot/java/runelite steps; " +
+                    "steps changed from ${oldSteps.map { "${it.step.id}=${it.status::class.simpleName}" }} " +
+                    "to ${_steps.value.map { "${it.step.id}=${it.status::class.simpleName}" }}"
+            )
             return true
         } else {
             val errorOutput = result.stderr ?: result.error ?: "Unknown error"
+            AppLog.e("STEP", "runSetupScript: script failed errorOutput=$errorOutput")
             _currentOutput.value = errorOutput
             updateCurrentStepStatus(StepStatus.Failed(errorOutput))
             return false
@@ -282,16 +327,24 @@ class SetupOrchestrator(
     }
 
     private fun evaluateCompletedSteps() {
+        AppLog.step("setup", "evaluateCompletedSteps: checking pre-installed packages")
+        val termuxInstalled = termuxHelper.isTermuxInstalled()
+        val termuxX11Installed = termuxHelper.isTermuxX11Installed()
+        AppLog.step("termux", "evaluateCompletedSteps: isTermuxInstalled=$termuxInstalled")
+        AppLog.step("termux_x11", "evaluateCompletedSteps: isTermuxX11Installed=$termuxX11Installed")
+
         _steps.update { steps ->
             steps.map { stepState ->
                 when (stepState.step) {
                     SetupStep.InstallTermux -> {
-                        if (termuxHelper.isTermuxInstalled()) {
+                        if (termuxInstalled) {
+                            AppLog.step("termux", "evaluateCompletedSteps: marking termux as Completed (pre-check passed)")
                             stepState.copy(status = StepStatus.Completed)
                         } else stepState
                     }
                     SetupStep.InstallTermuxX11 -> {
-                        if (termuxHelper.isTermuxX11Installed()) {
+                        if (termuxX11Installed) {
+                            AppLog.step("termux_x11", "evaluateCompletedSteps: marking termux_x11 as Completed (pre-check passed)")
                             stepState.copy(status = StepStatus.Completed)
                         } else stepState
                     }
@@ -302,9 +355,13 @@ class SetupOrchestrator(
     }
 
     private fun updateStepStatus(index: Int, status: StepStatus) {
+        val oldStatus = _steps.value.getOrNull(index)?.status
+        val stepId = _steps.value.getOrNull(index)?.step?.id ?: "unknown"
+        AppLog.step(stepId, "updateStepStatus: index=$index stepId=$stepId ${oldStatus?.let { it::class.simpleName } ?: "?"} -> ${status::class.simpleName}")
         _steps.update { steps ->
             steps.toMutableList().also { it[index] = it[index].copy(status = status) }
         }
+        AppLog.state("updateStepStatus: steps[index=$index] stepId=$stepId -> ${status::class.simpleName}")
     }
 
     private fun updateCurrentStepStatus(status: StepStatus) {

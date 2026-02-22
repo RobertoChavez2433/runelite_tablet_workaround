@@ -7,8 +7,10 @@ import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.runelitetablet.cleanup.CleanupManager
 import com.runelitetablet.installer.ApkDownloader
 import com.runelitetablet.installer.ApkInstaller
+import com.runelitetablet.logging.AppLog
 import com.runelitetablet.termux.TermuxCommandRunner
 import com.runelitetablet.termux.TermuxPackageHelper
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,37 +45,56 @@ class SetupViewModel(
     private val setupStarted = AtomicBoolean(false)
 
     fun startSetup() {
-        if (!setupStarted.compareAndSet(false, true)) return
+        val wasAlreadyStarted = !setupStarted.compareAndSet(false, true)
+        AppLog.step("setup", "startSetup called: compareAndSet result=started wasAlreadyStarted=$wasAlreadyStarted")
+        if (wasAlreadyStarted) return
+        AppLog.step("setup", "startSetup: launching coroutine in viewModelScope")
         viewModelScope.launch {
+            AppLog.perf("startSetup: coroutine started thread=${Thread.currentThread().name}")
+            AppLog.step("setup", "startSetup coroutine: entry thread=${Thread.currentThread().name}")
             orchestrator.runSetup()
+            AppLog.step("setup", "startSetup coroutine: exit")
+            AppLog.perf("startSetup: coroutine completed")
         }
     }
 
     fun retry() {
+        val failedStep = orchestrator.steps.value.firstOrNull { it.status is StepStatus.Failed }
+        AppLog.step(failedStep?.step?.id ?: "unknown", "retry requested for step=${failedStep?.step?.id}")
         viewModelScope.launch {
+            AppLog.perf("retry: coroutine started")
             orchestrator.retryCurrentStep()
+            AppLog.perf("retry: coroutine completed")
         }
     }
 
     fun launch() {
+        AppLog.perf("launch: started")
+        val scriptPath = scriptManager.getScriptPath("launch-runelite.sh")
+        AppLog.step("launch", "launch: attempting RuneLite launch scriptPath=$scriptPath")
         val success = commandRunner.launch(
-            commandPath = scriptManager.getScriptPath("launch-runelite.sh"),
+            commandPath = scriptPath,
             sessionAction = TermuxCommandRunner.SESSION_ACTION_SWITCH_NEW
         )
+        AppLog.step("launch", "launch: result success=$success")
         if (!success) {
-            // Could update a state to show error, for now just log
+            AppLog.e("STEP", "launch: failed to start RuneLite launch command")
         }
+        AppLog.perf("launch: completed success=$success")
     }
 
     fun onManualStepClick(stepState: StepState) {
         val status = stepState.status
+        AppLog.state("onManualStepClick: stepId=${stepState.step.id} status=${status::class.simpleName}")
         if (status is StepStatus.ManualAction) {
             _permissionInstructions.value = status.instructions
             _showPermissionsSheet.value = true
+            AppLog.state("onManualStepClick: showing permissions sheet instructionCount=${status.instructions.size}")
         }
     }
 
     fun dismissPermissionsSheet() {
+        AppLog.state("dismissPermissionsSheet: hiding permissions sheet")
         _showPermissionsSheet.value = false
     }
 
@@ -133,9 +154,10 @@ class SetupViewModel(
             val apkInstaller = ApkInstaller(context)
             val commandRunner = TermuxCommandRunner(context)
             val scriptManager = ScriptManager(context, commandRunner)
+            val cleanupManager = CleanupManager(context)
             val orchestrator = SetupOrchestrator(
                 context, termuxHelper, apkDownloader, apkInstaller,
-                commandRunner, scriptManager
+                commandRunner, scriptManager, cleanupManager
             )
             return SetupViewModel(orchestrator, commandRunner, scriptManager) as T
         }
