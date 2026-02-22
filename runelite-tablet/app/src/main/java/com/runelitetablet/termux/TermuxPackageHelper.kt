@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import com.runelitetablet.logging.AppLog
 
 class TermuxPackageHelper(private val context: Context) {
 
@@ -14,9 +15,17 @@ class TermuxPackageHelper(private val context: Context) {
 
     private val packageManager: PackageManager get() = context.packageManager
 
-    fun isTermuxInstalled(): Boolean = isPackageInstalled(TERMUX_PACKAGE)
+    fun isTermuxInstalled(): Boolean {
+        val result = isPackageInstalled(TERMUX_PACKAGE)
+        AppLog.step("termux", "isTermuxInstalled: result=$result package=$TERMUX_PACKAGE")
+        return result
+    }
 
-    fun isTermuxX11Installed(): Boolean = isPackageInstalled(TERMUX_X11_PACKAGE)
+    fun isTermuxX11Installed(): Boolean {
+        val result = isPackageInstalled(TERMUX_X11_PACKAGE)
+        AppLog.step("termux_x11", "isTermuxX11Installed: result=$result package=$TERMUX_X11_PACKAGE")
+        return result
+    }
 
     fun getTermuxVersionCode(): Long? = getVersionCode(TERMUX_PACKAGE)
 

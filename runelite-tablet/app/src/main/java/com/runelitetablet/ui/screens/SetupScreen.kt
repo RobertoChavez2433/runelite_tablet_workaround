@@ -24,12 +24,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import com.runelitetablet.logging.AppLog
 import com.runelitetablet.setup.SetupViewModel
 import com.runelitetablet.setup.StepStatus
 import com.runelitetablet.ui.components.StepItem
@@ -43,6 +45,15 @@ fun SetupScreen(viewModel: SetupViewModel) {
     val showPermissionsSheet by viewModel.showPermissionsSheet.collectAsState()
     val permissionInstructions by viewModel.permissionInstructions.collectAsState()
     val sheetState = rememberModalBottomSheetState()
+
+    val hasFailed = steps.any { it.status is StepStatus.Failed }
+
+    SideEffect {
+        AppLog.ui(
+            "SetupScreen: canLaunch=$canLaunch hasFailed=$hasFailed " +
+                "showPermissionsSheet=$showPermissionsSheet hasOutput=${currentOutput != null}"
+        )
+    }
 
     LaunchedEffect(Unit) {
         viewModel.startSetup()
@@ -74,21 +85,27 @@ fun SetupScreen(viewModel: SetupViewModel) {
                 Spacer(modifier = Modifier.height(16.dp))
                 OutputCard(
                     text = output,
-                    isError = steps.any { it.status is StepStatus.Failed }
+                    isError = hasFailed
                 )
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
             Row(modifier = Modifier.fillMaxWidth()) {
-                if (steps.any { it.status is StepStatus.Failed }) {
-                    OutlinedButton(onClick = { viewModel.retry() }) {
+                if (hasFailed) {
+                    OutlinedButton(onClick = {
+                        AppLog.ui("SetupScreen: Retry button clicked hasFailed=$hasFailed")
+                        viewModel.retry()
+                    }) {
                         Text("Retry")
                     }
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 Button(
-                    onClick = { viewModel.launch() },
+                    onClick = {
+                        AppLog.ui("SetupScreen: Launch RuneLite button clicked canLaunch=$canLaunch")
+                        viewModel.launch()
+                    },
                     enabled = canLaunch
                 ) {
                     Text("Launch RuneLite")
@@ -101,7 +118,10 @@ fun SetupScreen(viewModel: SetupViewModel) {
         PermissionsBottomSheet(
             instructions = permissionInstructions,
             onVerify = { viewModel.verifyPermissions() },
-            onDismiss = { viewModel.dismissPermissionsSheet() },
+            onDismiss = {
+                AppLog.ui("SetupScreen: permissions sheet dismissed")
+                viewModel.dismissPermissionsSheet()
+            },
             sheetState = sheetState
         )
     }
@@ -145,6 +165,10 @@ private fun PermissionsBottomSheet(
 ) {
     val clipboardManager = LocalClipboardManager.current
 
+    SideEffect {
+        AppLog.ui("PermissionsBottomSheet: shown instructionCount=${instructions.size}")
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState
@@ -179,7 +203,10 @@ private fun PermissionsBottomSheet(
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = onVerify,
+                onClick = {
+                    AppLog.ui("PermissionsBottomSheet: Verify Setup button clicked")
+                    onVerify()
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Verify Setup")

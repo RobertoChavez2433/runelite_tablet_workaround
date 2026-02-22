@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
 import com.runelitetablet.PendingIntentCompat
+import com.runelitetablet.logging.AppLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -23,11 +24,14 @@ sealed class InstallResult {
 class ApkInstaller(private val context: Context) {
 
     fun canInstallPackages(): Boolean {
-        return context.packageManager.canRequestPackageInstalls()
+        val result = context.packageManager.canRequestPackageInstalls()
+        AppLog.install("canInstallPackages: result=$result")
+        return result
     }
 
     suspend fun install(apkFile: File): InstallResult {
         if (!apkFile.exists()) {
+            AppLog.install("install: APK file not found path=${apkFile.absolutePath}")
             return InstallResult.Failure("APK file not found: ${apkFile.absolutePath}")
         }
 
@@ -38,7 +42,12 @@ class ApkInstaller(private val context: Context) {
             val packageInstaller = context.packageManager.packageInstaller
 
             // Clean up any abandoned sessions
-            packageInstaller.mySessions.forEach { sessionInfo ->
+            val abandonedSessions = packageInstaller.mySessions
+            AppLog.install(
+                "abandoned sessions cleanup: count=${abandonedSessions.size} " +
+                    "sessionIds=${abandonedSessions.map { it.sessionId }}"
+            )
+            abandonedSessions.forEach { sessionInfo ->
                 try {
                     packageInstaller.abandonSession(sessionInfo.sessionId)
                 } catch (e: Exception) {
@@ -51,29 +60,48 @@ class ApkInstaller(private val context: Context) {
             )
 
             sessionId = packageInstaller.createSession(params)
+            AppLog.install(
+                "session create: sessionId=$sessionId mode=MODE_FULL_INSTALL " +
+                    "apkPath=${apkFile.absolutePath} apkSizeBytes=${apkFile.length()}"
+            )
             val session = packageInstaller.openSession(sessionId)
 
             InstallResultReceiver.pendingResults[sessionId] = deferred
 
+            val writeStartMs = System.currentTimeMillis()
             withContext(Dispatchers.IO) {
                 session.use { s ->
                     s.openWrite("apk", 0, apkFile.length()).use { outputStream ->
                         apkFile.inputStream().use { input ->
                             input.copyTo(outputStream)
                         }
+                        val syncStartMs = System.currentTimeMillis()
                         s.fsync(outputStream)
+                        val fsyncDurationMs = System.currentTimeMillis() - syncStartMs
+                        val writeDurationMs = System.currentTimeMillis() - writeStartMs
+                        AppLog.install(
+                            "session write: sessionId=$sessionId bytesWritten=${apkFile.length()} " +
+                                "fsyncDurationMs=$fsyncDurationMs totalWriteDurationMs=$writeDurationMs"
+                        )
                     }
 
                     val pendingIntent = createInstallIntent(sessionId)
+                    AppLog.install(
+                        "session commit: sessionId=$sessionId " +
+                            "pendingIntentAction=com.runelitetablet.INSTALL_RESULT requestCode=$sessionId"
+                    )
                     s.commit(pendingIntent.intentSender)
                 }
             }
 
             return try {
-                withTimeout(120_000L) {
+                val timeoutMs = 120_000L
+                AppLog.install("install: awaiting result sessionId=$sessionId timeoutMs=$timeoutMs")
+                withTimeout(timeoutMs) {
                     deferred.await()
                 }
             } catch (e: TimeoutCancellationException) {
+                AppLog.install("install: timeout waitedMs=120000 sessionId=$sessionId")
                 InstallResultReceiver.pendingResults.remove(sessionId)
                 InstallResult.Failure("Installation timed out after 2 minutes")
             }
@@ -81,9 +109,11 @@ class ApkInstaller(private val context: Context) {
             InstallResultReceiver.pendingResults.remove(sessionId)
             throw e
         } catch (e: IOException) {
+            AppLog.e("INSTALL", "install: IOException sessionId=$sessionId message=${e.message}", e)
             InstallResultReceiver.pendingResults.remove(sessionId)
             return InstallResult.Failure("Install failed: ${e.message}")
         } catch (e: SecurityException) {
+            AppLog.e("INSTALL", "install: SecurityException sessionId=$sessionId message=${e.message}", e)
             InstallResultReceiver.pendingResults.remove(sessionId)
             return InstallResult.Failure("Install permission denied: ${e.message}")
         }
