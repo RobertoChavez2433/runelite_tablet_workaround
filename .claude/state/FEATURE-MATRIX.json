@@ -1,0 +1,15 @@
+{
+  "generated_at": "2026-02-21T00:00:00Z",
+  "app_name": "Runelite for Tablet",
+  "total_features": 0,
+
+  "features": [],
+
+  "summary": {
+    "total_features": 0,
+    "stable": 0,
+    "in_progress": 0,
+    "needs_documentation": 0,
+    "average_test_coverage": 0
+  }
+}
