@@ -46,28 +46,30 @@ If >5 sessions exist in "Recent Sessions", run rotation:
 2. Append to `.claude/logs/state-archive.md` under appropriate month header
 3. Remove from _state.md
 
-### 3. Update Per-Feature Defect Files
-**Directory**: `.claude/defects/`
+### 3. Update Defects
+**File**: `.claude/autoload/_defects.md`
 
-For each feature where defects were discovered during this session:
-1. Open `.claude/defects/_defects-{feature}.md` (create if it doesn't exist)
-2. Add new defect at the top of Active Patterns section:
+For defects discovered during this session:
+1. Add new defect at the **top** of "Active Patterns" section
+2. Use standardized format:
 ```markdown
 ### [CATEGORY] YYYY-MM-DD: Brief Title
 **Pattern**: What to avoid (1 line)
 **Prevention**: How to avoid (1-2 lines)
 **Ref**: @path/to/file (optional)
 ```
-3. If >5 defects in that file, move oldest to `.claude/logs/defects-archive.md`
+3. If >7 defects, move oldest to `.claude/logs/defects-archive.md`
 
 ### Defect Categories
 | Category | Use For |
 |----------|---------|
-| [BUILD] | Build, compilation, dependency issues |
-| [UI] | Widget, layout, rendering patterns |
-| [DATA] | Model, repository, state patterns |
-| [CONFIG] | Environment, configuration issues |
-| [PERF] | Performance, memory, optimization |
+| [COROUTINE] | CancellationException, dispatcher, timeout, structured concurrency |
+| [ANDROID] | Activity lifecycle, ViewModel, permissions, config changes |
+| [COMPOSE] | Recomposition, state, side effects |
+| [TERMUX] | RUN_COMMAND intent, result service, permissions |
+| [INSTALLER] | PackageInstaller sessions, signing, downloads |
+| [SHELL] | Script errors, proot compatibility, idempotency |
+| [SECURITY] | Intent validation, credential handling, permissions |
 
 ### 4. Update JSON State Files
 
@@ -102,8 +104,8 @@ Present:
 ---
 
 ## Rules
-- **NO git commands** - not `git status`, not `git diff`, not `git add`, not `git commit`
+- **NO git commands** — not `git status`, not `git diff`, not `git add`, not `git commit`
 - All analysis from conversation context only
 - Zero user input required
-- Updates per-feature defect files in `.claude/defects/`
-- Defect tracking uses per-feature files in `.claude/defects/_defects-{feature}.md`
+- Defects go to single `.claude/autoload/_defects.md` (not per-feature files)
+- Max 7 active defects — oldest rotates to archive
