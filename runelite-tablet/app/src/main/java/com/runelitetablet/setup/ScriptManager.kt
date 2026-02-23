@@ -16,7 +16,8 @@ class ScriptManager(
         private const val CONFIGS_DIR = "${TermuxCommandRunner.TERMUX_HOME_PATH}/scripts/configs"
         private val SCRIPT_NAMES = listOf(
             "install-proot.sh", "install-java.sh", "download-runelite.sh",
-            "check-markers.sh", "check-x11-socket.sh", "launch-runelite.sh"
+            "check-markers.sh", "check-x11-socket.sh", "launch-runelite.sh",
+            "update-runelite.sh", "health-check.sh"
         )
         private val CONFIG_NAMES = listOf("openbox-rc.xml")
     }

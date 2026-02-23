@@ -1,5 +1,6 @@
 package com.runelitetablet.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -7,7 +8,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -19,7 +22,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -30,7 +36,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.runelitetablet.ui.DisplayPreferences
 
 /**
  * Settings screen accessible from the Launch screen.
@@ -43,8 +52,11 @@ fun SettingsScreen(
     appVersion: String,
     onSignOut: () -> Unit,
     onResetSetup: () -> Unit,
+    onViewLogs: () -> Unit,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    val displayPreferences = remember { DisplayPreferences(context) }
     var showResetConfirmDialog by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -83,6 +95,10 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            DisplaySection(displayPreferences = displayPreferences)
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             SetupSection(
                 onResetSetupClicked = { showResetConfirmDialog = true }
             )
@@ -90,7 +106,8 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             AboutSection(
-                appVersion = appVersion
+                appVersion = appVersion,
+                onViewLogs = onViewLogs
             )
         }
     }
@@ -179,8 +196,157 @@ private fun SetupSection(
 }
 
 @Composable
+private fun DisplaySection(
+    displayPreferences: DisplayPreferences
+) {
+    var resolutionMode by remember { mutableStateOf(displayPreferences.resolutionMode) }
+    var customWidth by remember { mutableStateOf(displayPreferences.customWidth.toString()) }
+    var customHeight by remember { mutableStateOf(displayPreferences.customHeight.toString()) }
+    var fullscreen by remember { mutableStateOf(displayPreferences.fullscreen) }
+    var showKeyboardBar by remember { mutableStateOf(displayPreferences.showKeyboardBar) }
+
+    SectionHeader(title = "Display")
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Resolution",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+
+            // Resolution mode radio buttons
+            RadioButtonRow(
+                label = "Native",
+                selected = resolutionMode == "native",
+                onClick = {
+                    resolutionMode = "native"
+                    displayPreferences.resolutionMode = "native"
+                }
+            )
+            RadioButtonRow(
+                label = "Scaled",
+                selected = resolutionMode == "scaled",
+                onClick = {
+                    resolutionMode = "scaled"
+                    displayPreferences.resolutionMode = "scaled"
+                }
+            )
+            RadioButtonRow(
+                label = "Custom",
+                selected = resolutionMode == "exact",
+                onClick = {
+                    resolutionMode = "exact"
+                    displayPreferences.resolutionMode = "exact"
+                }
+            )
+
+            // Custom resolution fields
+            if (resolutionMode == "exact") {
+                Row(modifier = Modifier.padding(top = 8.dp)) {
+                    OutlinedTextField(
+                        value = customWidth,
+                        onValueChange = { value ->
+                            customWidth = value
+                            value.toIntOrNull()?.let { displayPreferences.customWidth = it }
+                        },
+                        label = { Text("Width") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    OutlinedTextField(
+                        value = customHeight,
+                        onValueChange = { value ->
+                            customHeight = value
+                            value.toIntOrNull()?.let { displayPreferences.customHeight = it }
+                        },
+                        label = { Text("Height") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Fullscreen toggle
+            SwitchRow(
+                label = "Fullscreen",
+                checked = fullscreen,
+                onCheckedChange = {
+                    fullscreen = it
+                    displayPreferences.fullscreen = it
+                }
+            )
+
+            // Keyboard bar toggle
+            SwitchRow(
+                label = "Show keyboard bar",
+                checked = showKeyboardBar,
+                onCheckedChange = {
+                    showKeyboardBar = it
+                    displayPreferences.showKeyboardBar = it
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun RadioButtonRow(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 2.dp)
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun SwitchRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
 private fun AboutSection(
-    appVersion: String
+    appVersion: String,
+    onViewLogs: () -> Unit
 ) {
     SectionHeader(title = "About")
 
@@ -196,6 +362,15 @@ private fun AboutSection(
             Spacer(modifier = Modifier.height(12.dp))
 
             InfoRow(label = "RuneLite", value = "Official RuneLite client")
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = onViewLogs,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("View Session Logs")
+            }
         }
     }
 }

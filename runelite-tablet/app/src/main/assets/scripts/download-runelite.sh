@@ -71,4 +71,7 @@ rm -f "$RUNELITE_DL_LOG"
 mkdir -p "$MARKER_DIR"
 touch "$MARKER_DIR/step-runelite.done"
 echo "$SCRIPT_VERSION" > "$MARKER_DIR/version"
+# Write initial version marker — "unknown" because this script uses the /latest/download
+# redirect and doesn't parse the version tag. update-runelite.sh will correct it on first run.
+echo "unknown" > "$MARKER_DIR/runelite-version"
 echo "=== download-runelite.sh complete ==="

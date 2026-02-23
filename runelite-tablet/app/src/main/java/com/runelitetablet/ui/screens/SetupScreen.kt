@@ -8,13 +8,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -30,12 +40,16 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.runelitetablet.logging.AppLog
 import com.runelitetablet.setup.AppScreen
+import com.runelitetablet.BuildConfig
+import com.runelitetablet.setup.HealthCheckResult
+import com.runelitetablet.setup.LaunchState
 import com.runelitetablet.setup.SetupViewModel
 import com.runelitetablet.setup.StepStatus
 import com.runelitetablet.ui.components.StepItem
@@ -47,6 +61,10 @@ import com.runelitetablet.ui.components.StepItem
 @Composable
 fun SetupScreen(viewModel: SetupViewModel) {
     val currentScreen by viewModel.currentScreen.collectAsState()
+
+    val launchState by viewModel.launchState.collectAsState()
+    val healthStatus by viewModel.healthStatus.collectAsState()
+    val showHealthDialog by viewModel.showHealthDialog.collectAsState()
 
     when (val screen = currentScreen) {
         is AppScreen.Setup -> SetupWizardContent(viewModel)
@@ -69,13 +87,19 @@ fun SetupScreen(viewModel: SetupViewModel) {
         )
         is AppScreen.Launch -> LaunchScreen(
             displayName = viewModel.getDisplayName(),
+            healthStatus = healthStatus,
+            launchState = launchState,
             onLaunch = {
                 AppLog.ui("SetupScreen: Launch RuneLite button clicked")
                 viewModel.launchRuneLite()
             },
             onSettings = {
-                // Phase 14 will handle settings navigation
-                AppLog.ui("SetupScreen: Settings button clicked (Phase 14)")
+                AppLog.ui("SetupScreen: Settings button clicked")
+                viewModel.navigateToSettings()
+            },
+            onViewLogs = {
+                AppLog.ui("SetupScreen: View Logs button clicked")
+                viewModel.navigateToLogViewer()
             }
         )
         is AppScreen.AuthError -> AuthErrorScreen(
@@ -87,6 +111,50 @@ fun SetupScreen(viewModel: SetupViewModel) {
             onSkip = {
                 AppLog.ui("SetupScreen: AuthError skip clicked")
                 viewModel.skipLogin()
+            }
+        )
+        is AppScreen.Settings -> SettingsScreen(
+            displayName = viewModel.getDisplayName(),
+            appVersion = BuildConfig.VERSION_NAME,
+            onSignOut = {
+                AppLog.ui("SetupScreen: Sign out clicked")
+                viewModel.signOut()
+            },
+            onResetSetup = {
+                AppLog.ui("SetupScreen: Reset setup clicked")
+                viewModel.resetSetup()
+            },
+            onViewLogs = {
+                AppLog.ui("SetupScreen: View logs from settings clicked")
+                viewModel.navigateToLogViewer()
+            },
+            onBack = {
+                AppLog.ui("SetupScreen: Settings back clicked")
+                viewModel.navigateBackToLaunch()
+            }
+        )
+        is AppScreen.LogViewer -> LogViewerScreen(
+            onBack = {
+                AppLog.ui("SetupScreen: LogViewer back clicked")
+                viewModel.navigateBackToLaunch()
+            }
+        )
+    }
+
+    // Health dialog
+    if (showHealthDialog != null) {
+        HealthCheckDialog(
+            failures = showHealthDialog ?: emptyList(),
+            onRunSetup = {
+                AppLog.ui("SetupScreen: Health dialog -> Run Setup")
+                viewModel.runSetupForHealth()
+            },
+            onLaunchAnyway = {
+                AppLog.ui("SetupScreen: Health dialog -> Launch Anyway")
+                viewModel.launchAnyway()
+            },
+            onDismiss = {
+                viewModel.dismissHealthDialog()
             }
         )
     }
@@ -252,66 +320,216 @@ private fun LoginScreen(
 @Composable
 private fun LaunchScreen(
     displayName: String?,
+    healthStatus: HealthCheckResult?,
+    launchState: LaunchState,
     onLaunch: () -> Unit,
-    onSettings: () -> Unit
+    onSettings: () -> Unit,
+    onViewLogs: () -> Unit
 ) {
     Scaffold { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .padding(24.dp)
         ) {
-            Text(
-                text = "RuneLite for Tablet",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            if (displayName != null) {
-                Text(
-                    text = "Signed in as $displayName",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-            }
-
-            Text(
-                text = "Setup complete. Ready to play!",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 48.dp)
-            )
-
-            Button(
-                onClick = onLaunch,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
+            // Top bar with title and settings icon
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Launch RuneLite",
-                    style = MaterialTheme.typography.labelLarge
+                    text = "RuneLite for Tablet",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
                 )
+                IconButton(onClick = onSettings) {
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = "Settings",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            TextButton(onClick = onSettings) {
-                Text(
-                    text = "Settings",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            // Status card
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    // Account row
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = displayName ?: "Not signed in",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (displayName != null) {
+                            Text(
+                                text = "Session active",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Environment health row
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        val (healthColor, healthText) = when (healthStatus) {
+                            is HealthCheckResult.Healthy -> Color(0xFF4CAF50) to "Environment OK"
+                            is HealthCheckResult.Degraded -> Color(0xFFF44336) to "Issues detected"
+                            is HealthCheckResult.Inconclusive -> Color(0xFFFFC107) to "Not checked"
+                            null -> Color.Gray to "Not checked"
+                        }
+                        Icon(
+                            Icons.Default.Circle,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = healthColor
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = healthText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Launch button or progress
+            when (val state = launchState) {
+                is LaunchState.Idle -> {
+                    Button(
+                        onClick = onLaunch,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                    ) {
+                        Text(
+                            text = "Launch RuneLite",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
+                is LaunchState.CheckingUpdate -> LaunchProgress("Checking for updates...")
+                is LaunchState.Updating -> LaunchProgress(
+                    "Updating RuneLite (${state.fromVersion} -> ${state.toVersion})..."
                 )
+                is LaunchState.CheckingHealth -> LaunchProgress("Verifying environment...")
+                is LaunchState.RefreshingTokens -> LaunchProgress("Refreshing session...")
+                is LaunchState.Launching -> LaunchProgress("Launching RuneLite...")
+                is LaunchState.Failed -> {
+                    Text(
+                        text = state.message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = onViewLogs,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("View Logs")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = onLaunch,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Try Again")
+                        }
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun LaunchProgress(message: String) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun HealthCheckDialog(
+    failures: List<String>,
+    onRunSetup: () -> Unit,
+    onLaunchAnyway: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Environment Issue Detected",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "The following components need repair:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                failures.forEach { failure ->
+                    Text(
+                        text = "- $failure",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onRunSetup) {
+                Text("Run Setup Again")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onLaunchAnyway) {
+                Text("Launch Anyway")
+            }
+        }
+    )
 }
 
 // =============================================================================

@@ -24,6 +24,7 @@ import com.runelitetablet.installer.ApkInstaller
 import com.runelitetablet.logging.AppLog
 import com.runelitetablet.termux.TermuxCommandRunner
 import com.runelitetablet.termux.TermuxPackageHelper
+import com.runelitetablet.ui.DisplayPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
@@ -53,6 +54,43 @@ sealed class AppScreen {
     object Launch : AppScreen()
     /** Auth error with a message */
     data class AuthError(val message: String) : AppScreen()
+    /** Settings screen */
+    object Settings : AppScreen()
+    /** Log viewer screen */
+    object LogViewer : AppScreen()
+}
+
+/**
+ * Represents the current state of the launch sequence.
+ * Observed by LaunchScreen to show appropriate progress UI.
+ */
+sealed class LaunchState {
+    /** Ready to launch — show Launch button */
+    object Idle : LaunchState()
+    /** Checking GitHub API for RuneLite updates */
+    object CheckingUpdate : LaunchState()
+    /** Downloading a newer RuneLite version */
+    data class Updating(val fromVersion: String, val toVersion: String) : LaunchState()
+    /** Running environment health check */
+    object CheckingHealth : LaunchState()
+    /** Refreshing OAuth2 tokens */
+    object RefreshingTokens : LaunchState()
+    /** Launching RuneLite via Termux */
+    object Launching : LaunchState()
+    /** Launch failed with error */
+    data class Failed(val message: String) : LaunchState()
+}
+
+/**
+ * Result of the pre-launch health check.
+ */
+sealed class HealthCheckResult {
+    /** All components healthy */
+    object Healthy : HealthCheckResult()
+    /** One or more components failed verification */
+    data class Degraded(val failures: List<String>) : HealthCheckResult()
+    /** Health check could not run (Termux not running, timeout, etc.) */
+    object Inconclusive : HealthCheckResult()
 }
 
 class SetupViewModel(
@@ -61,7 +99,9 @@ class SetupViewModel(
     private val commandRunner: TermuxCommandRunner,
     private val scriptManager: ScriptManager,
     private val credentialManager: CredentialManager,
-    private val oAuth2Manager: JagexOAuth2Manager
+    private val oAuth2Manager: JagexOAuth2Manager,
+    private val displayPreferences: DisplayPreferences,
+    private val stateStore: SetupStateStore
 ) : ViewModel() {
 
     val steps: StateFlow<List<StepState>> = orchestrator.steps
@@ -79,6 +119,15 @@ class SetupViewModel(
 
     private val _currentScreen = MutableStateFlow<AppScreen>(AppScreen.Setup)
     val currentScreen: StateFlow<AppScreen> = _currentScreen.asStateFlow()
+
+    private val _launchState = MutableStateFlow<LaunchState>(LaunchState.Idle)
+    val launchState: StateFlow<LaunchState> = _launchState.asStateFlow()
+
+    private val _healthStatus = MutableStateFlow<HealthCheckResult?>(null)
+    val healthStatus: StateFlow<HealthCheckResult?> = _healthStatus.asStateFlow()
+
+    private val _showHealthDialog = MutableStateFlow<List<String>?>(null)
+    val showHealthDialog: StateFlow<List<String>?> = _showHealthDialog.asStateFlow()
 
     private val setupStarted = AtomicBoolean(false)
     private val isRetrying = AtomicBoolean(false)
@@ -151,26 +200,31 @@ class SetupViewModel(
 
     /**
      * Internal launch method — fires the Termux command to run launch-runelite.sh.
+     * Returns true if the command was successfully dispatched.
      */
-    private fun launch(envFilePath: String? = null) {
+    private fun launch(envFilePath: String? = null): Boolean {
         AppLog.perf("launch: started")
 
         // Check Termux:X11 is installed before anything else
         val termuxHelper = TermuxPackageHelper(context)
         if (!termuxHelper.isTermuxX11Installed()) {
             AppLog.e("STEP", "launch: Termux:X11 not installed — cannot launch")
-            return
+            return false
         }
 
-        // Set Termux:X11 preferences before launch so the display is fullscreen from the start.
+        // Set Termux:X11 preferences before launch using display settings
         val prefIntent = Intent("com.termux.x11.CHANGE_PREFERENCE").apply {
             setPackage("com.termux.x11")
-            putExtra("fullscreen", "true")
-            putExtra("showAdditionalKbd", "false")
-            putExtra("displayResolutionMode", "native")
+            putExtra("fullscreen", displayPreferences.fullscreen.toString())
+            putExtra("showAdditionalKbd", displayPreferences.showKeyboardBar.toString())
+            putExtra("displayResolutionMode", displayPreferences.resolutionMode)
+            if (displayPreferences.resolutionMode == "exact") {
+                putExtra("displayResolutionExactX", displayPreferences.customWidth.toString())
+                putExtra("displayResolutionExactY", displayPreferences.customHeight.toString())
+            }
         }
         context.sendBroadcast(prefIntent)
-        AppLog.step("launch", "launch: sent CHANGE_PREFERENCE broadcast to Termux:X11")
+        AppLog.step("launch", "launch: sent CHANGE_PREFERENCE broadcast to Termux:X11 (mode=${displayPreferences.resolutionMode} fullscreen=${displayPreferences.fullscreen})")
 
         // Bring Termux:X11 to foreground via SetupActions (routes through Activity)
         val x11LaunchIntent = context.packageManager.getLaunchIntentForPackage(
@@ -197,69 +251,267 @@ class SetupViewModel(
             AppLog.e("STEP", "launch: failed to start RuneLite launch command")
         }
         AppLog.perf("launch: completed success=$success")
+        return success
     }
 
     /**
      * Public launch entry point called from the UI.
-     * Refreshes tokens if needed, writes env file, then calls internal launch().
+     * Runs update check, health check, token refresh, then launches RuneLite.
      */
     fun launchRuneLite() {
         viewModelScope.launch {
-            // Pre-launch token refresh
-            if (credentialManager.hasCredentials()) {
-                when (val result = refreshIfNeeded()) {
-                    is AuthResult.NeedsLogin -> {
-                        AppLog.step("auth", "launchRuneLite: token expired, need re-login")
-                        _currentScreen.value = AppScreen.Login
-                        return@launch
-                    }
-                    is AuthResult.NetworkError -> {
-                        // Log but continue — existing credentials may still work
-                        AppLog.w("AUTH", "launchRuneLite: refresh failed: ${result.exception.message}")
-                    }
-                    else -> {} // Valid or Refreshed — proceed
-                }
-            }
-
-            // Write env file if we have credentials
-            var envFilePath: String? = null
-            var envFile: java.io.File? = null
-            val creds = credentialManager.getCredentials()
-            if (creds != null) {
-                try {
-                    val file = java.io.File(
-                        context.filesDir,
-                        "launch_env_${System.currentTimeMillis()}.sh"
-                    )
-                    withContext(Dispatchers.IO) {
-                        file.writeText(buildString {
-                            appendLine("export JX_SESSION_ID='${shellEscape(creds.sessionId)}'")
-                            appendLine("export JX_CHARACTER_ID='${shellEscape(creds.characterId)}'")
-                            appendLine("export JX_DISPLAY_NAME='${shellEscape(creds.displayName)}'")
-                            creds.accessToken?.let { appendLine("export JX_ACCESS_TOKEN='${shellEscape(it)}'") }
-                        })
-                    }
-                    envFile = file
-                    envFilePath = file.absolutePath
-                    AppLog.step("auth", "launchRuneLite: env file written to $envFilePath (credentials masked)")
-                } catch (e: Exception) {
-                    AppLog.e("AUTH", "launchRuneLite: failed to write env file: ${e.message}", e)
-                }
-            }
-
             try {
-                launch(envFilePath)
-            } finally {
-                // Clean up env file after a short delay to ensure Termux has time to read it
-                val capturedEnvFile = envFile
-                if (capturedEnvFile != null) {
-                    viewModelScope.launch(Dispatchers.IO) {
-                        kotlinx.coroutines.delay(5000)
-                        capturedEnvFile.delete()
-                        AppLog.step("auth", "launchRuneLite: env file deleted")
+                // 1. Update check (non-blocking on failure)
+                _launchState.value = LaunchState.CheckingUpdate
+                val updateOutput = runUpdateCheck()
+                val updateLines = updateOutput.lines()
+                val statusLine = updateLines.lastOrNull { it.startsWith("UPDATE_STATUS") } ?: ""
+                when {
+                    statusLine.contains("downloading") -> {
+                        // Parse "UPDATE_STATUS downloading <old> -> <new>"
+                        val parts = statusLine.removePrefix("UPDATE_STATUS downloading ").split(" -> ")
+                        val fromVer = parts.getOrElse(0) { "unknown" }
+                        val toVer = parts.getOrElse(1) { "unknown" }
+                        _launchState.value = LaunchState.Updating(fromVer, toVer)
+                        AppLog.step("update", "launchRuneLite: updating $fromVer -> $toVer")
+                        // The script handles download internally — wait for the full output
+                        // (it already ran to completion in runUpdateCheck)
+                    }
+                    statusLine.contains("updated") -> {
+                        AppLog.step("update", "launchRuneLite: RuneLite updated successfully")
+                    }
+                    statusLine.contains("current") -> {
+                        AppLog.step("update", "launchRuneLite: RuneLite already up to date")
+                    }
+                    statusLine.contains("offline") -> {
+                        AppLog.w("UPDATE", "launchRuneLite: offline, launching with current version")
+                    }
+                    statusLine.contains("failed") -> {
+                        AppLog.w("UPDATE", "launchRuneLite: update failed, launching with current version")
+                    }
+                    else -> {
+                        AppLog.w("UPDATE", "launchRuneLite: unexpected update output, continuing")
                     }
                 }
+
+                // 2. Health check
+                _launchState.value = LaunchState.CheckingHealth
+                val healthResult = runHealthCheck()
+                _healthStatus.value = healthResult
+                if (healthResult is HealthCheckResult.Degraded) {
+                    _launchState.value = LaunchState.Failed("Setup incomplete: ${healthResult.failures.joinToString()}")
+                    _showHealthDialog.value = healthResult.failures
+                    return@launch
+                }
+
+                // 3. Perform the actual launch (token refresh + env file + Termux)
+                performLaunch()
+
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.e("LAUNCH", "launchRuneLite: unexpected exception: ${e.message}", e)
+                _launchState.value = LaunchState.Failed(e.message ?: "Unknown error")
             }
+        }
+    }
+
+    /**
+     * Internal method that handles token refresh, env file writing, and launch.
+     * Can be called directly when bypassing health check ("Launch Anyway").
+     */
+    private suspend fun performLaunch() {
+        // Token refresh
+        if (credentialManager.hasCredentials()) {
+            _launchState.value = LaunchState.RefreshingTokens
+            when (val result = refreshIfNeeded()) {
+                is AuthResult.NeedsLogin -> {
+                    AppLog.step("auth", "performLaunch: token expired, need re-login")
+                    _launchState.value = LaunchState.Idle
+                    _currentScreen.value = AppScreen.Login
+                    return
+                }
+                is AuthResult.NetworkError -> {
+                    // Log but continue — existing credentials may still work
+                    AppLog.w("AUTH", "performLaunch: refresh failed: ${result.exception.message}")
+                }
+                else -> {} // Valid or Refreshed — proceed
+            }
+        }
+
+        _launchState.value = LaunchState.Launching
+
+        // Write env file if we have credentials
+        var envFilePath: String? = null
+        var envFile: java.io.File? = null
+        val creds = credentialManager.getCredentials()
+        if (creds != null) {
+            try {
+                val file = java.io.File(
+                    context.filesDir,
+                    "launch_env_${System.currentTimeMillis()}.sh"
+                )
+                withContext(Dispatchers.IO) {
+                    file.writeText(buildString {
+                        appendLine("export JX_SESSION_ID='${shellEscape(creds.sessionId)}'")
+                        appendLine("export JX_CHARACTER_ID='${shellEscape(creds.characterId)}'")
+                        appendLine("export JX_DISPLAY_NAME='${shellEscape(creds.displayName)}'")
+                        creds.accessToken?.let { appendLine("export JX_ACCESS_TOKEN='${shellEscape(it)}'") }
+                    })
+                }
+                envFile = file
+                envFilePath = file.absolutePath
+                AppLog.step("auth", "performLaunch: env file written to $envFilePath (credentials masked)")
+            } catch (e: Exception) {
+                AppLog.e("AUTH", "performLaunch: failed to write env file: ${e.message}", e)
+            }
+        }
+
+        try {
+            val launchSuccess = launch(envFilePath)
+            if (launchSuccess) {
+                _launchState.value = LaunchState.Idle
+            } else {
+                _launchState.value = LaunchState.Failed("Failed to start RuneLite launch command")
+            }
+        } finally {
+            // Clean up env file after a short delay to ensure Termux has time to read it
+            val capturedEnvFile = envFile
+            if (capturedEnvFile != null) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    kotlinx.coroutines.delay(5000)
+                    capturedEnvFile.delete()
+                    AppLog.step("auth", "performLaunch: env file deleted")
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Navigation
+    // -------------------------------------------------------------------------
+
+    fun navigateToSettings() {
+        _currentScreen.value = AppScreen.Settings
+    }
+
+    fun navigateToLogViewer() {
+        _currentScreen.value = AppScreen.LogViewer
+    }
+
+    fun navigateBackToLaunch() {
+        _currentScreen.value = AppScreen.Launch
+    }
+
+    fun signOut() {
+        credentialManager.clearCredentials()
+        _currentScreen.value = AppScreen.Login
+    }
+
+    fun resetSetup() {
+        viewModelScope.launch {
+            stateStore.clearAll()
+            setupStarted.set(false)
+            _currentScreen.value = AppScreen.Setup
+        }
+    }
+
+    fun dismissHealthDialog() {
+        _showHealthDialog.value = null
+    }
+
+    fun launchAnyway() {
+        _showHealthDialog.value = null
+        viewModelScope.launch {
+            performLaunch()
+        }
+    }
+
+    fun runSetupForHealth() {
+        _showHealthDialog.value = null
+        // Navigate to setup screen — the failures indicate which steps to re-run
+        _currentScreen.value = AppScreen.Setup
+    }
+
+    // -------------------------------------------------------------------------
+    // Update check
+    // -------------------------------------------------------------------------
+
+    /**
+     * Run update-runelite.sh and parse the output.
+     * Returns the raw stdout or empty string on failure.
+     */
+    private suspend fun runUpdateCheck(): String {
+        return try {
+            val deployed = scriptManager.deployScripts()
+            if (!deployed) {
+                AppLog.w("UPDATE", "runUpdateCheck: script deployment failed")
+                return ""
+            }
+            val result = withTimeout(60_000L) {
+                commandRunner.execute(
+                    commandPath = scriptManager.getScriptPath("update-runelite.sh"),
+                    background = true,
+                    timeoutMs = 60L * 1000
+                )
+            }
+            val output = result.stdout ?: ""
+            AppLog.step("update", "runUpdateCheck: exitCode=${result.exitCode} output=$output")
+            output
+        } catch (e: TimeoutCancellationException) {
+            AppLog.w("UPDATE", "runUpdateCheck: timed out after 60s")
+            ""
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.w("UPDATE", "runUpdateCheck: exception: ${e.message}")
+            ""
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Health check
+    // -------------------------------------------------------------------------
+
+    /**
+     * Run health-check.sh and parse the output into a HealthCheckResult.
+     */
+    private suspend fun runHealthCheck(): HealthCheckResult {
+        return try {
+            val deployed = scriptManager.deployScripts()
+            if (!deployed) {
+                AppLog.w("HEALTH", "runHealthCheck: script deployment failed")
+                return HealthCheckResult.Inconclusive
+            }
+            val result = withTimeout(10_000L) {
+                commandRunner.execute(
+                    commandPath = scriptManager.getScriptPath("health-check.sh"),
+                    background = true,
+                    timeoutMs = 10L * 1000
+                )
+            }
+            val output = result.stdout ?: ""
+            AppLog.step("health", "runHealthCheck: exitCode=${result.exitCode} output=$output")
+
+            val failures = output.lines()
+                .filter { it.startsWith("HEALTH") && it.contains("FAIL") }
+                .map { line ->
+                    val parts = line.split(" ")
+                    val component = parts.getOrElse(1) { "unknown" }
+                    val reason = parts.getOrElse(3) { "unknown" }
+                    "$component: $reason"
+                }
+
+            if (failures.isEmpty()) HealthCheckResult.Healthy
+            else HealthCheckResult.Degraded(failures)
+        } catch (e: TimeoutCancellationException) {
+            AppLog.w("HEALTH", "runHealthCheck: timed out after 10s")
+            HealthCheckResult.Inconclusive
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.w("HEALTH", "runHealthCheck: exception: ${e.message}")
+            HealthCheckResult.Inconclusive
         }
     }
 
@@ -656,13 +908,14 @@ class SetupViewModel(
             val stateStore = SetupStateStore(context)
             val credentialManager = CredentialManager(context)
             val oAuth2Manager = JagexOAuth2Manager(httpClient)
+            val displayPreferences = DisplayPreferences(context)
             val orchestrator = SetupOrchestrator(
                 context, termuxHelper, apkDownloader, apkInstaller,
                 commandRunner, scriptManager, cleanupManager, stateStore
             )
             return SetupViewModel(
                 context, orchestrator, commandRunner, scriptManager,
-                credentialManager, oAuth2Manager
+                credentialManager, oAuth2Manager, displayPreferences, stateStore
             ) as T
         }
     }
