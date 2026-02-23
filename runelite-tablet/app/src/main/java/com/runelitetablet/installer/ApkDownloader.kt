@@ -1,6 +1,7 @@
 package com.runelitetablet.installer
 
 import android.content.Context
+import com.runelitetablet.BuildConfig
 import com.runelitetablet.logging.AppLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -32,15 +33,19 @@ enum class GitHubRepo(
     val owner: String,
     val repo: String,
     val releaseTag: String?,
-    val assetPattern: Regex
+    val assetPattern: Regex,
+    /** Expected package name for APK verification before install. */
+    val expectedPackageName: String
 ) {
     TERMUX(
         "termux", "termux-app", null,
-        Regex("""termux-app_v.+\+apt-android-7-github-debug_arm64-v8a\.apk""")
+        Regex("""termux-app_v.+\+apt-android-7-github-debug_arm64-v8a\.apk"""),
+        "com.termux"
     ),
     TERMUX_X11(
         "termux", "termux-x11", "nightly",
-        Regex("""app-arm64-v8a-debug\.apk""")
+        Regex("""app-arm64-v8a-debug\.apk"""),
+        "com.termux.x11"
     )
 }
 
@@ -94,8 +99,10 @@ class ApkDownloader(
                         "contentLength=${resp.header("Content-Length")} latencyMs=$latencyMs"
                 )
                 if (!resp.isSuccessful) {
-                    val bodyPreview = resp.body?.string()?.take(500) ?: "<empty>"
-                    AppLog.http("response non-2xx body preview: $bodyPreview")
+                    if (BuildConfig.DEBUG) {
+                        val bodyPreview = resp.body?.string()?.take(500) ?: "<empty>"
+                        AppLog.http("response non-2xx body preview: $bodyPreview")
+                    }
                     throw IOException("Download failed: HTTP ${resp.code}")
                 }
 
@@ -195,8 +202,10 @@ class ApkDownloader(
                         "contentLength=${resp.header("Content-Length")} latencyMs=$latencyMs"
                 )
                 if (!resp.isSuccessful) {
-                    val bodyPreview = resp.body?.string()?.take(500) ?: "<empty>"
-                    AppLog.http("fetchRelease non-2xx body preview: $bodyPreview")
+                    if (BuildConfig.DEBUG) {
+                        val bodyPreview = resp.body?.string()?.take(500) ?: "<empty>"
+                        AppLog.http("fetchRelease non-2xx body preview: $bodyPreview")
+                    }
                     throw IOException("GitHub API request failed: HTTP ${resp.code}")
                 }
 

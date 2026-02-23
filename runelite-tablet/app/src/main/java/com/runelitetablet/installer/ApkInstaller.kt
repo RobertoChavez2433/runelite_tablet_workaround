@@ -38,10 +38,25 @@ class ApkInstaller(private val context: Context) {
         return result
     }
 
-    suspend fun install(apkFile: File): InstallResult {
+    suspend fun install(apkFile: File, expectedPackageName: String? = null): InstallResult {
         if (!apkFile.exists()) {
             AppLog.install("install: APK file not found path=${apkFile.absolutePath}")
             return InstallResult.Failure("APK file not found: ${apkFile.absolutePath}")
+        }
+
+        // Verify APK package name matches expected before proceeding with install
+        if (expectedPackageName != null) {
+            val archiveInfo = context.packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
+            val actualPackage = archiveInfo?.packageName
+            if (actualPackage == null) {
+                AppLog.e("INSTALL", "install: could not read package name from APK at ${apkFile.absolutePath}")
+                return InstallResult.Failure("Could not verify APK package name")
+            }
+            if (actualPackage != expectedPackageName) {
+                AppLog.e("INSTALL", "install: package name mismatch — expected=$expectedPackageName actual=$actualPackage")
+                return InstallResult.Failure("APK package mismatch: expected $expectedPackageName, got $actualPackage")
+            }
+            AppLog.install("install: APK package name verified=$actualPackage")
         }
 
         val deferred = CompletableDeferred<InstallResult>()
@@ -139,6 +154,10 @@ class ApkInstaller(private val context: Context) {
             action = "com.runelitetablet.INSTALL_RESULT"
             putExtra("session_id", sessionId)
         }
-        return PendingIntent.getBroadcast(context, sessionId, intent, PendingIntentCompat.FLAGS)
+        // FLAG_ONE_SHOT prevents the PendingIntent from being reused after delivery
+        return PendingIntent.getBroadcast(
+            context, sessionId, intent,
+            PendingIntentCompat.FLAGS or PendingIntent.FLAG_ONE_SHOT
+        )
     }
 }

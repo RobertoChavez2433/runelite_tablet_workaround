@@ -39,6 +39,17 @@ class CleanupManager(private val context: Context) {
         }
 
         try {
+            val (envDeleted, envBytes) = cleanStaleEnvFiles()
+            totalFilesDeleted += envDeleted
+            totalBytesReclaimed += envBytes
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.cleanup("cleanStaleEnvFiles failed: ${e.message}")
+            AppLog.e("CLEANUP", "cleanStaleEnvFiles exception", e)
+        }
+
+        try {
             val (filesDeleted, bytesReclaimed) = cleanOldLogs()
             totalFilesDeleted += filesDeleted
             totalBytesReclaimed += bytesReclaimed
@@ -56,6 +67,37 @@ class CleanupManager(private val context: Context) {
                 "bytesReclaimed=$totalBytesReclaimed " +
                 "durationMs=$durationMs"
         )
+    }
+
+    /**
+     * Delete stale launch_env_*.sh credential files from filesDir.
+     * These contain exported JX_SESSION_ID, JX_ACCESS_TOKEN, etc. and should not persist on disk.
+     */
+    private fun cleanStaleEnvFiles(): Pair<Int, Long> {
+        val filesDir = context.filesDir
+        val envFiles = filesDir.listFiles { f -> f.isFile && f.name.startsWith("launch_env_") && f.name.endsWith(".sh") }
+            ?: return Pair(0, 0L)
+
+        var filesDeleted = 0
+        var bytesReclaimed = 0L
+
+        for (file in envFiles) {
+            val sizeBytes = file.length()
+            try {
+                file.delete()
+                filesDeleted++
+                bytesReclaimed += sizeBytes
+                AppLog.cleanup("cleanStaleEnvFiles: deleted ${file.name} size=$sizeBytes bytes")
+            } catch (e: Exception) {
+                AppLog.cleanup("cleanStaleEnvFiles: failed to delete ${file.name}: ${e.message}")
+            }
+        }
+
+        if (filesDeleted > 0) {
+            AppLog.cleanup("cleanStaleEnvFiles: deleted $filesDeleted stale credential file(s), reclaimed $bytesReclaimed bytes")
+        }
+
+        return Pair(filesDeleted, bytesReclaimed)
     }
 
     private fun cleanCachedApks(): Pair<Int, Long> {

@@ -293,9 +293,21 @@ class SetupOrchestrator(
             return false
         }
 
-        val result = apkInstaller.install(apkFile)
+        val result = apkInstaller.install(apkFile, repo.expectedPackageName)
         return when (result) {
-            is InstallResult.Success -> true
+            is InstallResult.Success -> {
+                // Delete downloaded APK after successful installation to reclaim disk space
+                try {
+                    if (apkFile.exists()) {
+                        val sizeBytes = apkFile.length()
+                        apkFile.delete()
+                        AppLog.install("installPackage: deleted APK after install path=${apkFile.name} size=$sizeBytes")
+                    }
+                } catch (e: Exception) {
+                    AppLog.w("INSTALL", "installPackage: failed to delete APK after install: ${e.message}")
+                }
+                true
+            }
             is InstallResult.NeedsUserAction -> {
                 _currentOutput.value = "Install requires confirmation — please retry"
                 updateCurrentStepStatus(StepStatus.Failed("Install requires confirmation — please retry"))

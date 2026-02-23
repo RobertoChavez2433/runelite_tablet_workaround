@@ -24,7 +24,24 @@ class TermuxResultService : Service() {
 
         private const val STDOUT_PREVIEW_LEN = 200
 
+        /** Patterns that may contain credentials in stdout/stderr output. */
+        private val CREDENTIAL_PATTERNS = listOf(
+            Regex("""(JX_SESSION_ID|JX_ACCESS_TOKEN|JX_REFRESH_TOKEN|JX_CHARACTER_ID)=[^\s]+"""),
+            Regex("""Bearer\s+[A-Za-z0-9._-]+""", RegexOption.IGNORE_CASE)
+        )
+
         fun createExecutionId(): Int = counter.incrementAndGet()
+
+        /**
+         * Scrub credential patterns from a string preview before logging.
+         */
+        private fun scrubCredentials(preview: String): String {
+            var scrubbed = preview
+            for (pattern in CREDENTIAL_PATTERNS) {
+                scrubbed = pattern.replace(scrubbed, "[CREDENTIAL_REDACTED]")
+            }
+            return scrubbed
+        }
     }
 
     override fun onCreate() {
@@ -41,8 +58,8 @@ class TermuxResultService : Service() {
 
         val executionId = intent.getIntExtra(EXTRA_EXECUTION_ID, -1)
         val resultBundle = intent.getBundleExtra(EXTRA_RESULT_BUNDLE)
-        val stdoutPreview = resultBundle?.getString(EXTRA_STDOUT)?.take(STDOUT_PREVIEW_LEN) ?: "<absent>"
-        val stderrPreview = resultBundle?.getString(EXTRA_STDERR)?.take(STDOUT_PREVIEW_LEN) ?: "<absent>"
+        val stdoutPreview = scrubCredentials(resultBundle?.getString(EXTRA_STDOUT)?.take(STDOUT_PREVIEW_LEN) ?: "<absent>")
+        val stderrPreview = scrubCredentials(resultBundle?.getString(EXTRA_STDERR)?.take(STDOUT_PREVIEW_LEN) ?: "<absent>")
         val exitCode = resultBundle?.getInt(EXTRA_EXIT_CODE, Int.MIN_VALUE) ?: Int.MIN_VALUE
         val errCode = resultBundle?.getInt(EXTRA_ERROR, -1) ?: -1
         val errmsg = resultBundle?.getString(EXTRA_ERROR_MSG)
@@ -73,8 +90,8 @@ class TermuxResultService : Service() {
         val errmsg = resultBundle?.getString(EXTRA_ERROR_MSG)
         val error = errmsg ?: if (errCode > 0) "Termux error code: $errCode" else null
 
-        val stdoutPreview = stdout?.take(STDOUT_PREVIEW_LEN) ?: "<null>"
-        val stderrPreview = stderr?.take(STDOUT_PREVIEW_LEN) ?: "<null>"
+        val stdoutPreview = scrubCredentials(stdout?.take(STDOUT_PREVIEW_LEN) ?: "<null>")
+        val stderrPreview = scrubCredentials(stderr?.take(STDOUT_PREVIEW_LEN) ?: "<null>")
         AppLog.cmd(
             executionId,
             "handleResult: executionId=$executionId exitCode=$exitCode errCode=$errCode errmsg=$errmsg " +
