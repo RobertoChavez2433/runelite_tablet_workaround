@@ -12,7 +12,6 @@ import androidx.lifecycle.viewModelScope
 import com.runelitetablet.auth.AuthCodeResult
 import com.runelitetablet.auth.AuthResult
 import com.runelitetablet.auth.CredentialManager
-import com.runelitetablet.auth.CustomTabAuthCapture
 import com.runelitetablet.auth.GameCharacter
 import com.runelitetablet.auth.JagexOAuth2Manager
 import com.runelitetablet.auth.LocalhostAuthServer
@@ -27,7 +26,6 @@ import com.runelitetablet.termux.TermuxPackageHelper
 import com.runelitetablet.ui.DisplayPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -36,7 +34,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import okhttp3.OkHttpClient
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -135,7 +132,6 @@ class SetupViewModel(
     // Auth state — lives only for the duration of one login attempt
     @Volatile private var codeVerifier: String? = null
     @Volatile private var authState: String? = null
-    @Volatile private var customTabCapture: CustomTabAuthCapture? = null
 
     // Stored access token between character list fetch and character selection
     @Volatile private var pendingAccessToken: String? = null
@@ -151,8 +147,6 @@ class SetupViewModel(
         pendingAccessToken = null
         codeVerifier = null
         authState = null
-        customTabCapture?.unbind(context)
-        customTabCapture = null
         AppLog.lifecycle("SetupViewModel.onCleared: auth state wiped")
     }
 
@@ -520,19 +514,17 @@ class SetupViewModel(
     // -------------------------------------------------------------------------
 
     /**
-     * Start the Jagex OAuth2 login flow via Chrome Custom Tab.
+     * Start the Jagex OAuth2 login flow via Chrome Custom Tab + localhost redirect capture.
+     *
+     * A LocalhostAuthServer is started on a random port. The OAuth2 redirect_uri is set to
+     * http://localhost:<port> so the browser redirects there after login. The server captures
+     * the auth code from the redirect request. This is reliable across all devices (unlike
+     * CustomTabsCallback URL interception which depends on Chrome internals).
      */
     fun startLogin() {
         codeVerifier = PkceHelper.generateVerifier()
         authState = PkceHelper.generateState()
 
-        val capture = CustomTabAuthCapture()
-        customTabCapture = capture
-
-        val chromePackage = getChromePackage()
-        capture.bindService(context, chromePackage)
-
-        // Build auth URL and launch Custom Tab
         val verifier = codeVerifier ?: run {
             AppLog.e("AUTH", "startLogin: codeVerifier is null unexpectedly")
             _currentScreen.value = AppScreen.AuthError("Authentication state lost")
@@ -543,39 +535,46 @@ class SetupViewModel(
             _currentScreen.value = AppScreen.AuthError("Authentication state lost")
             return
         }
-        val authUrl = oAuth2Manager.buildAuthUrl(verifier, state)
-        val customTabIntent = capture.buildCustomTabIntent(authUrl, chromePackage)
-        customTabIntent.intent.data = authUrl
-        orchestrator.actions?.launchIntent(customTabIntent.intent)
-        AppLog.step("auth", "startLogin: launched Custom Tab for auth")
 
-        // Listen for the redirect asynchronously
         viewModelScope.launch {
+            val server = LocalhostAuthServer()
             try {
-                val result = withTimeout(300_000L) { // 5 minute timeout
-                    capture.authCodeDeferred.await()
+                val port = server.start()
+                val redirectUri = "http://localhost:$port"
+                val authUrl = oAuth2Manager.buildAuthUrl(verifier, state, redirectUri)
+                AppLog.step("auth", "startLogin: launching Custom Tab with localhost redirect on port $port")
+
+                // Open in Custom Tab for good login UX
+                val intent = CustomTabsIntent.Builder().setShowTitle(true).build()
+                intent.intent.data = authUrl
+                val chromePackage = getChromePackage()
+                if (chromePackage != null) {
+                    intent.intent.setPackage(chromePackage)
                 }
+                orchestrator.actions?.launchIntent(intent.intent)
+
+                // Wait for localhost redirect (5 minute timeout)
+                val result = server.awaitRedirect(300_000L)
                 when (result) {
                     is AuthCodeResult.Success ->
-                        handleAuthCode(result.code, result.state)
+                        handleAuthCode(result.code, result.state, redirectUri)
                     is AuthCodeResult.Error ->
                         _currentScreen.value = AppScreen.AuthError("${result.error}: ${result.description}")
                     is AuthCodeResult.Cancelled ->
                         _currentScreen.value = AppScreen.Login
                 }
-            } catch (e: TimeoutCancellationException) {
-                AppLog.w("AUTH", "startLogin: auth timed out after 5 minutes")
-                _currentScreen.value = AppScreen.AuthError("Login timed out")
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: Exception) {
+                AppLog.e("AUTH", "startLogin: exception: ${e.message}", e)
+                _currentScreen.value = AppScreen.AuthError(e.message ?: "Login failed")
             } finally {
-                capture.unbind(context)
-                customTabCapture = null
+                server.stop()
             }
         }
     }
 
-    private suspend fun handleAuthCode(code: String, state: String) {
+    private suspend fun handleAuthCode(code: String, state: String, redirectUri: String) {
         if (state != authState) {
             AppLog.e("AUTH", "handleAuthCode: state mismatch — potential CSRF attack")
             _currentScreen.value = AppScreen.AuthError("Security check failed (state mismatch)")
@@ -589,7 +588,7 @@ class SetupViewModel(
                 return
             }
             val tokenResponse = oAuth2Manager.exchangeCodeForTokens(
-                code, verifier, JagexOAuth2Manager.REDIRECT_URI
+                code, verifier, redirectUri
             )
             credentialManager.storeTokens(tokenResponse)
             AppLog.step("auth", "handleAuthCode: tokens stored successfully")
@@ -669,14 +668,6 @@ class SetupViewModel(
     fun skipLogin() {
         AppLog.step("auth", "skipLogin: skipping login, going to Launch")
         _currentScreen.value = AppScreen.Launch
-    }
-
-    /**
-     * Handle redirect URI from onNewIntent (fallback if CustomTabsCallback misses it).
-     */
-    fun onAuthRedirect(uri: Uri) {
-        AppLog.step("auth", "onAuthRedirect: received redirect URI from onNewIntent")
-        customTabCapture?.handleRedirectUri(uri)
     }
 
     // -------------------------------------------------------------------------

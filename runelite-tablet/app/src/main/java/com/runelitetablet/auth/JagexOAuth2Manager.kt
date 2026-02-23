@@ -67,14 +67,15 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
 
     /**
      * Build the authorization URL for the Chrome Custom Tab.
-     * Uses Option 2 redirect (documented web URL, intercepted via CustomTabsCallback).
+     * @param redirectUri Override the redirect URI (e.g. http://localhost:<port> for localhost capture).
+     *                    Defaults to [REDIRECT_URI] for backward compatibility.
      */
-    fun buildAuthUrl(codeVerifier: String, state: String): Uri {
+    fun buildAuthUrl(codeVerifier: String, state: String, redirectUri: String = REDIRECT_URI): Uri {
         val codeChallenge = PkceHelper.deriveChallenge(codeVerifier)
         return Uri.parse(AUTH_ENDPOINT).buildUpon()
             .appendQueryParameter("client_id", CLIENT_ID)
             .appendQueryParameter("response_type", "code")
-            .appendQueryParameter("redirect_uri", REDIRECT_URI)
+            .appendQueryParameter("redirect_uri", redirectUri)
             .appendQueryParameter("scope", SCOPES)
             .appendQueryParameter("code_challenge", codeChallenge)
             .appendQueryParameter("code_challenge_method", "S256")
