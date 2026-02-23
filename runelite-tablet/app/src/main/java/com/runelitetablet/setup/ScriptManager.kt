@@ -13,7 +13,9 @@ class ScriptManager(
 
     companion object {
         private const val SCRIPTS_DIR = "${TermuxCommandRunner.TERMUX_HOME_PATH}/scripts"
+        private const val CONFIGS_DIR = "${TermuxCommandRunner.TERMUX_HOME_PATH}/scripts/configs"
         private val SCRIPT_NAMES = listOf("setup-environment.sh", "launch-runelite.sh")
+        private val CONFIG_NAMES = listOf("openbox-rc.xml")
     }
 
     suspend fun deployScripts(): Boolean {
@@ -26,6 +28,19 @@ class ScriptManager(
             }
         }
         AppLog.script("deployScripts: all scripts deployed successfully")
+        return true
+    }
+
+    suspend fun deployConfigs(): Boolean {
+        AppLog.script("deployConfigs: starting configCount=${CONFIG_NAMES.size} configs=${CONFIG_NAMES}")
+        for (configName in CONFIG_NAMES) {
+            val success = deployConfig(configName)
+            if (!success) {
+                AppLog.script("deployConfigs: halting — deployment failed for $configName")
+                return false
+            }
+        }
+        AppLog.script("deployConfigs: all configs deployed successfully")
         return true
     }
 
@@ -65,6 +80,47 @@ class ScriptManager(
             AppLog.e(
                 "SCRIPT",
                 "deployScript: FAILED name=$scriptName durationMs=$deployDurationMs " +
+                    "exitCode=${result.exitCode} error=${result.error} " +
+                    "stdout=${result.stdout} stderr=${result.stderr}"
+            )
+            false
+        }
+    }
+
+    private suspend fun deployConfig(configName: String): Boolean {
+        val assetReadStartMs = System.currentTimeMillis()
+        val configContent = withContext(Dispatchers.IO) {
+            context.assets.open("configs/$configName").use {
+                it.bufferedReader().readText()
+            }
+        }
+        val assetReadDurationMs = System.currentTimeMillis() - assetReadStartMs
+        AppLog.script(
+            "deployConfig: assetRead name=$configName contentLen=${configContent.length} " +
+                "assetReadDurationMs=$assetReadDurationMs (Dispatchers.IO)"
+        )
+
+        // Configs are not executable — no chmod +x
+        val deployCommand = "mkdir -p $CONFIGS_DIR && cat > $CONFIGS_DIR/$configName"
+        AppLog.script("deployConfig: name=$configName contentLenBytes=${configContent.length} deployCommand='$deployCommand'")
+
+        val deployStartMs = System.currentTimeMillis()
+        val result = commandRunner.execute(
+            commandPath = "${TermuxCommandRunner.TERMUX_BIN_PATH}/bash",
+            arguments = arrayOf("-c", deployCommand),
+            stdin = configContent,
+            background = true,
+            timeoutMs = TermuxCommandRunner.TIMEOUT_VERIFY_MS
+        )
+        val deployDurationMs = System.currentTimeMillis() - deployStartMs
+
+        return if (result.isSuccess) {
+            AppLog.script("deployConfig: success name=$configName durationMs=$deployDurationMs")
+            true
+        } else {
+            AppLog.e(
+                "SCRIPT",
+                "deployConfig: FAILED name=$configName durationMs=$deployDurationMs " +
                     "exitCode=${result.exitCode} error=${result.error} " +
                     "stdout=${result.stdout} stderr=${result.stderr}"
             )

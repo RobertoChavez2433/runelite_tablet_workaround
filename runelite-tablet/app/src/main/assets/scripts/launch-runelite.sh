@@ -43,6 +43,18 @@ fi
 
 echo "X11 socket ready" | tee -a "$LOGFILE"
 
+# Auto-switch to Termux:X11 so the user sees the display without manually switching apps.
+echo "Switching to Termux:X11..." | tee -a "$LOGFILE"
+am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity 2>&1 | tee -a "$LOGFILE" || true
+
+# Set Termux:X11 preferences from the shell as backup.
+# The primary mechanism is the CHANGE_PREFERENCE broadcast sent from the Kotlin launch() method.
+# timeout guards against the CLI tool hanging if the activity hasn't fully initialized yet.
+echo "Setting Termux:X11 preferences (shell backup)..." | tee -a "$LOGFILE"
+timeout 5 termux-x11-preference "fullscreen"="true" 2>&1 | tee -a "$LOGFILE" || true
+timeout 5 termux-x11-preference "showAdditionalKbd"="false" 2>&1 | tee -a "$LOGFILE" || true
+timeout 5 termux-x11-preference "displayResolutionMode"="native" 2>&1 | tee -a "$LOGFILE" || true
+
 # Launch RuneLite inside proot.
 # Bind-mount Termux's X11 socket directory into proot so DISPLAY=:0 can find it.
 # Without this, proot's /tmp is isolated and the X11 socket is invisible to RuneLite.

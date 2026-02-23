@@ -152,6 +152,23 @@ if ! grep -q "=== Java install OK ===" "$JAVA_INSTALL_LOG"; then
 fi
 rm -f "$JAVA_INSTALL_LOG"
 
+echo "=== Step 3b: Deploying openbox config inside Ubuntu ==="
+# Write openbox config via stdin pass-through into proot (avoids nested heredoc conflicts).
+# The config maximizes all windows and removes decorations so RuneLite fills the X11 display.
+# This is idempotent — safe to re-run if setup is retried.
+proot-distro login ubuntu -- bash -c 'mkdir -p /root/.config/openbox && cat > /root/.config/openbox/rc.xml' << 'OBCFG' 2>&1 || true
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_config xmlns="http://openbox.org/3.4/rc"
+    xmlns:xi="http://www.w3.org/2001/XInclude">
+  <applications>
+    <application class="*" groupclass="*">
+      <decor>no</decor>
+      <maximized>yes</maximized>
+    </application>
+  </applications>
+</openbox_config>
+OBCFG
+
 echo "=== Step 4: Downloading RuneLite ==="
 # Verify RuneLite download in the same proot login to avoid a second proot spawn.
 RUNELITE_INSTALL_LOG="$HOME/.rlt-runelite-dl.log"

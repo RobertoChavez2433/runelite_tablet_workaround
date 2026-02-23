@@ -266,6 +266,13 @@ class SetupOrchestrator(
             return false
         }
 
+        val configsDeployed = scriptManager.deployConfigs()
+        if (!configsDeployed) {
+            _currentOutput.value = "Failed to deploy configs to Termux"
+            updateCurrentStepStatus(StepStatus.Failed("Config deployment failed"))
+            return false
+        }
+
         _currentOutput.value = "Running setup (this may take several minutes)..."
 
         val result = commandRunner.execute(

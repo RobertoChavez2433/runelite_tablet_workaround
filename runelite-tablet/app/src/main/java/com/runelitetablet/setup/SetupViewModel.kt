@@ -25,6 +25,7 @@ import okhttp3.OkHttpClient
 import java.util.concurrent.atomic.AtomicBoolean
 
 class SetupViewModel(
+    private val context: Context,
     private val orchestrator: SetupOrchestrator,
     private val commandRunner: TermuxCommandRunner,
     private val scriptManager: ScriptManager
@@ -77,6 +78,18 @@ class SetupViewModel(
 
     fun launch() {
         AppLog.perf("launch: started")
+        // Set Termux:X11 preferences before launch so the display is fullscreen from the start.
+        // Preferences persist across Termux:X11 restarts, so subsequent launches also benefit.
+        // The shell script also sets these as a backup in case this broadcast is missed.
+        val prefIntent = Intent("com.termux.x11.CHANGE_PREFERENCE").apply {
+            setPackage("com.termux.x11")
+            putExtra("fullscreen", "true")
+            putExtra("showAdditionalKbd", "false")
+            putExtra("displayResolutionMode", "native")
+        }
+        context.sendBroadcast(prefIntent)
+        AppLog.step("launch", "launch: sent CHANGE_PREFERENCE broadcast to Termux:X11")
+
         val scriptPath = scriptManager.getScriptPath("launch-runelite.sh")
         AppLog.step("launch", "launch: attempting RuneLite launch scriptPath=$scriptPath")
         val success = commandRunner.launch(
@@ -193,7 +206,7 @@ class SetupViewModel(
                 context, termuxHelper, apkDownloader, apkInstaller,
                 commandRunner, scriptManager, cleanupManager
             )
-            return SetupViewModel(orchestrator, commandRunner, scriptManager) as T
+            return SetupViewModel(context, orchestrator, commandRunner, scriptManager) as T
         }
     }
 }
