@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import com.runelitetablet.auth.JagexOAuth2Manager
 import com.runelitetablet.logging.AppLog
 import com.runelitetablet.setup.SetupViewModel
 import com.runelitetablet.ui.screens.SetupScreen
@@ -62,6 +63,16 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         val uri = intent.data ?: return
         AppLog.lifecycle("MainActivity.onNewIntent: received URI with host=${uri.host}")
+
+        // Validate redirect URI host before forwarding to ViewModel.
+        // Only accept the known OAuth2 redirect hosts to prevent malicious intents.
+        val expectedRedirectHost = android.net.Uri.parse(JagexOAuth2Manager.REDIRECT_URI).host
+        val allowedHosts = setOf(expectedRedirectHost, "localhost", "127.0.0.1")
+        if (uri.host !in allowedHosts) {
+            AppLog.w("AUTH", "onNewIntent: ignoring URI with unexpected host=${uri.host}")
+            return
+        }
+
         viewModel.onAuthRedirect(uri)
     }
 }

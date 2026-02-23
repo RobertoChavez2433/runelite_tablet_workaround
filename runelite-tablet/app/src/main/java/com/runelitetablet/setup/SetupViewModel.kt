@@ -60,7 +60,7 @@ class SetupViewModel(
     private val orchestrator: SetupOrchestrator,
     private val commandRunner: TermuxCommandRunner,
     private val scriptManager: ScriptManager,
-    val credentialManager: CredentialManager,
+    private val credentialManager: CredentialManager,
     private val oAuth2Manager: JagexOAuth2Manager
 ) : ViewModel() {
 
@@ -90,6 +90,22 @@ class SetupViewModel(
 
     // Stored access token between character list fetch and character selection
     @Volatile private var pendingAccessToken: String? = null
+
+    /**
+     * Expose display name to the UI without leaking the full CredentialManager.
+     */
+    fun getDisplayName(): String? = credentialManager.getDisplayName()
+
+    override fun onCleared() {
+        super.onCleared()
+        // Wipe sensitive auth state when ViewModel is destroyed
+        pendingAccessToken = null
+        codeVerifier = null
+        authState = null
+        customTabCapture?.unbind(context)
+        customTabCapture = null
+        AppLog.lifecycle("SetupViewModel.onCleared: auth state wiped")
+    }
 
     fun startSetup() {
         val wasAlreadyStarted = !setupStarted.compareAndSet(false, true)

@@ -68,7 +68,7 @@ fun SetupScreen(viewModel: SetupViewModel) {
             }
         )
         is AppScreen.Launch -> LaunchScreen(
-            displayName = viewModel.credentialManager.getDisplayName(),
+            displayName = viewModel.getDisplayName(),
             onLaunch = {
                 AppLog.ui("SetupScreen: Launch RuneLite button clicked")
                 viewModel.launchRuneLite()
