@@ -20,6 +20,9 @@
       "Bash(grep:*)",
       "Bash(python3:*)",
 
+      "Bash(./gradlew:*)",
+      "Bash(./gradlew *)",
+
       "Bash(git status:*)",
       "Bash(git log:*)",
       "Bash(git diff:*)",

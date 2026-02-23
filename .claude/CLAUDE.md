@@ -22,6 +22,7 @@ Tablet-optimized client for Old School RuneScape based on RuneLite.
 |-------|-------|---------|-------|
 | `code-review-agent` | Opus | Senior Kotlin/Android reviewer (10-category checklist) | Read, Grep, Glob |
 | `performance-agent` | Opus | Full-stack perf analysis (6-category pipeline) | Read, Grep, Glob, Bash |
+| `security-review-agent` | Opus | Credential handling, IPC security, shell injection, network security (10-category checklist) | Read, Grep, Glob |
 
 ## Skills
 
@@ -41,6 +42,7 @@ Tablet-optimized client for Old School RuneScape based on RuneLite.
 | Bug or unexpected behavior | `/systematic-debugging` |
 | Code quality concern | `code-review-agent` |
 | Performance concern | `performance-agent` |
+| Security or credential concern | `security-review-agent` |
 | Starting a session | `/resume-session` |
 | Ending a session | `/end-session` |
 
