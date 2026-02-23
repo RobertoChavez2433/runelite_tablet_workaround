@@ -92,16 +92,16 @@ class LocalhostAuthServer {
             val error = uri.getQueryParameter("error")
             val errorDescription = uri.getQueryParameter("error_description")
 
-            // Send a simple HTML response to the browser
+            // Send styled HTML response with auto-return to the app
             val writer = PrintWriter(it.getOutputStream(), true)
             val responseBody = if (error != null) {
-                "<html><body><h2>Login failed</h2><p>$error: $errorDescription</p><p>You can close this tab.</p></body></html>"
+                buildErrorHtml(error, errorDescription)
             } else {
-                "<html><body><h2>Login successful!</h2><p>You can close this tab and return to the app.</p></body></html>"
+                buildSuccessHtml()
             }
             writer.println("HTTP/1.1 200 OK")
-            writer.println("Content-Type: text/html")
-            writer.println("Content-Length: ${responseBody.length}")
+            writer.println("Content-Type: text/html; charset=utf-8")
+            writer.println("Content-Length: ${responseBody.toByteArray(Charsets.UTF_8).size}")
             writer.println("Connection: close")
             writer.println()
             writer.print(responseBody)
@@ -117,6 +117,133 @@ class LocalhostAuthServer {
             }
         }
     }
+
+    /**
+     * Build a styled success HTML page with auto-return to the app via intent URI.
+     * The intent scheme triggers the app to come back to the foreground.
+     */
+    private fun buildSuccessHtml(): String = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Login Successful</title>
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    text-align: center;
+                    padding: 40px 20px;
+                    background: #1a1a2e;
+                    color: #e0e0e0;
+                    margin: 0;
+                }
+                .container { max-width: 400px; margin: 0 auto; }
+                .icon { font-size: 64px; margin-bottom: 16px; }
+                h2 { color: #4ecca3; margin-bottom: 8px; }
+                p { color: #b0b0b0; line-height: 1.5; }
+                a {
+                    display: inline-block;
+                    margin-top: 20px;
+                    padding: 12px 24px;
+                    background: #4ecca3;
+                    color: #1a1a2e;
+                    text-decoration: none;
+                    border-radius: 8px;
+                    font-weight: bold;
+                }
+                a:active { background: #3ba882; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="icon">&#x2705;</div>
+                <h2>Login successful!</h2>
+                <p>Returning to RuneLite for Tablet...</p>
+                <a href="intent:#Intent;package=com.runelitetablet;end">
+                    Tap here if not redirected automatically
+                </a>
+            </div>
+            <script>
+                // Try to return to app automatically via intent scheme
+                setTimeout(function() {
+                    window.location = "intent:#Intent;package=com.runelitetablet;end";
+                }, 500);
+            </script>
+        </body>
+        </html>
+    """.trimIndent()
+
+    /**
+     * Build a styled error HTML page.
+     * HTML-escapes error strings to prevent XSS from malicious query parameters.
+     */
+    private fun buildErrorHtml(error: String, description: String?): String {
+        val safeError = htmlEscape(error)
+        val safeDesc = htmlEscape(description ?: "An error occurred during login.")
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Login Failed</title>
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    text-align: center;
+                    padding: 40px 20px;
+                    background: #1a1a2e;
+                    color: #e0e0e0;
+                    margin: 0;
+                }
+                .container { max-width: 400px; margin: 0 auto; }
+                .icon { font-size: 64px; margin-bottom: 16px; }
+                h2 { color: #e74c3c; margin-bottom: 8px; }
+                p { color: #b0b0b0; line-height: 1.5; }
+                .error-detail {
+                    margin-top: 12px;
+                    padding: 12px;
+                    background: rgba(231, 76, 60, 0.1);
+                    border-radius: 8px;
+                    font-size: 14px;
+                    color: #e0a0a0;
+                }
+                a {
+                    display: inline-block;
+                    margin-top: 20px;
+                    padding: 12px 24px;
+                    background: #4ecca3;
+                    color: #1a1a2e;
+                    text-decoration: none;
+                    border-radius: 8px;
+                    font-weight: bold;
+                }
+                a:active { background: #3ba882; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="icon">&#x274C;</div>
+                <h2>Login failed</h2>
+                <p>$safeDesc</p>
+                <div class="error-detail">Error: $safeError</div>
+                <a href="intent:#Intent;package=com.runelitetablet;end">
+                    Return to app
+                </a>
+            </div>
+        </body>
+        </html>
+    """.trimIndent()
+    }
+
+    /** Minimal HTML escaping to prevent XSS from OAuth error parameters. */
+    private fun htmlEscape(text: String): String =
+        text.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;")
 }
 
 /**
