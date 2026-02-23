@@ -3,14 +3,14 @@
     "app_name": "Runelite for Tablet",
     "app_version": "0.1.0",
     "description": "Android installer app that runs the real RuneLite client on Samsung Tab S10 Ultra via Termux + proot-distro",
-    "last_updated": "2026-02-23T20:30:00Z",
-    "session_notes": "Session 28: On-device test — Custom Tabs passes Cloudflare but Jagex rejects login (wrong client_id). Researched 3 open-source launchers. Discovered Jagex uses 2-step, 2-client-ID OAuth flow. Step 1 needs com_jagex_auth_desktop_launcher + jagex: protocol. Research doc written. Auth rewrite needed."
+    "last_updated": "2026-02-23T22:30:00Z",
+    "session_notes": "Session 29: Brainstormed OAuth 2-step rewrite. 3 verification agents + 1 adversarial reviewer. 4 on-device tests confirmed: consent client can't work standalone, jagex: scheme works on Android Chrome. Design approved. Found game session API bug. Committed 5 logical commits + pushed all 7 to origin."
   },
   "current_phase": {
     "phase_name": "MVP Development — On-Device Testing & Bug Fixing",
-    "phase_status": "oauth_client_id_fix_needed",
+    "phase_status": "oauth_2step_rewrite_designed",
     "phase_started": "2026-02-22",
-    "progress_percentage": 83
+    "progress_percentage": 85
   },
   "release_cycle": {
     "last_release": null,
@@ -20,13 +20,19 @@
   },
   "active_blockers": [
     {
-      "id": "oauth-wrong-client-id",
-      "description": "OAuth Step 1 uses wrong client_id (1fddee4e consent client instead of com_jagex_auth_desktop_launcher). Jagex rejects with 'something went wrong'. Must implement correct 2-step, 2-client-ID flow with jagex: protocol capture for Step 1.",
+      "id": "oauth-2step-not-implemented",
+      "description": "OAuth 2-step flow design approved but code not yet written. Must rewrite JagexOAuth2Manager (2 client IDs, fix game session API), add forwarder HTML to LocalhostAuthServer, orchestrate 2-step flow in SetupViewModel.",
       "severity": "P0",
-      "plan": ".claude/research/jagex-oauth2-two-step-flow.md"
+      "plan": ".claude/plans/2026-02-23-oauth-2step-rewrite-design.md"
     }
   ],
   "resolved_blockers": [
+    {
+      "id": "oauth-wrong-client-id",
+      "description": "OAuth Step 1 uses wrong client_id (1fddee4e consent client instead of com_jagex_auth_desktop_launcher). Jagex rejects with 'something went wrong'.",
+      "resolved": "2026-02-23",
+      "resolution": "Root cause identified. 2-step flow design approved. Implementation pending."
+    },
     {
       "id": "permissions-npe",
       "description": "StepState NPE crash on launch — sealed class companion val eager init returns null objects",
@@ -47,31 +53,31 @@
     },
     {
       "id": "cloudflare-webview",
-      "description": "Cloudflare blocks Android WebView auth page due to ; wv User-Agent token — persistent 9+ hour block",
+      "description": "Cloudflare blocks Android WebView auth page — unfixable due to TLS/canvas/JS fingerprint mismatch",
       "resolved": "2026-02-23",
-      "resolution": "Stripped ; wv from WebView UA string, enabled cookies/DOM storage for Cloudflare challenge pages"
+      "resolution": "Replaced with Chrome Custom Tabs (runs in real Chrome process, passes Cloudflare)"
     },
     {
       "id": "oauth-redirect",
-      "description": "Chrome Custom Tabs onNavigationEvent doesn't reliably provide redirect URL — OAuth login stuck on Jagex redirect page",
+      "description": "Chrome Custom Tabs onNavigationEvent doesn't reliably provide redirect URL",
       "resolved": "2026-02-23",
-      "resolution": "Replaced CustomTabAuthCapture with LocalhostAuthServer for first auth step. Same pattern already used for second auth step."
+      "resolution": "Replaced with localhost ServerSocket + jagex: intent scheme capture"
     },
     {
       "id": "headless-jdk",
       "description": "openjdk-11-jdk-headless missing AWT/X11 libs (libawt_xawt.so)",
       "resolved": "2026-02-22",
-      "resolution": "Changed to openjdk-11-jdk in setup-environment.sh. Verified on device in Session 15."
+      "resolution": "Changed to openjdk-11-jdk in setup-environment.sh"
     },
     {
       "id": "proot-distro-exit-code",
-      "description": "proot-distro install ubuntu returns non-zero due to /proc/self/fd warnings, cleans up rootfs",
+      "description": "proot-distro install ubuntu returns non-zero due to /proc/self/fd warnings",
       "resolved": "2026-02-22",
-      "resolution": "Manual rootfs extraction fallback + post-extraction config (DNS, hosts, env)"
+      "resolution": "Manual rootfs extraction fallback + post-extraction config"
     },
     {
       "id": "apt-get-hang",
-      "description": "apt-get install hangs for 10+ minutes inside proot due to debconf prompts and missing DNS config",
+      "description": "apt-get install hangs inside proot due to debconf prompts and missing DNS",
       "resolved": "2026-02-22",
       "resolution": "DEBIAN_FRONTEND=noninteractive + resolv.conf in manual rootfs config"
     },
@@ -88,12 +94,7 @@
       "resolution": "Extract via getBundleExtra('result')"
     }
   ],
-  "brainstorm_backlog": [
-    {
-      "topic": "Phase 1 permissions UX — best approach for Termux config paste",
-      "notes": "User wants copy-paste (not typing). Need to handle clipboard quote corruption. Brainstorm next session."
-    }
-  ],
+  "brainstorm_backlog": [],
   "completed_phases": [
     {
       "phase_name": "Project Setup",
@@ -128,32 +129,37 @@
     {
       "phase_name": "On-Device Bug Fixes (Sessions 11-15)",
       "completed": "2026-02-22",
-      "notes": "Fixed Termux Bundle extraction, service lifecycle, shell compatibility, proot-distro install, DNS config, DEBIAN_FRONTEND, X11 socket bind-mount, full JDK, direct RuneLite client launch. RuneLite running on tablet — login screen visible."
+      "notes": "Fixed Termux Bundle extraction, service lifecycle, shell compatibility, proot-distro install, DNS config, DEBIAN_FRONTEND, X11 socket bind-mount, full JDK, direct RuneLite client launch. RuneLite running on tablet."
     },
     {
       "phase_name": "Slice 2+3 Design (Session 16)",
       "completed": "2026-02-22",
-      "notes": "Comprehensive plan for setup persistence, modular scripts, seamless UX, and native OAuth2 auth. 5 research agents, 2 adversarial reviews, 7 P0 + 14 P1 issues found and resolved."
+      "notes": "Setup persistence, modular scripts, seamless UX, native OAuth2 auth."
     },
     {
       "phase_name": "Slice 2+3 Implementation (Sessions 19-20)",
       "completed": "2026-02-23",
-      "notes": "22 files changed (+2571/-115). OAuth2 auth, modular scripts, settings UI. 6 quality gates passed. Committed."
+      "notes": "22 files changed (+2571/-115). OAuth2 auth, modular scripts, settings UI."
     },
     {
       "phase_name": "Security Hardening (Session 22)",
       "completed": "2026-02-23",
-      "notes": "3-agent security review (10-category checklist). 15 findings fixed (2 P0, 10 P1, 3 P2). 16 files, 4 phases, 6 quality gates. 5 commits pushed."
+      "notes": "3-agent security review. 15 findings fixed. 16 files, 5 commits pushed."
     },
     {
       "phase_name": "OAuth Login Fix (Session 23)",
       "completed": "2026-02-23",
-      "notes": "Replaced unreliable CustomTabs callback with localhost server for OAuth redirect capture. 4 files modified. Committed and pushed."
+      "notes": "Replaced CustomTabs callback with localhost server for redirect capture."
     },
     {
-      "phase_name": "Permissions Automation + Cloudflare Fix (Session 24)",
+      "phase_name": "Permissions Automation + Phase 1 UX (Sessions 24-26)",
       "completed": "2026-02-23",
-      "notes": "3-phase guided permissions flow (copy-paste + auto dialogs). Cloudflare WebView fix (strip ; wv from UA). 6 files modified, 6 quality gates passed. Awaiting on-device test + commit."
+      "notes": "3-phase permission flow, CRLF fix, clipboard UX, all setup steps verified on device."
+    },
+    {
+      "phase_name": "OAuth 2-Step Flow Research + Design (Sessions 27-29)",
+      "completed": "2026-02-23",
+      "notes": "Cloudflare WebView incompatibility discovered. Custom Tabs + localhost approach designed. Wrong client_id identified. Full 2-step flow researched from 3 launchers. 4 on-device tests. Design approved."
     }
   ],
   "dependencies_at_risk": [],

@@ -6,6 +6,11 @@ Session history archive. See `.claude/autoload/_state.md` for current state (las
 
 ## February 2026
 
+### Session 24 (2026-02-23)
+**Work**: Fixed Cloudflare WebView block (remove `; wv` UA token). Brainstormed + implemented permissions automation (5 phases, 5 files, 6 quality gates, 4 P1s fixed).
+**Decisions**: Copy-paste flow for Termux config (can't automate), auto-poll on resume, permissions before Termux work, strip `; wv` from WebView UA.
+**Next**: On-device test of permissions + login, commit, then Slice 4+5.
+
 ### Session 23 (2026-02-23)
 **Work**: Diagnosed and fixed OAuth login redirect failure. Chrome Custom Tabs callback unreliable — replaced with localhost server capture. Committed and pushed both OAuth fix + remaining unstaged changes.
 **Decisions**: Localhost server for both auth steps (not just second). Removed CustomTabAuthCapture entirely.

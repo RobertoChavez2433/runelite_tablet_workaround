@@ -84,6 +84,20 @@ Older/resolved defects rotated from per-feature files in `.claude/defects/`.
 
 ---
 
+## Rotated 2026-02-23 (Session 29)
+
+### [ANDROID] 2026-02-23: Chrome Custom Tabs onNavigationEvent URL extra is unreliable
+**Pattern**: `CustomTabsCallback.onNavigationEvent(NAVIGATION_STARTED)` does not guarantee URL in extras Bundle. Session callback may not attach if Custom Tab launched before `onCustomTabsServiceConnected`.
+**Prevention**: Use localhost `ServerSocket` or `jagex:` intent scheme capture — fully under app control, no Chrome dependency.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/AuthRedirectCapture.kt
+
+### [SECURITY] 2026-02-23: Kotlin data class toString() leaks sensitive fields by default
+**Pattern**: Auto-generated `toString()` includes ALL fields. Accidental logging exposes plaintext secrets.
+**Prevention**: Always add `override fun toString() = "ClassName([REDACTED])"` to data classes with sensitive fields.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/CredentialManager.kt
+
+---
+
 ## Rotated 2026-02-23 (Session 28)
 
 ### [WINDOWS] 2026-02-23: CRLF line endings in shell scripts break shebang on Termux
