@@ -1,41 +1,55 @@
 # Session State
 
-**Last Updated**: 2026-02-23 | **Session**: 21
+**Last Updated**: 2026-02-23 | **Session**: 22
 
 ## Current Phase
-- **Phase**: MVP Development — Slice 4+5 Designed, Ready to Implement
-- **Status**: Slice 4+5 implementation plan brainstormed, designed, and committed. Slice 2+3 code still needs on-device testing.
+- **Phase**: MVP Development — Security Hardened, Slice 4+5 Ready
+- **Status**: Full security review completed (3 agents, 10-category checklist). All 15 findings (2 P0, 10 P1, 3 P2) fixed and verified through 6 quality gates. Pushed in 5 commits.
 
 ## HOT CONTEXT - Resume Here
 
 ### EXACTLY WHERE WE LEFT OFF
 
-**Slice 4+5 implementation plan is written and committed.** Brainstorming complete — all design decisions finalized. Plan at `.claude/plans/2026-02-23-slice4-5-implementation-plan.md`.
+**Security hardening complete.** 3 security review agents found 15 issues across auth, IPC, network, and build layers. All fixed via `/implement` orchestrator (4 phases, 16 files modified). 6 quality gates passed (build, lint, P1 fixes, full code review, completeness, performance).
 
-**Slice 4+5 scope summary:**
-- **Slice 4** (5 phases): RuneLite auto-update via `update-runelite.sh` shell script. Pre-launch GitHub API check, auto-download if newer, non-blocking if offline. `LaunchState` sealed class for progress tracking.
-- **Slice 5** (9 phases): Wire SettingsScreen, display settings (resolution/fullscreen/keyboard), health checks via `health-check.sh`, log viewer with copy/share, launch screen polish with status indicators.
-- **14 total phases**, 4 new files, 5 modified files.
+**5 commits pushed:**
+1. `3257de2` — Auth hardening (error body sanitization, in-memory access_token, toString redaction, loopback binding)
+2. `4baa186` — Activity/ViewModel hardening (URI validation, onCleared, private credentialManager)
+3. `7e723cd` — IPC hardening (FLAG_ONE_SHOT, APK verification, APK cleanup, env file cleanup, credential scrubbing)
+4. `c75850b` — Network/build hardening (cleartext block, R8 minification, debug-only file logging)
+5. `98f2d29` — Tooling (security plan + archived slice 2+3 plan)
 
-**Key design decisions:**
-- Update approach: Shell script (consistent with existing architecture), not Kotlin-side
-- Update timing: Pre-launch only, auto-download without prompt
-- All 4 polish items included (settings, log viewer, health checks, main screen)
-- Display settings stored in SharedPreferences, sent via Termux:X11 CHANGE_PREFERENCE broadcast
-
-**Slice 2+3 status:** Code-complete and committed but **NOT yet tested on device**. Branch is 2+ commits ahead of origin/master.
+**Key security improvements:**
+- OAuth2 error bodies sanitized (truncated + token patterns stripped)
+- access_token in-memory only (not persisted to EncryptedSharedPreferences)
+- toString() overrides on JagexCredentials, TokenResponse, AuthCodeResult.Success, OAuthException
+- LocalhostAuthServer bound to 127.0.0.1 only
+- onNewIntent validates redirect URI host
+- ViewModel onCleared() wipes auth state
+- FLAG_ONE_SHOT on install PendingIntent
+- APK package name verified before install
+- Stale credential env files cleaned on startup
+- Credential patterns scrubbed from log previews
+- network_security_config.xml blocks cleartext
+- R8 minification + ProGuard log stripping for release
+- AppLog file logging gated behind BuildConfig.DEBUG
 
 ### What Needs to Happen Next
 
-1. **On-device test** — install Slice 2+3 APK, run full flow (setup -> auth -> launch)
-2. **Push commits** to origin/master
-3. **Implement Slice 4+5** — use `/implement` with the new plan
+1. **On-device test** — install APK, run full flow (setup -> auth -> launch) to validate security changes don't break anything
+2. **Implement Slice 4+5** — use `/implement` with plan at `.claude/plans/2026-02-23-slice4-5-implementation-plan.md`
+3. **Address remaining unstaged changes** — shell script `< /dev/null` removal, SetupStep.kt getter change (pre-existing, not security-related)
 
 ## Blockers
 
 - None
 
 ## Recent Sessions
+
+### Session 22 (2026-02-23)
+**Work**: Full security review (3 parallel agents) + fix all 15 findings via `/implement`. 4 phases, 16 files, 6 quality gates passed. 5 commits pushed.
+**Decisions**: sanitizeErrorBody() helper, in-memory access_token, loopback-only auth server, allowedHosts for onNewIntent, APK package verification via getPackageArchiveInfo, R8 + ProGuard for release builds.
+**Next**: On-device test, then implement Slice 4+5.
 
 ### Session 21 (2026-02-23)
 **Work**: Brainstormed and designed Slice 4+5 combined implementation plan. Explored codebase to understand current state. Wrote plan with 14 phases covering update manager + polish.
@@ -56,19 +70,18 @@
 **Work**: Brainstormed and implemented redesign of `/implement` skill. New orchestrator agent pattern.
 **Next**: Implement Slice 2+3 (completed in Session 19).
 
-### Session 17 (2026-02-22)
-**Work**: Investigated display size + launch UX defects via ADB. Designed openbox WM + fullscreen + auto-switch approach.
-
 ## Active Plans
 
+- **Security Hardening** — **COMPLETE**. All 15 findings fixed and verified. Plan at `.claude/plans/2026-02-23-security-fixes.md`.
 - **Slice 4+5 Implementation** — **DESIGNED**. Plan committed. Ready to implement.
-- **Slice 2+3 Implementation** — **COMPLETE**. Committed. Awaiting on-device test.
+- **Slice 2+3 Implementation** — **COMPLETE**. Committed + security hardened. Awaiting on-device test.
 - **Brainstorming PRD** — COMPLETE
 - **MVP Implementation Plan** — COMPLETE
 - **Slice 1 Code** — COMPLETE + HARDENED
 - **/implement Skill Redesign** — COMPLETE + IMPROVED
 
 ## Reference
+- **Security fixes plan**: `.claude/plans/2026-02-23-security-fixes.md`
 - **Slice 4+5 plan**: `.claude/plans/2026-02-23-slice4-5-implementation-plan.md`
 - **Slice 2+3 plan**: `.claude/plans/completed/2026-02-22-slice2-3-implementation-plan.md`
 - **Source code**: `runelite-tablet/app/src/main/java/com/runelitetablet/`

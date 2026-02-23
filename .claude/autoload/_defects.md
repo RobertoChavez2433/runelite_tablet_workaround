@@ -4,6 +4,16 @@ Max 7 active. Oldest rotates to `.claude/logs/defects-archive.md`.
 
 ## Active Patterns
 
+### [SECURITY] 2026-02-23: Kotlin data class toString() leaks sensitive fields by default
+**Pattern**: Kotlin `data class` auto-generates `toString()` including ALL fields. If a data class holds tokens, credentials, or auth codes, any accidental logging (crash reports, exception interpolation, debug logs) exposes plaintext secrets.
+**Prevention**: Always add `override fun toString() = "ClassName([REDACTED])"` to any data class holding sensitive fields. Check: JagexCredentials, TokenResponse, AuthCodeResult.Success, OAuthException.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/CredentialManager.kt
+
+### [SECURITY] 2026-02-23: OAuth2 error response bodies can contain tokens
+**Pattern**: When token exchange fails, the HTTP error body may echo back the submitted `code`, `refresh_token`, or partial credentials. Logging the full error body exposes these to logcat and persistent log files.
+**Prevention**: Always truncate error bodies (max 200 chars) and sanitize token-like patterns before logging. Never pass raw response bodies to exception classes that might reach UI or logs.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/JagexOAuth2Manager.kt
+
 ### [TERMUX] 2026-02-22: Env var injection via command string prefix doesn't work with Termux execve
 **Pattern**: Prepending `export VAR=val; bash script.sh` to the Termux RUN_COMMAND `commandPath` string doesn't work — Termux passes `commandPath` as the literal executable path to `execve()`, not to a shell. Credentials never reach the script.
 **Prevention**: Pass credentials via a temp file in app-private storage. Script sources and immediately `rm -f`s the file. Never pass secrets as command-line arguments (also visible in `ps`).
@@ -19,21 +29,16 @@ Max 7 active. Oldest rotates to `.claude/logs/defects-archive.md`.
 **Prevention**: Route all Activity starts through `SetupActions.launchIntent()` callback (goes through the Activity, which IS in the foreground when the user taps Launch).
 **Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupOrchestrator.kt
 
-### [SHELL] 2026-02-22: setupScriptRan guard silently routes refactored steps to old monolithic script
-**Pattern**: `SetupOrchestrator` has a `setupScriptRan: Boolean` guard in `executeStep()` that returns early for steps 4-6 after the first script run, routing them all to `runSetupScript()` (the old monolithic script). If this field is not explicitly deleted during the Slice 2 refactor, modular script calls are silently bypassed.
-**Prevention**: When refactoring to modular scripts, explicitly delete `setupScriptRan: Boolean` field AND `runSetupScript()` function — don't just add new dispatch logic around them.
-**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupOrchestrator.kt
-
 ### [UX] 2026-02-22: RuneLite window is tiny — not filling tablet screen — DESIGNED
 **Pattern**: RuneLite renders at 1038x503 on a 2960x1711 X11 desktop. No window manager = windows open at default size.
 **Root cause**: Bare X11 with no window manager. OSRS defaults to 765x503 + sidebar.
-**Fix**: Install openbox WM in proot, configure auto-maximize + no decorations. Design at `.claude/plans/2026-02-22-display-and-launch-ux-design.md`.
+**Fix**: Install openbox WM in proot, configure auto-maximize + no decorations.
 **Status**: DESIGNED — ready to implement.
 **Ref**: @runelite-tablet/app/src/main/assets/scripts/launch-runelite.sh
 
 ### [UX] 2026-02-22: Termux/Termux:X11 workflow confusing — user must manually switch apps — DESIGNED
 **Pattern**: User must manually switch from the RuneLite Tablet app to Termux:X11 after tapping Launch. No in-app guidance; context switch is unintuitive.
 **Root cause**: No auto-switch logic. No fullscreen/immersive configuration.
-**Fix**: Kotlin sends CHANGE_PREFERENCE broadcast (fullscreen, no keyboard bar). Shell script polls X11 socket then runs `am start` to bring Termux:X11 to foreground. Design at `.claude/plans/2026-02-22-display-and-launch-ux-design.md`.
+**Fix**: Kotlin sends CHANGE_PREFERENCE broadcast (fullscreen, no keyboard bar). Shell script polls X11 socket then runs `am start` to bring Termux:X11 to foreground.
 **Status**: DESIGNED — ready to implement.
 **Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupOrchestrator.kt

@@ -16,7 +16,7 @@ FALLBACK_URL="https://github.com/runelite/launcher/releases/download/2.7.6/RuneL
 echo "=== Downloading RuneLite ==="
 
 RUNELITE_DL_LOG="$HOME/.rlt-runelite-dl.log"
-proot-distro login ubuntu -- bash -s << RUNELITE_SCRIPT < /dev/null 2>&1 | tee "$RUNELITE_DL_LOG" || true
+proot-distro login ubuntu -- bash -s << RUNELITE_SCRIPT 2>&1 | tee "$RUNELITE_DL_LOG" || true
     RUNELITE_URL="https://github.com/runelite/launcher/releases/latest/download/RuneLite.jar"
     FALLBACK_URL="$FALLBACK_URL"
     mkdir -p "$RUNELITE_DIR"

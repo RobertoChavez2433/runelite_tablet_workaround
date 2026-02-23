@@ -10,7 +10,7 @@ sealed class SetupStep(val id: String, val label: String) {
     object VerifySetup : SetupStep("verify", "Verify Setup")
 
     companion object {
-        val allSteps: List<SetupStep> = listOf(
+        val allSteps: List<SetupStep> get() = listOf(
             InstallTermux, InstallTermuxX11, EnablePermissions,
             InstallProot, InstallJava, DownloadRuneLite, VerifySetup
         )

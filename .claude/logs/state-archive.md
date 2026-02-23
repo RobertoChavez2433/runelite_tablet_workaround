@@ -60,3 +60,7 @@ Session history archive. See `.claude/autoload/_state.md` for current state (las
 ### Session 16 (2026-02-22)
 **Work**: Designed Slice 2+3 plan. 5 parallel agents for research + adversarial review.
 **Next**: Investigate display/launch UX defects. (Session 17)
+
+### Session 17 (2026-02-22)
+**Work**: Investigated display size + launch UX defects via ADB. Designed openbox WM + fullscreen + auto-switch approach.
+**Next**: Redesign /implement skill. (Session 18)

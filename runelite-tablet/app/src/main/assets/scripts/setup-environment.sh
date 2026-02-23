@@ -137,7 +137,7 @@ echo "=== Step 3: Installing Java inside Ubuntu ==="
 # Verification (java -version) is combined into the same proot login to avoid a
 # second full proot process spawn (~200-500ms overhead per invocation).
 JAVA_INSTALL_LOG="$HOME/.rlt-java-install.log"
-proot-distro login ubuntu -- env DEBIAN_FRONTEND=noninteractive bash -s << 'JAVA_SCRIPT' < /dev/null 2>&1 | tee "$JAVA_INSTALL_LOG" || true
+proot-distro login ubuntu -- env DEBIAN_FRONTEND=noninteractive bash -s << 'JAVA_SCRIPT' 2>&1 | tee "$JAVA_INSTALL_LOG" || true
     # Retry apt-get update up to 3 times — transient DNS/CDN errors are common inside proot
     attempt=1
     while [ $attempt -le 3 ]; do
@@ -179,7 +179,7 @@ OBCFG
 echo "=== Step 4: Downloading RuneLite ==="
 # Verify RuneLite download in the same proot login to avoid a second proot spawn.
 RUNELITE_INSTALL_LOG="$HOME/.rlt-runelite-dl.log"
-proot-distro login ubuntu -- bash -s << 'RUNELITE_SCRIPT' < /dev/null 2>&1 | tee "$RUNELITE_INSTALL_LOG" || true
+proot-distro login ubuntu -- bash -s << 'RUNELITE_SCRIPT' 2>&1 | tee "$RUNELITE_INSTALL_LOG" || true
     RUNELITE_URL="https://github.com/runelite/launcher/releases/latest/download/RuneLite.jar"
     mkdir -p /root/runelite
     if [ ! -f /root/runelite/RuneLite.jar ]; then

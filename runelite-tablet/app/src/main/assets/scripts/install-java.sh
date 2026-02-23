@@ -21,7 +21,7 @@ else
     # x11-xserver-utils provides xrandr for display resolution management.
     # openbox provides window management (maximizes RuneLite window on launch).
     JAVA_INSTALL_LOG="$HOME/.rlt-java-install.log"
-    proot-distro login ubuntu -- env DEBIAN_FRONTEND=noninteractive bash -s << 'JAVA_SCRIPT' < /dev/null 2>&1 | tee "$JAVA_INSTALL_LOG" || true
+    proot-distro login ubuntu -- env DEBIAN_FRONTEND=noninteractive bash -s << 'JAVA_SCRIPT' 2>&1 | tee "$JAVA_INSTALL_LOG" || true
         # Retry apt-get update up to 3 times
         attempt=1
         while [ $attempt -le 3 ]; do
