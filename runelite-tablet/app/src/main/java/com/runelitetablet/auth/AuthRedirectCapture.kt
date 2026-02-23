@@ -174,7 +174,8 @@ class LocalhostAuthServer {
      * Start the localhost server. Returns the port number to use in the redirect_uri.
      */
     suspend fun start(): Int = withContext(Dispatchers.IO) {
-        val server = ServerSocket(0)  // OS assigns a random available port
+        // Bind to loopback only — prevents other apps on the network from connecting
+        val server = ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1"))
         serverSocket = server
         port = server.localPort
         AppLog.step("auth", "LocalhostAuthServer: started on port $port")
@@ -264,7 +265,9 @@ class LocalhostAuthServer {
  * Result of capturing an auth code from a redirect.
  */
 sealed class AuthCodeResult {
-    data class Success(val code: String, val state: String) : AuthCodeResult()
+    data class Success(val code: String, val state: String) : AuthCodeResult() {
+        override fun toString(): String = "Success(code=***, state=***)"
+    }
     data class Error(val error: String, val description: String) : AuthCodeResult()
     object Cancelled : AuthCodeResult()
 }

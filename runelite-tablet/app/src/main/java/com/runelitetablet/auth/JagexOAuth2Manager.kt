@@ -36,6 +36,13 @@ import org.json.JSONObject
 class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
 
     companion object {
+        /** Max length for error body excerpts in logs/exceptions to prevent credential leakage. */
+        private const val MAX_ERROR_BODY_LEN = 200
+        /** Patterns that look like tokens/secrets — redacted before logging. */
+        private val SENSITIVE_PATTERNS = listOf(
+            Regex("""(access_token|refresh_token|id_token|session_id|authorization|bearer)\s*[=:]\s*\S+""", RegexOption.IGNORE_CASE),
+            Regex("""eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+""") // JWT
+        )
         // Part A: Account authentication
         private const val AUTH_ENDPOINT = "https://account.jagex.com/oauth2/auth"
         private const val TOKEN_ENDPOINT = "https://account.jagex.com/oauth2/token"
@@ -123,8 +130,9 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 val errorBody = response.body?.string() ?: ""
-                AppLog.e("AUTH", "exchangeCodeForTokens: HTTP ${response.code} — $errorBody")
-                throw OAuthException(response.code, "Token exchange failed: HTTP ${response.code}", errorBody)
+                val sanitized = sanitizeErrorBody(errorBody)
+                AppLog.e("AUTH", "exchangeCodeForTokens: HTTP ${response.code} — $sanitized")
+                throw OAuthException(response.code, "Token exchange failed: HTTP ${response.code}", sanitized)
             }
 
             val responseBody = response.body?.string()
@@ -159,8 +167,9 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 val errorBody = response.body?.string() ?: ""
-                AppLog.e("AUTH", "exchangeSecondCode: HTTP ${response.code} — $errorBody")
-                throw OAuthException(response.code, "Second token exchange failed: HTTP ${response.code}", errorBody)
+                val sanitized = sanitizeErrorBody(errorBody)
+                AppLog.e("AUTH", "exchangeSecondCode: HTTP ${response.code} — $sanitized")
+                throw OAuthException(response.code, "Second token exchange failed: HTTP ${response.code}", sanitized)
             }
 
             val responseBody = response.body?.string()
@@ -189,8 +198,9 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 val errorBody = response.body?.string() ?: ""
-                AppLog.e("AUTH", "refreshTokens: HTTP ${response.code} — $errorBody")
-                throw OAuthException(response.code, "Token refresh failed: HTTP ${response.code}", errorBody)
+                val sanitized = sanitizeErrorBody(errorBody)
+                AppLog.e("AUTH", "refreshTokens: HTTP ${response.code} — $sanitized")
+                throw OAuthException(response.code, "Token refresh failed: HTTP ${response.code}", sanitized)
             }
 
             val responseBody = response.body?.string()
@@ -218,8 +228,9 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 val errorBody = response.body?.string() ?: ""
-                AppLog.e("AUTH", "fetchCharacters: HTTP ${response.code} — $errorBody")
-                throw OAuthException(response.code, "Failed to fetch characters: HTTP ${response.code}", errorBody)
+                val sanitized = sanitizeErrorBody(errorBody)
+                AppLog.e("AUTH", "fetchCharacters: HTTP ${response.code} — $sanitized")
+                throw OAuthException(response.code, "Failed to fetch characters: HTTP ${response.code}", sanitized)
             }
 
             val responseBody = response.body?.string()
@@ -260,8 +271,9 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 val errorBody = response.body?.string() ?: ""
-                AppLog.e("AUTH", "createGameSession: HTTP ${response.code} — $errorBody")
-                throw OAuthException(response.code, "Failed to create game session: HTTP ${response.code}", errorBody)
+                val sanitized = sanitizeErrorBody(errorBody)
+                AppLog.e("AUTH", "createGameSession: HTTP ${response.code} — $sanitized")
+                throw OAuthException(response.code, "Failed to create game session: HTTP ${response.code}", sanitized)
             }
 
             val responseBody = response.body?.string()
@@ -269,7 +281,7 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
 
             val jsonObj = Json.parseToJsonElement(responseBody).jsonObject
             jsonObj["sessionId"]?.jsonPrimitive?.content
-                ?: throw OAuthException(0, "No sessionId in response", responseBody)
+                ?: throw OAuthException(0, "No sessionId in response", "Response keys: ${jsonObj.keys.joinToString()}")
         }
     }
 
@@ -277,10 +289,25 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
     // Helpers
     // -------------------------------------------------------------------------
 
+    /**
+     * Truncate and sanitize an error body before logging or embedding in exceptions.
+     * Strips token-like patterns and limits length to prevent credential leakage.
+     */
+    private fun sanitizeErrorBody(body: String): String {
+        var sanitized = body.take(MAX_ERROR_BODY_LEN)
+        for (pattern in SENSITIVE_PATTERNS) {
+            sanitized = pattern.replace(sanitized, "[REDACTED]")
+        }
+        if (body.length > MAX_ERROR_BODY_LEN) {
+            sanitized += "...[truncated]"
+        }
+        return sanitized
+    }
+
     private fun parseTokenResponse(responseBody: String): TokenResponse {
         val jsonObj = Json.parseToJsonElement(responseBody).jsonObject
         val accessToken = jsonObj["access_token"]?.jsonPrimitive?.content
-            ?: throw OAuthException(0, "No access_token in response", responseBody)
+            ?: throw OAuthException(0, "No access_token in response", "Response keys: ${jsonObj.keys.joinToString()}")
         val refreshToken = jsonObj["refresh_token"]?.jsonPrimitive?.content
         val expiresIn = jsonObj["expires_in"]?.jsonPrimitive?.content?.toLongOrNull() ?: 3600L
 
@@ -324,7 +351,9 @@ data class TokenResponse(
     val refreshToken: String?,
     val expiresIn: Long,
     val accessTokenExpiry: Long // Unix seconds
-)
+) {
+    override fun toString(): String = "TokenResponse(expiresIn=$expiresIn, [REDACTED])"
+}
 
 /**
  * Represents a game character from the accounts endpoint.
@@ -341,7 +370,10 @@ class OAuthException(
     val httpCode: Int,
     message: String,
     val errorBody: String
-) : Exception(message)
+) : Exception(message) {
+    /** Never expose errorBody in toString() to prevent accidental credential leakage in logs. */
+    override fun toString(): String = "OAuthException(httpCode=$httpCode, message=$message)"
+}
 
 /**
  * Result of a pre-launch token refresh check.

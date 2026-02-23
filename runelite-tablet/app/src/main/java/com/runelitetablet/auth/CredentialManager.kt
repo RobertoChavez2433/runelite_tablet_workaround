@@ -32,6 +32,13 @@ class CredentialManager(private val context: Context) {
     private var _prefs: SharedPreferences? = null
 
     /**
+     * Access token is kept in memory only — never persisted to EncryptedSharedPreferences.
+     * On cold start the caller must refresh via refresh_token to obtain a new access token.
+     */
+    @Volatile
+    private var inMemoryAccessToken: String? = null
+
+    /**
      * Get the encrypted SharedPreferences, lazily initializing on first call.
      * Returns null if Keystore is unavailable (device locked).
      *
@@ -81,14 +88,15 @@ class CredentialManager(private val context: Context) {
             AppLog.e("AUTH", "storeTokens: Keystore unavailable")
             return
         }
+        // Keep access_token in memory only — never persisted to disk
+        inMemoryAccessToken = response.accessToken
         prefs.edit()
-            .putString(KEY_ACCESS_TOKEN, response.accessToken)
             .also { editor ->
                 response.refreshToken?.let { editor.putString(KEY_REFRESH_TOKEN, it) }
             }
             .putLong(KEY_ACCESS_TOKEN_EXPIRY, response.accessTokenExpiry)
             .apply()
-        AppLog.step("auth", "storeTokens: tokens stored, expiry=${response.accessTokenExpiry}")
+        AppLog.step("auth", "storeTokens: tokens stored (access_token in-memory only), expiry=${response.accessTokenExpiry}")
     }
 
     /**
@@ -119,7 +127,7 @@ class CredentialManager(private val context: Context) {
             sessionId = sessionId,
             characterId = characterId,
             displayName = displayName,
-            accessToken = prefs.getString(KEY_ACCESS_TOKEN, null),
+            accessToken = inMemoryAccessToken,
             refreshToken = prefs.getString(KEY_REFRESH_TOKEN, null)
         )
     }
@@ -149,6 +157,7 @@ class CredentialManager(private val context: Context) {
      * Clear all stored credentials. Used on sign-out or session expiry.
      */
     fun clearCredentials() {
+        inMemoryAccessToken = null
         _prefs?.edit()?.clear()?.apply()
         _prefs = null
         AppLog.step("auth", "clearCredentials: all credentials cleared")
@@ -164,4 +173,6 @@ data class JagexCredentials(
     val displayName: String,
     val accessToken: String?,
     val refreshToken: String?
-)
+) {
+    override fun toString(): String = "JagexCredentials(displayName=$displayName, [REDACTED])"
+}
