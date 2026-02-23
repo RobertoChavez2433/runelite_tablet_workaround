@@ -2,6 +2,7 @@ package com.runelitetablet.setup
 
 import android.content.Context
 import android.content.Intent
+import android.os.PowerManager
 import com.runelitetablet.cleanup.CleanupManager
 import com.runelitetablet.installer.ApkDownloader
 import com.runelitetablet.installer.ApkInstaller
@@ -26,6 +27,8 @@ import kotlinx.coroutines.flow.update
 interface SetupActions {
     fun requestInstallPermission()
     fun requestTermuxPermission()
+    fun requestBatteryOptimization(packageName: String)
+    fun openAppSettings(packageName: String)
     fun launchIntent(intent: Intent)
 }
 
@@ -61,9 +64,18 @@ class SetupOrchestrator(
     private val _setupState = MutableStateFlow<SetupState>(SetupState.Reconciling)
     val setupState: StateFlow<SetupState> = _setupState.asStateFlow()
 
+    private val _permissionPhase = MutableStateFlow<PermissionPhase>(PermissionPhase.TermuxConfig)
+    val permissionPhase: StateFlow<PermissionPhase> = _permissionPhase.asStateFlow()
+
+    /** Set to true when the permissions step is actively waiting for user action */
+    private val _awaitingPermissionCompletion = MutableStateFlow(false)
+    val awaitingPermissionCompletion: StateFlow<Boolean> = _awaitingPermissionCompletion.asStateFlow()
+
     @Volatile private var failedStepIndex: Int = -1
 
     companion object {
+        const val TERMUX_PACKAGE = "com.termux"
+
         /** Timeout for check-markers.sh reconciliation on startup */
         private const val MARKER_CHECK_TIMEOUT_MS = 10_000L
 
@@ -139,13 +151,18 @@ class SetupOrchestrator(
     }
 
     suspend fun verifyPermissions(): Boolean {
-        val result = commandRunner.execute(
-            commandPath = "${TermuxCommandRunner.TERMUX_BIN_PATH}/echo",
-            arguments = arrayOf("ok"),
-            background = true,
-            timeoutMs = TermuxCommandRunner.TIMEOUT_VERIFY_MS
-        )
-        return result.isSuccess && result.stdout?.trim() == "ok"
+        return try {
+            val result = commandRunner.execute(
+                commandPath = "${TermuxCommandRunner.TERMUX_BIN_PATH}/echo",
+                arguments = arrayOf("ok"),
+                background = true,
+                timeoutMs = TermuxCommandRunner.TIMEOUT_VERIFY_MS
+            )
+            result.isSuccess && result.stdout?.trim() == "ok"
+        } catch (e: SecurityException) {
+            AppLog.w("permissions", "verifyPermissions: SecurityException (permission not granted yet)")
+            false
+        }
     }
 
     private suspend fun runSetupFrom(startIndex: Int) {
@@ -328,26 +345,154 @@ class SetupOrchestrator(
         }
     }
 
+    /**
+     * Phased permission flow. Checks each permission phase in order:
+     * 1. TermuxConfig — verify that allow-external-apps is set (test RUN_COMMAND)
+     * 2. RuntimePermission — request com.termux.permission.RUN_COMMAND
+     * 3. BatteryOptimization — request battery optimization exemption
+     *
+     * If all phases pass immediately, returns true. Otherwise, sets the
+     * permission phase state and halts — the ViewModel will drive the UI and
+     * call [advancePermissionPhase] when user completes each phase.
+     */
     private suspend fun handlePermissionsStep(): Boolean {
-        // Request the Termux RUN_COMMAND runtime permission before checking
-        actions?.requestTermuxPermission()
-
+        // Check if everything already works (fast path for re-runs)
         val alreadyWorking = verifyPermissions()
-        if (alreadyWorking) return true
+        if (alreadyWorking && isBatteryOptimized(TERMUX_PACKAGE)) {
+            AppLog.step("permissions", "handlePermissionsStep: all permissions already configured")
+            _permissionPhase.value = PermissionPhase.Complete
+            return true
+        }
 
-        val instructions = listOf(
-            "Open Termux and run:\necho \"allow-external-apps=true\" >> ~/.termux/termux.properties",
-            "Grant the \"Run commands in Termux\" permission when prompted (or via Settings > Apps > RuneLite for Tablet > Permissions)",
-            "Go to Settings > Apps > Termux > Battery > Unrestricted"
-        )
+        // Determine which phase to start at
+        if (alreadyWorking) {
+            // Termux config + runtime permission already working, jump to battery
+            AppLog.step("permissions", "handlePermissionsStep: RUN_COMMAND works, checking battery")
+            if (isBatteryOptimized(TERMUX_PACKAGE)) {
+                _permissionPhase.value = PermissionPhase.Complete
+                return true
+            }
+            _permissionPhase.value = PermissionPhase.BatteryOptimization
+        } else {
+            // Start from the beginning
+            _permissionPhase.value = PermissionPhase.TermuxConfig
+        }
 
+        // Halt the setup loop — the ViewModel will drive phase progression
+        _awaitingPermissionCompletion.value = true
         val stepIndex = _steps.value.indexOfFirst { it.step == SetupStep.EnablePermissions }
-        updateStepStatus(stepIndex, StepStatus.ManualAction(instructions))
-        _currentOutput.value =
-            "Manual configuration required. Complete the steps above, then tap Verify."
-
+        updateStepStatus(stepIndex, StepStatus.InProgress)
+        _currentOutput.value = null
         failedStepIndex = stepIndex
         return false
+    }
+
+    /**
+     * Called by the ViewModel when the user completes a permission phase.
+     * Advances to the next phase or completes the step.
+     * Returns true if all permission phases are now complete.
+     */
+    suspend fun advancePermissionPhase(): Boolean {
+        val currentPhase = _permissionPhase.value
+        AppLog.step("permissions", "advancePermissionPhase: currentPhase=${currentPhase::class.simpleName}")
+
+        return when (currentPhase) {
+            is PermissionPhase.TermuxConfig -> {
+                // We can't verify Termux config independently — verifyPermissions() sends
+                // a RUN_COMMAND intent which requires the Android runtime permission (Phase 2).
+                // Without it, we always get SecurityException regardless of Termux config state.
+                // Advance to Phase 2 unconditionally and request the runtime permission.
+                // If BOTH Termux config and runtime permission are already set, verifyPermissions()
+                // will succeed and we'll skip through Phase 2 as well.
+                AppLog.step("permissions", "advancePermissionPhase: TermuxConfig phase done (user returned), moving to RuntimePermission")
+                _permissionPhase.value = PermissionPhase.RuntimePermission
+                // Auto-advance: request the runtime permission immediately
+                actions?.requestTermuxPermission()
+                // If permission was already granted, the system dialog won't appear —
+                // verify and skip RuntimePermission phase, advance to BatteryOptimization.
+                if (verifyPermissions()) {
+                    AppLog.step("permissions", "advancePermissionPhase: RuntimePermission already granted, advancing to BatteryOptimization")
+                    _permissionPhase.value = PermissionPhase.BatteryOptimization
+                    actions?.requestBatteryOptimization(TERMUX_PACKAGE)
+                }
+                true
+            }
+            is PermissionPhase.RuntimePermission -> {
+                // Verify RUN_COMMAND permission is now granted
+                val working = verifyPermissions()
+                if (working) {
+                    AppLog.step("permissions", "advancePermissionPhase: RuntimePermission verified, moving to BatteryOptimization")
+                    _permissionPhase.value = PermissionPhase.BatteryOptimization
+                    true
+                } else {
+                    AppLog.step("permissions", "advancePermissionPhase: RuntimePermission not yet granted")
+                    false
+                }
+            }
+            is PermissionPhase.BatteryOptimization -> {
+                val termuxExempt = isBatteryOptimized(TERMUX_PACKAGE)
+                if (termuxExempt) {
+                    AppLog.step("permissions", "advancePermissionPhase: BatteryOptimization verified, all phases complete")
+                    _permissionPhase.value = PermissionPhase.Complete
+                    completePermissionsStep()
+                    true
+                } else {
+                    AppLog.step("permissions", "advancePermissionPhase: Termux not battery-exempt yet")
+                    false
+                }
+            }
+            is PermissionPhase.Complete -> {
+                AppLog.step("permissions", "advancePermissionPhase: already complete")
+                true
+            }
+        }
+    }
+
+    /**
+     * Request battery optimization exemption for the given package.
+     * Uses ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS with Samsung fallback.
+     */
+    fun requestBatteryOptimization() {
+        try {
+            actions?.requestBatteryOptimization(TERMUX_PACKAGE)
+        } catch (e: Exception) {
+            AppLog.w("PERM", "requestBatteryOptimization: intent failed, falling back to app settings: ${e.message}")
+            actions?.openAppSettings(TERMUX_PACKAGE)
+        }
+    }
+
+    /**
+     * Also request battery optimization for our own app if not already exempt.
+     */
+    fun requestOwnBatteryOptimization() {
+        if (!isBatteryOptimized(context.packageName)) {
+            try {
+                actions?.requestBatteryOptimization(context.packageName)
+            } catch (e: Exception) {
+                AppLog.w("PERM", "requestOwnBatteryOptimization: failed: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Check if a package is exempt from battery optimization.
+     */
+    fun isBatteryOptimized(packageName: String): Boolean {
+        val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return false
+        return pm.isIgnoringBatteryOptimizations(packageName)
+    }
+
+    /**
+     * Mark the permissions step as completed and resume the setup loop.
+     */
+    private suspend fun completePermissionsStep() {
+        _awaitingPermissionCompletion.value = false
+        val stepIndex = _steps.value.indexOfFirst { it.step == SetupStep.EnablePermissions }
+        if (stepIndex >= 0) {
+            updateStepStatus(stepIndex, StepStatus.Completed)
+            AppLog.step("permissions", "completePermissionsStep: permissions step completed, resuming setup")
+            runSetupFrom(stepIndex + 1)
+        }
     }
 
     private suspend fun runVerification(): Boolean {

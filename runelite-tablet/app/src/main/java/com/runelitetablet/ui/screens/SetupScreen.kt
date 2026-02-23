@@ -22,27 +22,22 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.runelitetablet.logging.AppLog
@@ -50,6 +45,7 @@ import com.runelitetablet.setup.AppScreen
 import com.runelitetablet.BuildConfig
 import com.runelitetablet.setup.HealthCheckResult
 import com.runelitetablet.setup.LaunchState
+import com.runelitetablet.setup.PermissionPhase
 import com.runelitetablet.setup.SetupViewModel
 import com.runelitetablet.setup.StepStatus
 import com.runelitetablet.ui.components.StepItem
@@ -164,22 +160,21 @@ fun SetupScreen(viewModel: SetupViewModel) {
 // Setup wizard content (moved from the old SetupScreen body)
 // =============================================================================
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SetupWizardContent(viewModel: SetupViewModel) {
     val steps by viewModel.steps.collectAsState()
     val canLaunch by viewModel.canLaunch.collectAsState()
     val currentOutput by viewModel.currentOutput.collectAsState()
-    val showPermissionsSheet by viewModel.showPermissionsSheet.collectAsState()
-    val permissionInstructions by viewModel.permissionInstructions.collectAsState()
-    val sheetState = rememberModalBottomSheetState()
+    val isPermissionStepActive by viewModel.isPermissionStepActive.collectAsState()
+    val permissionPhase by viewModel.permissionPhase.collectAsState()
 
     val hasFailed = steps.any { it.status is StepStatus.Failed }
 
     SideEffect {
         AppLog.ui(
             "SetupWizardContent: canLaunch=$canLaunch hasFailed=$hasFailed " +
-                "showPermissionsSheet=$showPermissionsSheet hasOutput=${currentOutput != null}"
+                "isPermissionStepActive=$isPermissionStepActive phase=${permissionPhase::class.simpleName} " +
+                "hasOutput=${currentOutput != null}"
         )
     }
 
@@ -201,11 +196,21 @@ private fun SetupWizardContent(viewModel: SetupViewModel) {
                 modifier = Modifier.padding(bottom = 24.dp)
             )
 
-            steps.forEach { stepState ->
-                StepItem(
-                    label = stepState.step.label,
-                    status = stepState.status,
-                    onClick = { viewModel.onManualStepClick(stepState) }
+            steps.forEachIndexed { index, stepState ->
+                key(index) {
+                    StepItem(
+                        label = stepState.step.label,
+                        status = stepState.status
+                    )
+                }
+            }
+
+            // Phased permission UI — shown inline when the permissions step is active
+            if (isPermissionStepActive) {
+                Spacer(modifier = Modifier.height(16.dp))
+                PermissionPhaseContent(
+                    phase = permissionPhase,
+                    viewModel = viewModel
                 )
             }
 
@@ -220,7 +225,7 @@ private fun SetupWizardContent(viewModel: SetupViewModel) {
             Spacer(modifier = Modifier.weight(1f))
 
             Row(modifier = Modifier.fillMaxWidth()) {
-                if (hasFailed) {
+                if (hasFailed && !isPermissionStepActive) {
                     OutlinedButton(onClick = {
                         AppLog.ui("SetupWizardContent: Retry button clicked hasFailed=$hasFailed")
                         viewModel.retry()
@@ -240,18 +245,6 @@ private fun SetupWizardContent(viewModel: SetupViewModel) {
                 }
             }
         }
-    }
-
-    if (showPermissionsSheet) {
-        PermissionsBottomSheet(
-            instructions = permissionInstructions,
-            onVerify = { viewModel.verifyPermissions() },
-            onDismiss = {
-                AppLog.ui("SetupWizardContent: permissions sheet dismissed")
-                viewModel.dismissPermissionsSheet()
-            },
-            sheetState = sheetState
-        )
     }
 }
 
@@ -633,64 +626,161 @@ private fun OutputCard(text: String, isError: Boolean) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+// =============================================================================
+// Phased permission content — replaces the old bottom sheet
+// =============================================================================
+
+/**
+ * Shows phase-specific content for the multi-phase permission setup.
+ * Displayed inline below the step list when the permissions step is active.
+ */
 @Composable
-private fun PermissionsBottomSheet(
-    instructions: List<String>,
-    onVerify: () -> Unit,
-    onDismiss: () -> Unit,
-    sheetState: SheetState
+private fun PermissionPhaseContent(
+    phase: PermissionPhase,
+    viewModel: SetupViewModel
 ) {
-    val clipboardManager = LocalClipboardManager.current
+    val commandCopied by viewModel.commandCopied.collectAsState()
 
-    SideEffect {
-        AppLog.ui("PermissionsBottomSheet: shown instructionCount=${instructions.size}")
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(24.dp)) {
-            Text(
-                text = "Configure Permissions",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
+        Column(modifier = Modifier.padding(16.dp)) {
+            when (phase) {
+                is PermissionPhase.TermuxConfig -> {
+                    Text(
+                        text = "Step 1 of 3: Enable Termux Commands",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = "We need to configure Termux to accept commands from our app " +
+                            "and add helpful terminal shortcut keys.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
 
-            instructions.forEachIndexed { index, instruction ->
-                Text(
-                    text = "${index + 1}. $instruction",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
+                    // Numbered instruction list
+                    val instructions = listOf(
+                        "Tap \"Copy & Open Termux\" below",
+                        "Long-press anywhere in Termux",
+                        "Tap \"Paste\"",
+                        "Tap Enter on your keyboard",
+                        "Come back here -- we'll check automatically!"
+                    )
+                    instructions.forEachIndexed { index, instruction ->
+                        Text(
+                            text = "${index + 1}. $instruction",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
+                        )
+                    }
 
-                if (index == 0) {
-                    val command =
-                        "echo \"allow-external-apps=true\" >> ~/.termux/termux.properties"
-                    TextButton(
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
                         onClick = {
-                            clipboardManager.setText(AnnotatedString(command))
-                        }
+                            AppLog.ui("PermissionPhaseContent: Copy & Open Termux clicked")
+                            viewModel.copyConfigAndOpenTermux()
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Copy Command")
+                        Text("Copy & Open Termux")
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            AppLog.ui("PermissionPhaseContent: Done - Check Now clicked")
+                            viewModel.checkPermissionPhase()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = commandCopied
+                    ) {
+                        Text("Done -- Check Now")
                     }
                 }
+
+                is PermissionPhase.RuntimePermission -> {
+                    Text(
+                        text = "Step 2 of 3: Grant Command Permission",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = "Android needs your permission for this app to send commands to Termux. " +
+                            "Tap the button below and select \"Allow\" in the dialog.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = {
+                                AppLog.ui("PermissionPhaseContent: Grant Permission clicked")
+                                viewModel.checkPermissionPhase()
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Grant Permission")
+                        }
+                    }
+                }
+
+                is PermissionPhase.BatteryOptimization -> {
+                    Text(
+                        text = "Step 3 of 3: Allow Background Activity",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = "Termux needs to run in the background without being killed by Android. " +
+                            "Tap below and select \"Allow\" to exempt Termux from battery optimization.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    Button(
+                        onClick = {
+                            AppLog.ui("PermissionPhaseContent: Allow Background clicked")
+                            viewModel.requestBatteryOptimization()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Allow Background Activity")
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    TextButton(
+                        onClick = {
+                            AppLog.ui("PermissionPhaseContent: Check battery optimization clicked")
+                            viewModel.checkPermissionPhase()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("I've allowed it - check now")
+                    }
+                }
+
+                is PermissionPhase.Complete -> {
+                    // This state is transient — once Complete, isPermissionStepActive becomes false
+                    // and this composable is not shown. Include for exhaustive when.
+                    Text(
+                        text = "All permissions configured!",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color(0xFF4CAF50)
+                    )
+                }
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = {
-                    AppLog.ui("PermissionsBottomSheet: Verify Setup button clicked")
-                    onVerify()
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Verify Setup")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

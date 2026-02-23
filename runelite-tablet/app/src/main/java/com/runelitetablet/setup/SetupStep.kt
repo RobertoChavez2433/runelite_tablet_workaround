@@ -10,10 +10,12 @@ sealed class SetupStep(val id: String, val label: String) {
     object VerifySetup : SetupStep("verify", "Verify Setup")
 
     companion object {
-        val allSteps: List<SetupStep> get() = listOf(
-            InstallTermux, InstallTermuxX11, EnablePermissions,
-            InstallProot, InstallJava, DownloadRuneLite, VerifySetup
-        )
+        val allSteps: List<SetupStep> by lazy {
+            listOf(
+                InstallTermux, InstallTermuxX11, EnablePermissions,
+                InstallProot, InstallJava, DownloadRuneLite, VerifySetup
+            )
+        }
     }
 }
 
@@ -51,3 +53,18 @@ data class StepState(
     val step: SetupStep,
     val status: StepStatus = StepStatus.Pending
 )
+
+/**
+ * Tracks the current phase within the multi-phase permissions step.
+ * After all 3 phases complete, the permissions step is marked Completed.
+ */
+sealed class PermissionPhase {
+    /** Phase 1: User must paste a command in Termux to enable allow-external-apps */
+    object TermuxConfig : PermissionPhase()
+    /** Phase 2: Request the RUN_COMMAND runtime permission via system dialog */
+    object RuntimePermission : PermissionPhase()
+    /** Phase 3: Request battery optimization exemption for Termux and our app */
+    object BatteryOptimization : PermissionPhase()
+    /** All permission phases completed successfully */
+    object Complete : PermissionPhase()
+}

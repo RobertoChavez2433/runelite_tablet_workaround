@@ -26,10 +26,15 @@ import com.runelitetablet.termux.TermuxPackageHelper
 import com.runelitetablet.ui.DisplayPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -108,11 +113,22 @@ class SetupViewModel(
         .map { steps -> steps.all { it.status is StepStatus.Completed } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
-    private val _showPermissionsSheet = MutableStateFlow(false)
-    val showPermissionsSheet: StateFlow<Boolean> = _showPermissionsSheet.asStateFlow()
+    /** Current permission phase within the permissions step */
+    val permissionPhase: StateFlow<PermissionPhase> = orchestrator.permissionPhase
 
-    private val _permissionInstructions = MutableStateFlow<List<String>>(emptyList())
-    val permissionInstructions: StateFlow<List<String>> = _permissionInstructions.asStateFlow()
+    /** Whether the permissions step is actively waiting for user to complete phases */
+    val isPermissionStepActive: StateFlow<Boolean> = combine(
+        orchestrator.steps,
+        orchestrator.awaitingPermissionCompletion
+    ) { steps, awaiting ->
+        val permStep = steps.find { it.step == SetupStep.EnablePermissions }
+        permStep?.status is StepStatus.InProgress && awaiting
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    /** Whether the command was already copied to clipboard (UI state) */
+    private val _commandCopied = MutableStateFlow(false)
+    val commandCopied: StateFlow<Boolean> = _commandCopied.asStateFlow()
+
 
     private val _currentScreen = MutableStateFlow<AppScreen>(AppScreen.Setup)
     val currentScreen: StateFlow<AppScreen> = _currentScreen.asStateFlow()
@@ -136,6 +152,11 @@ class SetupViewModel(
     // Stored access token between character list fetch and character selection
     @Volatile private var pendingAccessToken: String? = null
 
+    // Active localhost server for Custom Tab redirect capture.
+    // Tracked so onResume() can detect Custom Tab dismissal without a redirect.
+    @Volatile private var activeAuthServer: LocalhostAuthServer? = null
+    @Volatile private var activeLoginJob: Job? = null
+
     /**
      * Expose display name to the UI without leaking the full CredentialManager.
      */
@@ -143,7 +164,11 @@ class SetupViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        // Wipe sensitive auth state when ViewModel is destroyed
+        // Stop any active auth server and wipe sensitive state
+        activeAuthServer?.stop()
+        activeAuthServer = null
+        activeLoginJob?.cancel()
+        activeLoginJob = null
         pendingAccessToken = null
         codeVerifier = null
         authState = null
@@ -514,62 +539,105 @@ class SetupViewModel(
     // -------------------------------------------------------------------------
 
     /**
-     * Start the Jagex OAuth2 login flow via Chrome Custom Tab + localhost redirect capture.
+     * Start the Jagex OAuth2 login flow using Chrome Custom Tab + localhost redirect.
      *
-     * A LocalhostAuthServer is started on a random port. The OAuth2 redirect_uri is set to
-     * http://localhost:<port> so the browser redirects there after login. The server captures
-     * the auth code from the redirect request. This is reliable across all devices (unlike
-     * CustomTabsCallback URL interception which depends on Chrome internals).
+     * Flow:
+     * 1. Start LocalhostAuthServer on a random port
+     * 2. Build auth URL with localhost redirect
+     * 3. Open Chrome Custom Tab to the auth URL
+     * 4. Await redirect on localhost (captures auth code)
+     * 5. Exchange code for tokens
+     * 6. Fetch characters / start second auth step if needed
      */
     fun startLogin() {
-        codeVerifier = PkceHelper.generateVerifier()
-        authState = PkceHelper.generateState()
+        // Cancel any previous login attempt
+        activeLoginJob?.cancel()
+        activeAuthServer?.stop()
 
-        val verifier = codeVerifier ?: run {
-            AppLog.e("AUTH", "startLogin: codeVerifier is null unexpectedly")
-            _currentScreen.value = AppScreen.AuthError("Authentication state lost")
-            return
-        }
-        val state = authState ?: run {
-            AppLog.e("AUTH", "startLogin: authState is null unexpectedly")
-            _currentScreen.value = AppScreen.AuthError("Authentication state lost")
-            return
-        }
-
-        viewModelScope.launch {
-            val server = LocalhostAuthServer()
+        val server = LocalhostAuthServer()
+        activeLoginJob = viewModelScope.launch {
+            activeAuthServer = server
             try {
                 val port = server.start()
+                codeVerifier = PkceHelper.generateVerifier()
+                authState = PkceHelper.generateState()
+
+                val verifier = codeVerifier ?: run {
+                    AppLog.e("AUTH", "startLogin: codeVerifier is null unexpectedly")
+                    _currentScreen.value = AppScreen.AuthError("Authentication state lost")
+                    return@launch
+                }
+                val state = authState ?: run {
+                    AppLog.e("AUTH", "startLogin: authState is null unexpectedly")
+                    _currentScreen.value = AppScreen.AuthError("Authentication state lost")
+                    return@launch
+                }
+
                 val redirectUri = "http://localhost:$port"
-                val authUrl = oAuth2Manager.buildAuthUrl(verifier, state, redirectUri)
+                val authUrl = oAuth2Manager.buildAuthUrl(verifier, state, port)
                 AppLog.step("auth", "startLogin: launching Custom Tab with localhost redirect on port $port")
 
-                // Open in Custom Tab for good login UX
-                val intent = CustomTabsIntent.Builder().setShowTitle(true).build()
-                intent.intent.data = authUrl
-                val chromePackage = getChromePackage()
-                if (chromePackage != null) {
-                    intent.intent.setPackage(chromePackage)
+                // Open Chrome Custom Tab
+                val actions = orchestrator.actions
+                if (actions == null) {
+                    AppLog.e("AUTH", "startLogin: no actions bound — activity not available")
+                    _currentScreen.value = AppScreen.AuthError("Activity not available")
+                    return@launch
                 }
-                orchestrator.actions?.launchIntent(intent.intent)
 
-                // Wait for localhost redirect (5 minute timeout)
-                val result = server.awaitRedirect(300_000L)
+                val customTabIntent = buildCustomTabIntent()
+                customTabIntent.intent.data = authUrl
+                actions.launchIntent(customTabIntent.intent)
+
+                // Wait for localhost redirect
+                val result = server.awaitRedirect(120_000L)
+                activeAuthServer = null
+
                 when (result) {
-                    is AuthCodeResult.Success ->
-                        handleAuthCode(result.code, result.state, redirectUri)
-                    is AuthCodeResult.Error ->
-                        _currentScreen.value = AppScreen.AuthError("${result.error}: ${result.description}")
-                    is AuthCodeResult.Cancelled ->
-                        _currentScreen.value = AppScreen.Login
+                    is AuthCodeResult.Success -> handleAuthCode(result.code, result.state, redirectUri)
+                    is AuthCodeResult.Error -> {
+                        AppLog.e("AUTH", "startLogin: OAuth error: ${result.error} — ${result.description}")
+                        _currentScreen.value = AppScreen.AuthError("Login failed: ${result.description}")
+                    }
+                    is AuthCodeResult.Cancelled -> {
+                        AppLog.step("auth", "startLogin: timed out waiting for redirect")
+                        _currentScreen.value = AppScreen.AuthError("Login timed out — try again")
+                    }
                 }
             } catch (e: CancellationException) {
+                AppLog.step("auth", "startLogin: cancelled")
                 throw e
             } catch (e: Exception) {
                 AppLog.e("AUTH", "startLogin: exception: ${e.message}", e)
                 _currentScreen.value = AppScreen.AuthError(e.message ?: "Login failed")
             } finally {
                 server.stop()
+                // Only clear tracking refs if this is still the active login
+                // (prevents a cancelled job from clearing a newer job's refs)
+                if (activeAuthServer === server) activeAuthServer = null
+            }
+        }
+    }
+
+    /**
+     * Called from onResume() to detect Custom Tab dismissal.
+     * If a login is in progress and the user returns without completing auth,
+     * cancel the login after a short grace period.
+     */
+    fun checkLoginDismissal() {
+        val server = activeAuthServer ?: return
+        val job = activeLoginJob ?: return
+        // Give a short grace period — the redirect may arrive slightly after onResume
+        viewModelScope.launch {
+            delay(500)
+            // If the server is still active (no redirect captured), user dismissed the Custom Tab
+            if (activeAuthServer === server && job.isActive) {
+                AppLog.step("auth", "checkLoginDismissal: Custom Tab dismissed without redirect — cancelling login")
+                job.cancel()
+                activeAuthServer = null
+                activeLoginJob = null
+                server.stop()
+                _currentScreen.value = AppScreen.Login
             }
         }
     }
@@ -581,7 +649,6 @@ class SetupViewModel(
             return
         }
         try {
-            // Step 1: Exchange code for tokens
             val verifier = codeVerifier ?: run {
                 AppLog.e("AUTH", "handleAuthCode: codeVerifier is null — authentication state lost")
                 _currentScreen.value = AppScreen.AuthError("Authentication state lost")
@@ -593,13 +660,13 @@ class SetupViewModel(
             credentialManager.storeTokens(tokenResponse)
             AppLog.step("auth", "handleAuthCode: tokens stored successfully")
 
-            // Try Step 1 direct: fetch characters with first token
+            // Try fetching characters with the first token
             try {
                 val characters = oAuth2Manager.fetchCharacters(tokenResponse.accessToken)
                 handleCharacters(characters, tokenResponse.accessToken)
             } catch (e: OAuthException) {
                 if (e.httpCode == 401 || e.httpCode == 403) {
-                    // Step 1 token not sufficient — need second OAuth2 step
+                    // First token not sufficient — need second OAuth2 step
                     AppLog.step("auth", "handleAuthCode: Step 1 token rejected (${e.httpCode}), starting second auth step")
                     startSecondAuthStep(tokenResponse.accessToken)
                 } else {
@@ -680,13 +747,13 @@ class SetupViewModel(
             val port = server.start()
             val secondVerifier = PkceHelper.generateVerifier()
             val secondState = PkceHelper.generateState()
-            val secondAuthUrl = oAuth2Manager.buildSecondAuthUrl(secondVerifier, secondState, port)
+            val secondAuthUrl = oAuth2Manager.buildAuthUrl(secondVerifier, secondState, port)
             AppLog.step("auth", "startSecondAuthStep: launching second Custom Tab on port $port")
 
             // Open in Custom Tab
-            val intent = CustomTabsIntent.Builder().setShowTitle(true).build()
-            intent.intent.data = secondAuthUrl
-            orchestrator.actions?.launchIntent(intent.intent)
+            val customTabIntent = buildCustomTabIntent()
+            customTabIntent.intent.data = secondAuthUrl
+            orchestrator.actions?.launchIntent(customTabIntent.intent)
 
             // Wait for localhost redirect
             val result = server.awaitRedirect(120_000L)
@@ -697,7 +764,7 @@ class SetupViewModel(
                         _currentScreen.value = AppScreen.AuthError("Security check failed")
                         return
                     }
-                    val secondTokens = oAuth2Manager.exchangeSecondCode(
+                    val secondTokens = oAuth2Manager.exchangeCodeForTokens(
                         result.code, secondVerifier, "http://localhost:$port"
                     )
                     credentialManager.storeTokens(secondTokens)
@@ -759,37 +826,69 @@ class SetupViewModel(
     }
 
     // -------------------------------------------------------------------------
-    // Manual step / permissions
+    // Phased permissions
     // -------------------------------------------------------------------------
 
-    fun onManualStepClick(stepState: StepState) {
-        val status = stepState.status
-        AppLog.state("onManualStepClick: stepId=${stepState.step.id} status=${status::class.simpleName}")
-        if (status is StepStatus.ManualAction) {
-            _permissionInstructions.value = status.instructions
-            _showPermissionsSheet.value = true
-            AppLog.state("onManualStepClick: showing permissions sheet instructionCount=${status.instructions.size}")
+    /**
+     * Combined command that configures both allow-external-apps and extra keys in one paste.
+     * No single quotes — avoids Android clipboard curly-quote corruption.
+     * Double quotes are safe — Android clipboard doesn't corrupt them.
+     */
+    val termuxConfigCommand: String =
+        "mkdir -p ~/.termux && echo allow-external-apps=true >> ~/.termux/termux.properties && " +
+            "echo \"extra-keys = [['ESC','CTRL','ALT','LEFT','DOWN','UP','RIGHT','TAB']," +
+            "['~','/','-','|','HOME','END','PGUP','PGDN']]\" >> ~/.termux/termux.properties && " +
+            "termux-reload-settings && echo Done && am start -n ${context.packageName}/.MainActivity"
+
+    /**
+     * Copy the combined config command to the Android clipboard and launch Termux.
+     * The user long-presses to paste it in Termux, then presses Enter.
+     */
+    fun copyConfigAndOpenTermux() {
+        AppLog.ui("copyConfigAndOpenTermux: copying config command to clipboard and launching Termux")
+
+        // Copy to clipboard
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clip = android.content.ClipData.newPlainText("Termux Config", termuxConfigCommand)
+        clipboard.setPrimaryClip(clip)
+        _commandCopied.value = true
+
+        // Launch Termux
+        val intent = context.packageManager.getLaunchIntentForPackage(SetupOrchestrator.TERMUX_PACKAGE)
+        if (intent != null) {
+            orchestrator.actions?.launchIntent(intent)
+        } else {
+            AppLog.w("PERM", "copyConfigAndOpenTermux: could not get launch intent for Termux")
         }
+
     }
 
-    fun dismissPermissionsSheet() {
-        AppLog.state("dismissPermissionsSheet: hiding permissions sheet")
-        _showPermissionsSheet.value = false
-    }
-
-    fun verifyPermissions() {
+    /**
+     * Called when the user returns from Termux (onResume) or taps "Retry" on a permission phase.
+     * Tries to advance the current permission phase.
+     */
+    fun checkPermissionPhase() {
         if (!isRetrying.compareAndSet(false, true)) return
         viewModelScope.launch {
             try {
-                _showPermissionsSheet.value = false
-                val verified = orchestrator.verifyPermissions()
-                if (verified) {
-                    orchestrator.retryCurrentStep()
-                }
+                if (!orchestrator.awaitingPermissionCompletion.value) return@launch
+                val advanced = orchestrator.advancePermissionPhase()
+                AppLog.step("permissions", "checkPermissionPhase: advanced=$advanced phase=${orchestrator.permissionPhase.value::class.simpleName}")
             } finally {
                 isRetrying.set(false)
             }
         }
+    }
+
+    /**
+     * Request battery optimization exemption for Termux.
+     * Called from the UI when the battery optimization phase is active.
+     */
+    fun requestBatteryOptimization() {
+        AppLog.ui("requestBatteryOptimization: requesting for Termux")
+        orchestrator.requestBatteryOptimization()
+        // Also request for our own app
+        orchestrator.requestOwnBatteryOptimization()
     }
 
     fun recheckPermissions() {
@@ -799,6 +898,12 @@ class SetupViewModel(
         if (!isRetrying.compareAndSet(false, true)) return
         viewModelScope.launch {
             try {
+                // If we're in the phased permissions flow, try to advance
+                if (orchestrator.awaitingPermissionCompletion.value) {
+                    orchestrator.advancePermissionPhase()
+                    return@launch
+                }
+
                 val currentSteps = orchestrator.steps.value
                 val hasFailedInstall = currentSteps.any {
                     (it.step == SetupStep.InstallTermux || it.step == SetupStep.InstallTermuxX11) &&
@@ -834,6 +939,22 @@ class SetupViewModel(
                 }
             }
 
+            override fun requestBatteryOptimization(packageName: String) {
+                val intent = Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:$packageName")
+                )
+                activity.startActivity(intent)
+            }
+
+            override fun openAppSettings(packageName: String) {
+                val intent = Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:$packageName")
+                )
+                activity.startActivity(intent)
+            }
+
             override fun launchIntent(intent: Intent) {
                 activity.startActivity(intent)
             }
@@ -853,6 +974,22 @@ class SetupViewModel(
      * Replaces ' with '\'' so injection via credential values is not possible.
      */
     private fun shellEscape(value: String): String = value.replace("'", "'\\''")
+
+    /**
+     * Build a CustomTabsIntent configured for the Jagex login flow.
+     * Prefers Chrome if available; falls back to system default browser.
+     */
+    private fun buildCustomTabIntent(): CustomTabsIntent {
+        val builder = CustomTabsIntent.Builder()
+            .setShowTitle(true)
+        val intent = builder.build()
+        // Prefer Chrome if installed — guarantees Cloudflare compatibility
+        val chromePackage = getChromePackage()
+        if (chromePackage != null) {
+            intent.intent.setPackage(chromePackage)
+        }
+        return intent
+    }
 
     /**
      * Find an installed Chrome or Chrome-variant package to use for Custom Tabs.
