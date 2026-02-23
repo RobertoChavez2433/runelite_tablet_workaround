@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network security configuration for RuneLite for Tablet.
+    Blocks cleartext (HTTP) traffic by default with a localhost exception
+    for the OAuth2 localhost redirect server (LocalhostAuthServer).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+
+    <!-- Allow cleartext for localhost only (OAuth2 second-step redirect capture) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

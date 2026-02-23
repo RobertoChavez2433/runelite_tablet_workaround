@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.StatFs
 import android.os.SystemClock
 import android.util.Log
+import com.runelitetablet.BuildConfig
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
@@ -80,19 +81,26 @@ object AppLog {
     fun d(prefix: String, message: String) {
         val line = formatLine(prefix, message)
         Log.d(TAG, line)
-        fileWriter.write(line)
+        // File logging for debug/info/warn only in debug builds
+        if (BuildConfig.DEBUG) {
+            fileWriter.write(line)
+        }
     }
 
     fun i(prefix: String, message: String) {
         val line = formatLine(prefix, message)
         Log.i(TAG, line)
-        fileWriter.write(line)
+        if (BuildConfig.DEBUG) {
+            fileWriter.write(line)
+        }
     }
 
     fun w(prefix: String, message: String) {
         val line = formatLine(prefix, message)
         Log.w(TAG, line)
-        fileWriter.write(line)
+        if (BuildConfig.DEBUG) {
+            fileWriter.write(line)
+        }
     }
 
     fun e(prefix: String, message: String, throwable: Throwable? = null) {
@@ -100,6 +108,7 @@ object AppLog {
         if (throwable != null) {
             Log.e(TAG, line, throwable)
             val fullLine = line + "\n" + formatStackTrace(throwable)
+            // Error-level always writes to file (even in release)
             fileWriter.write(fullLine)
         } else {
             Log.e(TAG, line)
