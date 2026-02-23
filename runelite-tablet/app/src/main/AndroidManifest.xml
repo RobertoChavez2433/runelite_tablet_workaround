@@ -32,7 +32,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Test: capture jagex: protocol redirects from OAuth Step 1 -->
+            <!-- Capture jagex: protocol redirects from OAuth Step 1 (launcher-redirect page) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

@@ -39,8 +39,8 @@ class MainActivity : ComponentActivity() {
         val uri = intent.data
         AppLog.lifecycle("MainActivity.onNewIntent: scheme=${uri?.scheme} data=$uri")
         if (uri?.scheme == "jagex") {
-            AppLog.step("auth", "Captured jagex: URI — $uri")
-            // TODO: Extract code/state from URI and pass to auth flow
+            AppLog.step("auth", "Captured jagex: URI — forwarding to ViewModel")
+            viewModel.handleJagexRedirect(uri)
         }
         setIntent(intent)
     }

@@ -5,28 +5,45 @@ import com.runelitetablet.logging.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.coroutines.suspendCancellableCoroutine
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
+import okhttp3.Response
+import java.io.IOException
+import java.security.SecureRandom
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
- * Manages Jagex OAuth2 authentication flow using Chrome Custom Tabs + localhost redirect.
+ * Manages Jagex OAuth2 authentication — correct 2-step, 2-client-ID flow.
  *
- * Part A: Account authentication (browser-based via Chrome Custom Tab)
- *   - Authorization code + PKCE flow
- *   - Client ID: 1fddee4e-b100-4f4e-b2b0-097f9088f9d2 (supports http://localhost redirect)
+ * Step 1 (Account Authentication):
+ *   - Client: com_jagex_auth_desktop_launcher
+ *   - Redirect: https://secure.runescape.com/m=weblogin/launcher-redirect
+ *   - Captured via jagex: custom URI scheme (intent filter in AndroidManifest)
+ *   - PKCE S256
+ *   - Returns access_token, refresh_token, id_token
+ *
+ * Step 2 (Consent — Jagex accounts only):
+ *   - Client: 1fddee4e-b100-4f4e-b2b0-097f9088f9d2
  *   - Redirect: http://localhost:<port> (captured via LocalhostAuthServer)
- *   - Both first and second auth steps use the same client_id + localhost pattern
+ *   - No PKCE, nonce instead
+ *   - response_type: id_token code (hybrid)
+ *   - Returns id_token in URL fragment (captured by forwarder HTML)
  *
- * Part B: Game session (direct API calls, no browser)
- *   - Fetch character list
- *   - Create game session -> JX_SESSION_ID
+ * Step 3 (Game Session — API calls, no browser):
+ *   - POST id_token to /sessions -> sessionId
+ *   - GET /accounts with Bearer sessionId -> character list
  */
 class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
 
@@ -38,52 +55,51 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
             Regex("""(access_token|refresh_token|id_token|session_id|authorization|bearer)\s*[=:]\s*\S+""", RegexOption.IGNORE_CASE),
             Regex("""eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+""") // JWT
         )
+
         // OAuth2 endpoints
         private const val AUTH_ENDPOINT = "https://account.jagex.com/oauth2/auth"
         private const val TOKEN_ENDPOINT = "https://account.jagex.com/oauth2/token"
 
-        // Single client ID that supports http://localhost redirect — used for all OAuth steps
-        private const val CLIENT_ID = "1fddee4e-b100-4f4e-b2b0-097f9088f9d2"
+        // Step 1: Launcher client — account authentication
+        private const val LAUNCHER_CLIENT_ID = "com_jagex_auth_desktop_launcher"
+        private const val LAUNCHER_REDIRECT_URI = "https://secure.runescape.com/m=weblogin/launcher-redirect"
+        private const val LAUNCHER_SCOPES = "openid offline gamesso.token.create user.profile.read"
 
-        // Full scopes for initial auth attempt
-        private const val FULL_SCOPES = "openid offline gamesso.token.create user.profile.read"
-        // Reduced scopes for fallback if Jagex rejects full scopes for this client_id
-        private const val REDUCED_SCOPES = "openid offline"
+        // Step 2: Consent client — Jagex account consent
+        private const val CONSENT_CLIENT_ID = "1fddee4e-b100-4f4e-b2b0-097f9088f9d2"
+        private const val CONSENT_SCOPES = "openid offline"
 
         // Game session endpoints
         private const val ACCOUNTS_ENDPOINT = "https://auth.jagex.com/game-session/v1/accounts"
         private const val SESSIONS_ENDPOINT = "https://auth.jagex.com/game-session/v1/sessions"
+
+        /** Nonce length for Step 2 consent (48 alphanumeric characters). */
+        private const val NONCE_LENGTH = 48
+        private val NONCE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+        private val secureRandom = SecureRandom()
     }
 
     private val json = Json { ignoreUnknownKeys = true }
 
     // -------------------------------------------------------------------------
-    // Build auth URL
+    // Step 1: Build auth URL (launcher client)
     // -------------------------------------------------------------------------
 
     /**
-     * Build the authorization URL for the Chrome Custom Tab.
-     * Uses localhost redirect captured via LocalhostAuthServer.
+     * Build the Step 1 authorization URL for Chrome Custom Tab.
+     * Uses the launcher client with PKCE. The redirect goes to Jagex's launcher-redirect
+     * page, which triggers a jagex: custom URI scheme redirect captured by our intent filter.
      *
      * @param codeVerifier PKCE code verifier
      * @param state CSRF protection nonce
-     * @param localPort Port of the LocalhostAuthServer
-     * @param useReducedScopes If true, use reduced scopes (openid offline only).
-     *                         Set after a full-scope attempt fails with invalid_scope.
      */
-    fun buildAuthUrl(
-        codeVerifier: String,
-        state: String,
-        localPort: Int,
-        useReducedScopes: Boolean = false
-    ): Uri {
+    fun buildStep1AuthUrl(codeVerifier: String, state: String): Uri {
         val codeChallenge = PkceHelper.deriveChallenge(codeVerifier)
-        val scopes = if (useReducedScopes) REDUCED_SCOPES else FULL_SCOPES
         return Uri.parse(AUTH_ENDPOINT).buildUpon()
-            .appendQueryParameter("client_id", CLIENT_ID)
+            .appendQueryParameter("client_id", LAUNCHER_CLIENT_ID)
             .appendQueryParameter("response_type", "code")
-            .appendQueryParameter("redirect_uri", "http://localhost:$localPort")
-            .appendQueryParameter("scope", scopes)
+            .appendQueryParameter("redirect_uri", LAUNCHER_REDIRECT_URI)
+            .appendQueryParameter("scope", LAUNCHER_SCOPES)
             .appendQueryParameter("code_challenge", codeChallenge)
             .appendQueryParameter("code_challenge_method", "S256")
             .appendQueryParameter("state", state)
@@ -91,26 +107,61 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
     }
 
     // -------------------------------------------------------------------------
-    // Token exchange
+    // Step 2: Build consent URL (consent client)
     // -------------------------------------------------------------------------
 
     /**
-     * Exchange authorization code for tokens.
+     * Build the Step 2 consent URL for Chrome Custom Tab.
+     * Uses the consent client with hybrid response_type (id_token code).
+     * No PKCE — uses nonce for replay protection.
+     * Redirect to localhost where forwarder HTML extracts fragment params.
+     *
+     * @param localPort Port of the LocalhostAuthServer
+     * @param state CSRF protection nonce
+     * @param nonce Nonce for id_token replay protection (48 alphanumeric chars)
+     */
+    fun buildStep2ConsentUrl(localPort: Int, state: String, nonce: String): Uri {
+        return Uri.parse(AUTH_ENDPOINT).buildUpon()
+            .appendQueryParameter("client_id", CONSENT_CLIENT_ID)
+            .appendQueryParameter("response_type", "id_token code")
+            .appendQueryParameter("redirect_uri", "http://localhost:$localPort")
+            .appendQueryParameter("scope", CONSENT_SCOPES)
+            .appendQueryParameter("state", state)
+            .appendQueryParameter("nonce", nonce)
+            .build()
+    }
+
+    /**
+     * Generate a random nonce for Step 2 consent (48 alphanumeric characters).
+     */
+    fun generateNonce(): String {
+        return buildString(NONCE_LENGTH) {
+            repeat(NONCE_LENGTH) {
+                append(NONCE_CHARS[secureRandom.nextInt(NONCE_CHARS.length)])
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Step 1: Token exchange (launcher client)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Exchange Step 1 authorization code for tokens.
      * POST to token endpoint with authorization_code grant type + PKCE verifier.
-     * Used for both first and second auth steps (same client_id).
+     * Uses the launcher client_id and the launcher redirect_uri.
      */
     suspend fun exchangeCodeForTokens(
         code: String,
-        codeVerifier: String,
-        redirectUri: String
+        codeVerifier: String
     ): TokenResponse = withContext(Dispatchers.IO) {
         AppLog.step("auth", "exchangeCodeForTokens: exchanging code for tokens")
 
         val body = FormBody.Builder()
             .add("grant_type", "authorization_code")
             .add("code", code)
-            .add("redirect_uri", redirectUri)
-            .add("client_id", CLIENT_ID)
+            .add("redirect_uri", LAUNCHER_REDIRECT_URI)
+            .add("client_id", LAUNCHER_CLIENT_ID)
             .add("code_verifier", codeVerifier)
             .build()
 
@@ -119,7 +170,7 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
             .post(body)
             .build()
 
-        httpClient.newCall(request).execute().use { response ->
+        httpClient.newCall(request).executeCancellable().use { response ->
             if (!response.isSuccessful) {
                 val errorBody = response.body?.string() ?: ""
                 val sanitized = sanitizeErrorBody(errorBody)
@@ -135,6 +186,7 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
 
     /**
      * Refresh tokens using a refresh_token grant.
+     * Uses the launcher client_id.
      */
     suspend fun refreshTokens(refreshToken: String): TokenResponse = withContext(Dispatchers.IO) {
         AppLog.step("auth", "refreshTokens: refreshing access token")
@@ -142,7 +194,7 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
         val body = FormBody.Builder()
             .add("grant_type", "refresh_token")
             .add("refresh_token", refreshToken)
-            .add("client_id", CLIENT_ID)
+            .add("client_id", LAUNCHER_CLIENT_ID)
             .build()
 
         val request = Request.Builder()
@@ -150,7 +202,7 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
             .post(body)
             .build()
 
-        httpClient.newCall(request).execute().use { response ->
+        httpClient.newCall(request).executeCancellable().use { response ->
             if (!response.isSuccessful) {
                 val errorBody = response.body?.string() ?: ""
                 val sanitized = sanitizeErrorBody(errorBody)
@@ -165,65 +217,70 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
     }
 
     // -------------------------------------------------------------------------
-    // Game session
+    // JWT parsing
     // -------------------------------------------------------------------------
 
     /**
-     * Fetch the list of characters associated with this account.
+     * Extract the login_provider claim from a JWT id_token.
+     * Returns "jagex" or "runescape". Defaults to "jagex" if claim is missing.
      */
-    suspend fun fetchCharacters(accessToken: String): List<GameCharacter> = withContext(Dispatchers.IO) {
-        AppLog.step("auth", "fetchCharacters: fetching character list")
+    fun parseLoginProvider(idToken: String): String {
+        return parseJwtClaim(idToken, "login_provider") ?: "jagex"
+    }
 
-        val request = Request.Builder()
-            .url(ACCOUNTS_ENDPOINT)
-            .header("Authorization", "Bearer $accessToken")
-            .get()
-            .build()
-
-        httpClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                val errorBody = response.body?.string() ?: ""
-                val sanitized = sanitizeErrorBody(errorBody)
-                AppLog.e("AUTH", "fetchCharacters: HTTP ${response.code} — $sanitized")
-                throw OAuthException(response.code, "Failed to fetch characters: HTTP ${response.code}", sanitized)
-            }
-
-            val responseBody = response.body?.string()
-                ?: throw OAuthException(0, "Empty response body", "")
-
-            val jsonArray = Json.parseToJsonElement(responseBody).jsonArray
-            jsonArray.map { element ->
-                val obj = element.jsonObject
-                GameCharacter(
-                    accountId = obj["accountId"]?.jsonPrimitive?.content ?: "",
-                    displayName = obj["displayName"]?.jsonPrimitive?.content ?: ""
-                )
-            }
-        }
+    fun verifyNonce(idToken: String, expectedNonce: String): Boolean {
+        val actual = parseJwtClaim(idToken, "nonce") ?: return false
+        return actual == expectedNonce
     }
 
     /**
-     * Create a game session for the selected character.
-     * Returns JX_SESSION_ID.
+     * Parse a specific claim from a JWT token's payload.
+     * JWT format: header.payload.signature (base64url encoded).
+     * Returns the claim value as a string, or null if parsing fails.
      */
-    suspend fun createGameSession(
-        accessToken: String,
-        accountId: String
-    ): String = withContext(Dispatchers.IO) {
-        AppLog.step("auth", "createGameSession: creating session for account ***")
+    private fun parseJwtClaim(jwt: String, claim: String): String? {
+        return try {
+            val parts = jwt.split(".")
+            if (parts.size < 2) return null
+            val payload = android.util.Base64.decode(
+                parts[1],
+                android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING
+            )
+            val payloadJson = String(payload, Charsets.UTF_8)
+            val jsonObj = json.parseToJsonElement(payloadJson).jsonObject
+            jsonObj[claim]?.jsonPrimitive?.content
+        } catch (e: IllegalArgumentException) {
+            AppLog.w("AUTH", "parseJwtClaim($claim): failed: ${e.message}")
+            null
+        } catch (e: kotlinx.serialization.SerializationException) {
+            AppLog.w("AUTH", "parseJwtClaim($claim): failed: ${e.message}")
+            null
+        }
+    }
 
-        val jsonBody = JSONObject().apply {
-            put("accountId", accountId)
-        }.toString()
+    // -------------------------------------------------------------------------
+    // Step 3: Game session APIs (correct auth method)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Create a game session by POSTing the id_token.
+     * This is Step 3a — the id_token comes from Step 2 consent.
+     *
+     * @param idToken JWT from Step 2 consent
+     * @return sessionId to use as Bearer token for subsequent API calls
+     */
+    suspend fun createGameSession(idToken: String): String = withContext(Dispatchers.IO) {
+        AppLog.step("auth", "createGameSession: posting id_token to sessions endpoint")
+
+        val jsonBody = buildJsonObject { put("idToken", idToken) }.toString()
         val body = jsonBody.toRequestBody("application/json".toMediaType())
 
         val request = Request.Builder()
             .url(SESSIONS_ENDPOINT)
-            .header("Authorization", "Bearer $accessToken")
             .post(body)
             .build()
 
-        httpClient.newCall(request).execute().use { response ->
+        httpClient.newCall(request).executeCancellable().use { response ->
             if (!response.isSuccessful) {
                 val errorBody = response.body?.string() ?: ""
                 val sanitized = sanitizeErrorBody(errorBody)
@@ -234,9 +291,47 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
             val responseBody = response.body?.string()
                 ?: throw OAuthException(0, "Empty response body", "")
 
-            val jsonObj = Json.parseToJsonElement(responseBody).jsonObject
+            val jsonObj = json.parseToJsonElement(responseBody).jsonObject
             jsonObj["sessionId"]?.jsonPrimitive?.content
                 ?: throw OAuthException(0, "No sessionId in response", "Response keys: ${jsonObj.keys.joinToString()}")
+        }
+    }
+
+    /**
+     * Fetch the list of characters (accounts) using the sessionId as Bearer token.
+     * This is Step 3b — the sessionId comes from createGameSession().
+     *
+     * @param sessionId Bearer token from createGameSession()
+     * @return List of game characters on this account
+     */
+    suspend fun fetchAccounts(sessionId: String): List<GameCharacter> = withContext(Dispatchers.IO) {
+        AppLog.step("auth", "fetchAccounts: fetching character list with session bearer")
+
+        val request = Request.Builder()
+            .url(ACCOUNTS_ENDPOINT)
+            .header("Authorization", "Bearer $sessionId")
+            .get()
+            .build()
+
+        httpClient.newCall(request).executeCancellable().use { response ->
+            if (!response.isSuccessful) {
+                val errorBody = response.body?.string() ?: ""
+                val sanitized = sanitizeErrorBody(errorBody)
+                AppLog.e("AUTH", "fetchAccounts: HTTP ${response.code} — $sanitized")
+                throw OAuthException(response.code, "Failed to fetch accounts: HTTP ${response.code}", sanitized)
+            }
+
+            val responseBody = response.body?.string()
+                ?: throw OAuthException(0, "Empty response body", "")
+
+            val jsonArray = json.parseToJsonElement(responseBody).jsonArray
+            jsonArray.map { element ->
+                val obj = element.jsonObject
+                GameCharacter(
+                    accountId = obj["accountId"]?.jsonPrimitive?.content ?: "",
+                    displayName = obj["displayName"]?.jsonPrimitive?.content ?: ""
+                )
+            }
         }
     }
 
@@ -259,42 +354,45 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
         return sanitized
     }
 
+    /**
+     * Execute an OkHttp call with coroutine cancellation support.
+     * Uses enqueue() + suspendCancellableCoroutine so that cancelling the coroutine
+     * also cancels the underlying HTTP call (freeing the IO thread immediately).
+     */
+    private suspend fun Call.executeCancellable(): Response {
+        return suspendCancellableCoroutine { cont ->
+            cont.invokeOnCancellation { this.cancel() }
+            this.enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    if (!cont.isCompleted) cont.resumeWithException(e)
+                }
+                override fun onResponse(call: Call, response: Response) {
+                    if (!cont.isCompleted) cont.resume(response)
+                }
+            })
+        }
+    }
+
     private fun parseTokenResponse(responseBody: String): TokenResponse {
-        val jsonObj = Json.parseToJsonElement(responseBody).jsonObject
+        val jsonObj = json.parseToJsonElement(responseBody).jsonObject
         val accessToken = jsonObj["access_token"]?.jsonPrimitive?.content
             ?: throw OAuthException(0, "No access_token in response", "Response keys: ${jsonObj.keys.joinToString()}")
         val refreshToken = jsonObj["refresh_token"]?.jsonPrimitive?.content
+        val idToken = jsonObj["id_token"]?.jsonPrimitive?.content
         val expiresIn = jsonObj["expires_in"]?.jsonPrimitive?.content?.toLongOrNull() ?: 3600L
 
         // Parse JWT exp claim for precise expiry tracking
-        val expiry = parseJwtExpiry(accessToken) ?: (System.currentTimeMillis() / 1000L + expiresIn)
+        val expiry = parseJwtClaim(accessToken, "exp")?.toLongOrNull()
+            ?: (System.currentTimeMillis() / 1000L + expiresIn)
 
-        AppLog.step("auth", "parseTokenResponse: token received, expiresIn=${expiresIn}s expiry=$expiry")
+        AppLog.step("auth", "parseTokenResponse: token received, expiresIn=${expiresIn}s expiry=$expiry hasIdToken=${idToken != null}")
         return TokenResponse(
             accessToken = accessToken,
             refreshToken = refreshToken,
+            idToken = idToken,
             expiresIn = expiresIn,
             accessTokenExpiry = expiry
         )
-    }
-
-    /**
-     * Parse the exp claim from a JWT access token.
-     * JWT format: header.payload.signature (base64url encoded).
-     * Returns Unix timestamp in seconds, or null if parsing fails.
-     */
-    private fun parseJwtExpiry(jwt: String): Long? {
-        return try {
-            val parts = jwt.split(".")
-            if (parts.size < 2) return null
-            val payload = android.util.Base64.decode(parts[1], android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING)
-            val payloadJson = String(payload, Charsets.UTF_8)
-            val jsonObj = Json.parseToJsonElement(payloadJson).jsonObject
-            jsonObj["exp"]?.jsonPrimitive?.content?.toLongOrNull()
-        } catch (e: Exception) {
-            AppLog.w("AUTH", "parseJwtExpiry: failed to parse JWT exp claim: ${e.message}")
-            null
-        }
     }
 }
 
@@ -304,10 +402,11 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
 data class TokenResponse(
     val accessToken: String,
     val refreshToken: String?,
+    val idToken: String?,
     val expiresIn: Long,
     val accessTokenExpiry: Long // Unix seconds
 ) {
-    override fun toString(): String = "TokenResponse(expiresIn=$expiresIn, [REDACTED])"
+    override fun toString(): String = "TokenResponse(expiresIn=$expiresIn, hasIdToken=${idToken != null}, [REDACTED])"
 }
 
 /**

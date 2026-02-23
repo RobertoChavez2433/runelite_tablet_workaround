@@ -1,6 +1,7 @@
 package com.runelitetablet.setup
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -9,8 +10,8 @@ import androidx.browser.customtabs.CustomTabsIntent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.runelitetablet.auth.AuthCodeResult
 import com.runelitetablet.auth.AuthResult
+import com.runelitetablet.auth.ConsentResult
 import com.runelitetablet.auth.CredentialManager
 import com.runelitetablet.auth.GameCharacter
 import com.runelitetablet.auth.JagexOAuth2Manager
@@ -25,6 +26,7 @@ import com.runelitetablet.termux.TermuxCommandRunner
 import com.runelitetablet.termux.TermuxPackageHelper
 import com.runelitetablet.ui.DisplayPreferences
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
@@ -146,16 +148,20 @@ class SetupViewModel(
     private val isRetrying = AtomicBoolean(false)
 
     // Auth state — lives only for the duration of one login attempt
-    @Volatile private var codeVerifier: String? = null
-    @Volatile private var authState: String? = null
+    // Step 1: PKCE verifier + state nonce + deferred for jagex: scheme redirect
+    @Volatile private var step1Verifier: String? = null
+    @Volatile private var step1State: String? = null
+    @Volatile private var step1Deferred: CompletableDeferred<Uri>? = null
 
-    // Stored access token between character list fetch and character selection
-    @Volatile private var pendingAccessToken: String? = null
+    // Whether we're currently awaiting the Step 1 jagex: redirect (for dismissal detection)
+    @Volatile private var awaitingStep1Auth = false
 
-    // Active localhost server for Custom Tab redirect capture.
-    // Tracked so onResume() can detect Custom Tab dismissal without a redirect.
-    @Volatile private var activeAuthServer: LocalhostAuthServer? = null
+    // Active localhost server for Step 2 consent redirect capture.
+    @Volatile private var activeConsentServer: LocalhostAuthServer? = null
     @Volatile private var activeLoginJob: Job? = null
+
+    // Stored session ID between character list fetch and character selection
+    @Volatile private var pendingSessionId: String? = null
 
     /**
      * Expose display name to the UI without leaking the full CredentialManager.
@@ -165,13 +171,16 @@ class SetupViewModel(
     override fun onCleared() {
         super.onCleared()
         // Stop any active auth server and wipe sensitive state
-        activeAuthServer?.stop()
-        activeAuthServer = null
+        activeConsentServer?.stop()
+        activeConsentServer = null
         activeLoginJob?.cancel()
         activeLoginJob = null
-        pendingAccessToken = null
-        codeVerifier = null
-        authState = null
+        step1Deferred?.cancel()
+        step1Deferred = null
+        step1Verifier = null
+        step1State = null
+        awaitingStep1Auth = false
+        pendingSessionId = null
         AppLog.lifecycle("SetupViewModel.onCleared: auth state wiped")
     }
 
@@ -189,7 +198,9 @@ class SetupViewModel(
             // After setup completes, decide what screen to show next
             val allDone = orchestrator.steps.value.all { it.status is StepStatus.Completed }
             if (allDone) {
-                if (credentialManager.hasCredentials()) {
+                // Fix 8: credentialManager I/O must run off the Main thread
+                val hasCreds = withContext(Dispatchers.IO) { credentialManager.hasCredentials() }
+                if (hasCreds) {
                     AppLog.step("setup", "startSetup: setup complete + credentials present -> Launch")
                     _currentScreen.value = AppScreen.Launch
                 } else {
@@ -341,7 +352,9 @@ class SetupViewModel(
      */
     private suspend fun performLaunch() {
         // Token refresh
-        if (credentialManager.hasCredentials()) {
+        // Fix 8: credentialManager I/O must run off the Main thread
+        val hasCredentials = withContext(Dispatchers.IO) { credentialManager.hasCredentials() }
+        if (hasCredentials) {
             _launchState.value = LaunchState.RefreshingTokens
             when (val result = refreshIfNeeded()) {
                 is AuthResult.NeedsLogin -> {
@@ -363,7 +376,8 @@ class SetupViewModel(
         // Write env file if we have credentials
         var envFilePath: String? = null
         var envFile: java.io.File? = null
-        val creds = credentialManager.getCredentials()
+        // Fix 8: credentialManager I/O must run off the Main thread
+        val creds = withContext(Dispatchers.IO) { credentialManager.getCredentials() }
         if (creds != null) {
             try {
                 val file = java.io.File(
@@ -371,12 +385,16 @@ class SetupViewModel(
                     "launch_env_${System.currentTimeMillis()}.sh"
                 )
                 withContext(Dispatchers.IO) {
-                    file.writeText(buildString {
+                    val content = buildString {
                         appendLine("export JX_SESSION_ID='${shellEscape(creds.sessionId)}'")
                         appendLine("export JX_CHARACTER_ID='${shellEscape(creds.characterId)}'")
                         appendLine("export JX_DISPLAY_NAME='${shellEscape(creds.displayName)}'")
                         creds.accessToken?.let { appendLine("export JX_ACCESS_TOKEN='${shellEscape(it)}'") }
-                    })
+                    }
+                    java.io.FileOutputStream(file).use { fos ->
+                        fos.write(content.toByteArray(Charsets.UTF_8))
+                        fos.fd.sync()
+                    }
                 }
                 envFile = file
                 envFilePath = file.absolutePath
@@ -535,49 +553,75 @@ class SetupViewModel(
     }
 
     // -------------------------------------------------------------------------
-    // Auth: Login flow
+    // Auth: 2-Step Login Flow
+    //
+    // Step 1: Account auth via launcher client + jagex: scheme redirect
+    // Step 2: Consent via consent client + localhost forwarder (Jagex accounts only)
+    // Step 3: Game session API calls (POST id_token, GET accounts with Bearer sessionId)
     // -------------------------------------------------------------------------
 
     /**
-     * Start the Jagex OAuth2 login flow using Chrome Custom Tab + localhost redirect.
+     * Called from MainActivity.onNewIntent when a jagex: URI is received.
+     * This completes Step 1 by delivering the redirect URI to the waiting coroutine.
+     */
+    fun handleJagexRedirect(uri: Uri) {
+        val deferred = step1Deferred
+        if (deferred == null) {
+            AppLog.w("AUTH", "handleJagexRedirect: received jagex: URI but no login in progress — ignoring")
+            return
+        }
+        // Fix 1: Log only the scheme, not the full URI (auth code is sensitive)
+        AppLog.step("auth", "handleJagexRedirect: received jagex: redirect (scheme=${uri.scheme})")
+        // Fix 2: Set awaitingStep1Auth = false BEFORE completing the deferred to prevent
+        // checkLoginDismissal from seeing stale true and cancelling a completed auth
+        awaitingStep1Auth = false
+        deferred.complete(uri)
+    }
+
+    /**
+     * Start the Jagex OAuth2 login flow — correct 2-step, 2-client-ID flow.
      *
-     * Flow:
-     * 1. Start LocalhostAuthServer on a random port
-     * 2. Build auth URL with localhost redirect
-     * 3. Open Chrome Custom Tab to the auth URL
-     * 4. Await redirect on localhost (captures auth code)
-     * 5. Exchange code for tokens
-     * 6. Fetch characters / start second auth step if needed
+     * Step 1: Open Chrome Custom Tab with launcher client.
+     *   - Jagex redirects to launcher-redirect page -> jagex: scheme -> our intent filter
+     *   - onNewIntent -> handleJagexRedirect -> completes step1Deferred
+     *   - Exchange code for tokens, parse id_token for login_provider
+     *
+     * Step 2 (Jagex accounts only): Open Chrome Custom Tab with consent client.
+     *   - Redirect to localhost -> forwarder HTML extracts fragment -> POST /jws
+     *   - awaitConsentRedirect captures id_token
+     *
+     * Step 3: Game session API calls.
+     *   - POST id_token to /sessions -> sessionId
+     *   - GET /accounts with Bearer sessionId -> character list
      */
     fun startLogin() {
         // Cancel any previous login attempt
         activeLoginJob?.cancel()
-        activeAuthServer?.stop()
+        activeConsentServer?.stop()
+        step1Deferred?.cancel()
 
-        val server = LocalhostAuthServer()
         activeLoginJob = viewModelScope.launch {
-            activeAuthServer = server
             try {
-                val port = server.start()
-                codeVerifier = PkceHelper.generateVerifier()
-                authState = PkceHelper.generateState()
+                // ---- STEP 1: Account authentication ----
+                step1Verifier = PkceHelper.generateVerifier()
+                step1State = PkceHelper.generateState()
+                val deferred = CompletableDeferred<Uri>()
+                step1Deferred = deferred
 
-                val verifier = codeVerifier ?: run {
-                    AppLog.e("AUTH", "startLogin: codeVerifier is null unexpectedly")
+                val verifier = step1Verifier ?: run {
+                    AppLog.e("AUTH", "startLogin: step1Verifier is null unexpectedly")
                     _currentScreen.value = AppScreen.AuthError("Authentication state lost")
                     return@launch
                 }
-                val state = authState ?: run {
-                    AppLog.e("AUTH", "startLogin: authState is null unexpectedly")
+                val state = step1State ?: run {
+                    AppLog.e("AUTH", "startLogin: step1State is null unexpectedly")
                     _currentScreen.value = AppScreen.AuthError("Authentication state lost")
                     return@launch
                 }
 
-                val redirectUri = "http://localhost:$port"
-                val authUrl = oAuth2Manager.buildAuthUrl(verifier, state, port)
-                AppLog.step("auth", "startLogin: launching Custom Tab with localhost redirect on port $port")
+                val authUrl = oAuth2Manager.buildStep1AuthUrl(verifier, state)
+                AppLog.step("auth", "startLogin: Step 1 — launching Custom Tab with launcher client")
 
-                // Open Chrome Custom Tab
                 val actions = orchestrator.actions
                 if (actions == null) {
                     AppLog.e("AUTH", "startLogin: no actions bound — activity not available")
@@ -587,130 +631,222 @@ class SetupViewModel(
 
                 val customTabIntent = buildCustomTabIntent()
                 customTabIntent.intent.data = authUrl
-                actions.launchIntent(customTabIntent.intent)
+                awaitingStep1Auth = true
+                // Fix 6: Fall back to ACTION_VIEW if Custom Tabs are unavailable
+                try {
+                    actions.launchIntent(customTabIntent.intent)
+                } catch (e: ActivityNotFoundException) {
+                    AppLog.w("AUTH", "startLogin: Custom Tabs unavailable, falling back to ACTION_VIEW")
+                    actions.launchIntent(Intent(Intent.ACTION_VIEW, authUrl))
+                }
 
-                // Wait for localhost redirect
-                val result = server.awaitRedirect(120_000L)
-                activeAuthServer = null
+                // Wait for jagex: scheme redirect via CompletableDeferred
+                val jagexUri: Uri
+                try {
+                    jagexUri = withTimeout(120_000L) { deferred.await() }
+                } catch (e: TimeoutCancellationException) {
+                    AppLog.w("AUTH", "startLogin: Step 1 timed out waiting for jagex: redirect")
+                    _currentScreen.value = AppScreen.AuthError("Login timed out — try again")
+                    return@launch
+                } finally {
+                    awaitingStep1Auth = false
+                    step1Deferred = null
+                }
 
-                when (result) {
-                    is AuthCodeResult.Success -> handleAuthCode(result.code, result.state, redirectUri)
-                    is AuthCodeResult.Error -> {
-                        AppLog.e("AUTH", "startLogin: OAuth error: ${result.error} — ${result.description}")
-                        _currentScreen.value = AppScreen.AuthError("Login failed: ${result.description}")
+                // Parse code + state from jagex: URI
+                // Format: jagex:code=XXX&state=YYY&intent=social_auth
+                val uriStr = jagexUri.toString()
+                val paramsStr = uriStr.removePrefix("jagex:")
+                val params = parseQueryParams(paramsStr)
+                val code = params["code"]
+                val returnedState = params["state"]
+
+                if (code == null) {
+                    AppLog.e("AUTH", "startLogin: no code in jagex: URI")
+                    _currentScreen.value = AppScreen.AuthError("No authorization code received")
+                    return@launch
+                }
+                if (returnedState != state) {
+                    AppLog.e("AUTH", "startLogin: state mismatch — potential CSRF attack")
+                    _currentScreen.value = AppScreen.AuthError("Security check failed — try again")
+                    return@launch
+                }
+
+                AppLog.step("auth", "startLogin: Step 1 — code received, exchanging for tokens")
+
+                // Exchange code for tokens (with PKCE verifier)
+                val tokenResponse = oAuth2Manager.exchangeCodeForTokens(code, verifier)
+                // Fix 8: credentialManager I/O must run off the Main thread
+                withContext(Dispatchers.IO) { credentialManager.storeTokens(tokenResponse) }
+                AppLog.step("auth", "startLogin: Step 1 — tokens received and stored")
+
+                // Parse login_provider from id_token
+                val idToken = tokenResponse.idToken
+                if (idToken == null) {
+                    AppLog.w("AUTH", "startLogin: no id_token in Step 1 response — defaulting to jagex flow")
+                }
+                val loginProvider = if (idToken != null) {
+                    oAuth2Manager.parseLoginProvider(idToken)
+                } else {
+                    "jagex"
+                }
+                AppLog.step("auth", "startLogin: login_provider=$loginProvider")
+
+                when (loginProvider) {
+                    "runescape" -> {
+                        // Legacy RuneScape account — use Step 1 tokens directly
+                        AppLog.step("auth", "startLogin: RuneScape account — skipping Step 2")
+                        // For legacy accounts, store tokens as credentials and go to Launch
+                        // JX_ACCESS_TOKEN and JX_REFRESH_TOKEN used directly
+                        _currentScreen.value = AppScreen.Launch
                     }
-                    is AuthCodeResult.Cancelled -> {
-                        AppLog.step("auth", "startLogin: timed out waiting for redirect")
-                        _currentScreen.value = AppScreen.AuthError("Login timed out — try again")
+                    else -> {
+                        // Jagex account — proceed to Step 2 consent
+                        AppLog.step("auth", "startLogin: Jagex account — proceeding to Step 2 consent")
+                        val consentIdToken = runStep2Consent()
+                        if (consentIdToken != null) {
+                            runStep3GameSession(consentIdToken)
+                        }
+                        // If null, error was already shown by runStep2Consent
                     }
                 }
+
             } catch (e: CancellationException) {
                 AppLog.step("auth", "startLogin: cancelled")
                 throw e
+            } catch (e: OAuthException) {
+                AppLog.e("AUTH", "startLogin: OAuth error: ${e.message}", e)
+                _currentScreen.value = AppScreen.AuthError(e.message ?: "Authentication failed")
             } catch (e: Exception) {
                 AppLog.e("AUTH", "startLogin: exception: ${e.message}", e)
                 _currentScreen.value = AppScreen.AuthError(e.message ?: "Login failed")
             } finally {
-                server.stop()
-                // Only clear tracking refs if this is still the active login
-                // (prevents a cancelled job from clearing a newer job's refs)
-                if (activeAuthServer === server) activeAuthServer = null
+                step1Verifier = null
+                step1State = null
+                step1Deferred = null
+                awaitingStep1Auth = false
             }
         }
     }
 
     /**
-     * Called from onResume() to detect Custom Tab dismissal.
-     * If a login is in progress and the user returns without completing auth,
-     * cancel the login after a short grace period.
+     * Step 2: Consent flow via consent client + localhost server.
+     * Opens a Chrome Custom Tab with the consent URL.
+     * The redirect lands on localhost with fragment params (id_token + code).
+     * Forwarder HTML extracts fragment and POSTs back to our server.
+     *
+     * @return The consent id_token, or null if the flow failed/was cancelled
      */
-    fun checkLoginDismissal() {
-        val server = activeAuthServer ?: return
-        val job = activeLoginJob ?: return
-        // Give a short grace period — the redirect may arrive slightly after onResume
-        viewModelScope.launch {
-            delay(500)
-            // If the server is still active (no redirect captured), user dismissed the Custom Tab
-            if (activeAuthServer === server && job.isActive) {
-                AppLog.step("auth", "checkLoginDismissal: Custom Tab dismissed without redirect — cancelling login")
-                job.cancel()
-                activeAuthServer = null
-                activeLoginJob = null
-                server.stop()
-                _currentScreen.value = AppScreen.Login
-            }
-        }
-    }
-
-    private suspend fun handleAuthCode(code: String, state: String, redirectUri: String) {
-        if (state != authState) {
-            AppLog.e("AUTH", "handleAuthCode: state mismatch — potential CSRF attack")
-            _currentScreen.value = AppScreen.AuthError("Security check failed (state mismatch)")
-            return
-        }
+    private suspend fun runStep2Consent(): String? {
+        val server = LocalhostAuthServer()
+        activeConsentServer = server
         try {
-            val verifier = codeVerifier ?: run {
-                AppLog.e("AUTH", "handleAuthCode: codeVerifier is null — authentication state lost")
-                _currentScreen.value = AppScreen.AuthError("Authentication state lost")
-                return
-            }
-            val tokenResponse = oAuth2Manager.exchangeCodeForTokens(
-                code, verifier, redirectUri
-            )
-            credentialManager.storeTokens(tokenResponse)
-            AppLog.step("auth", "handleAuthCode: tokens stored successfully")
+            val port = server.start()
+            val consentState = PkceHelper.generateState()
+            val nonce = oAuth2Manager.generateNonce()
+            val consentUrl = oAuth2Manager.buildStep2ConsentUrl(port, consentState, nonce)
+            AppLog.step("auth", "startLogin: Step 2 — launching consent Custom Tab on port $port")
 
-            // Try fetching characters with the first token
+            val actions = orchestrator.actions
+            if (actions == null) {
+                AppLog.e("AUTH", "runStep2Consent: no actions bound — activity not available")
+                _currentScreen.value = AppScreen.AuthError("Activity not available")
+                return null
+            }
+
+            val customTabIntent = buildCustomTabIntent()
+            customTabIntent.intent.data = consentUrl
+            // Fix 6: Fall back to ACTION_VIEW if Custom Tabs are unavailable
             try {
-                val characters = oAuth2Manager.fetchCharacters(tokenResponse.accessToken)
-                handleCharacters(characters, tokenResponse.accessToken)
-            } catch (e: OAuthException) {
-                if (e.httpCode == 401 || e.httpCode == 403) {
-                    // First token not sufficient — need second OAuth2 step
-                    AppLog.step("auth", "handleAuthCode: Step 1 token rejected (${e.httpCode}), starting second auth step")
-                    startSecondAuthStep(tokenResponse.accessToken)
-                } else {
-                    throw e
+                actions.launchIntent(customTabIntent.intent)
+            } catch (e: ActivityNotFoundException) {
+                AppLog.w("AUTH", "runStep2Consent: Custom Tabs unavailable, falling back to ACTION_VIEW")
+                actions.launchIntent(Intent(Intent.ACTION_VIEW, consentUrl))
+            }
+
+            // Wait for the 2-request consent flow (forwarder HTML + POST /jws)
+            val result = server.awaitConsentRedirect(consentState, 120_000L)
+            activeConsentServer = null
+
+            return when (result) {
+                is ConsentResult.Success -> {
+                    AppLog.step("auth", "startLogin: Step 2 — consent id_token received")
+                    // Fix 4: Validate nonce in the consent id_token to prevent replay attacks
+                    if (!oAuth2Manager.verifyNonce(result.idToken, nonce)) {
+                        throw OAuthException(0, "Security check failed - try again", "nonce_mismatch")
+                    }
+                    result.idToken
+                }
+                is ConsentResult.Error -> {
+                    AppLog.e("AUTH", "runStep2Consent: error: ${result.error} — ${result.description}")
+                    _currentScreen.value = AppScreen.AuthError("Consent failed: ${result.description}")
+                    null
+                }
+                is ConsentResult.Cancelled -> {
+                    AppLog.step("auth", "runStep2Consent: consent timed out or cancelled")
+                    _currentScreen.value = AppScreen.AuthError("Consent timed out — try again")
+                    null
                 }
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            AppLog.e("AUTH", "handleAuthCode: exception: ${e.message}", e)
-            _currentScreen.value = AppScreen.AuthError(e.message ?: "Authentication failed")
         } finally {
-            codeVerifier = null
-            authState = null
+            server.stop()
+            if (activeConsentServer === server) activeConsentServer = null
         }
     }
 
-    private suspend fun handleCharacters(characters: List<GameCharacter>, accessToken: String) {
+    /**
+     * Step 3: Game session API calls.
+     * POST id_token to /sessions -> sessionId
+     * GET /accounts with Bearer sessionId -> character list
+     */
+    private suspend fun runStep3GameSession(idToken: String) {
+        AppLog.step("auth", "startLogin: Step 3 — creating game session")
+
+        val sessionId = oAuth2Manager.createGameSession(idToken)
+        AppLog.step("auth", "startLogin: Step 3 — session created, fetching accounts")
+
+        val characters = oAuth2Manager.fetchAccounts(sessionId)
+        AppLog.step("auth", "startLogin: Step 3 — ${characters.size} character(s) found")
+
         if (characters.isEmpty()) {
-            AppLog.e("AUTH", "handleCharacters: no characters found on account")
+            AppLog.e("AUTH", "runStep3GameSession: no characters found on account")
             _currentScreen.value = AppScreen.AuthError("No characters found on this account")
             return
         }
+
         if (characters.size == 1) {
-            AppLog.step("auth", "handleCharacters: single character, auto-selecting")
-            selectCharacter(characters[0], accessToken)
+            AppLog.step("auth", "runStep3GameSession: single character, auto-selecting")
+            val character = characters[0]
+            // Fix 8: credentialManager I/O must run off the Main thread
+            withContext(Dispatchers.IO) {
+                credentialManager.storeGameSession(sessionId, character.accountId, character.displayName)
+            }
+            _currentScreen.value = AppScreen.Launch
         } else {
-            AppLog.step("auth", "handleCharacters: ${characters.size} characters found, showing selection screen")
-            pendingAccessToken = accessToken
+            AppLog.step("auth", "runStep3GameSession: ${characters.size} characters, showing selection screen")
+            pendingSessionId = sessionId
             _currentScreen.value = AppScreen.CharacterSelect(characters)
         }
     }
 
+    /**
+     * Called when the user selects a character from the character selection screen.
+     */
     fun onCharacterSelected(character: GameCharacter) {
         viewModelScope.launch {
             try {
-                val accessToken = pendingAccessToken
-                    ?: credentialManager.getCredentials()?.accessToken
-                    ?: run {
-                        AppLog.e("AUTH", "onCharacterSelected: no access token available")
-                        _currentScreen.value = AppScreen.AuthError("No access token")
-                        return@launch
-                    }
-                selectCharacter(character, accessToken)
+                val sessionId = pendingSessionId ?: run {
+                    AppLog.e("AUTH", "onCharacterSelected: no pending session ID")
+                    _currentScreen.value = AppScreen.AuthError("Session expired — please log in again")
+                    return@launch
+                }
+                // Fix 8: credentialManager I/O must run off the Main thread
+                withContext(Dispatchers.IO) {
+                    credentialManager.storeGameSession(sessionId, character.accountId, character.displayName)
+                }
+                pendingSessionId = null
+                AppLog.step("auth", "onCharacterSelected: session stored -> Launch")
+                _currentScreen.value = AppScreen.Launch
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -718,15 +854,6 @@ class SetupViewModel(
                 _currentScreen.value = AppScreen.AuthError(e.message ?: "Session creation failed")
             }
         }
-    }
-
-    private suspend fun selectCharacter(character: GameCharacter, accessToken: String) {
-        AppLog.step("auth", "selectCharacter: creating game session for ***")
-        val sessionId = oAuth2Manager.createGameSession(accessToken, character.accountId)
-        credentialManager.storeGameSession(sessionId, character.accountId, character.displayName)
-        pendingAccessToken = null
-        AppLog.step("auth", "selectCharacter: session created and stored -> Launch")
-        _currentScreen.value = AppScreen.Launch
     }
 
     /**
@@ -737,47 +864,48 @@ class SetupViewModel(
         _currentScreen.value = AppScreen.Launch
     }
 
-    // -------------------------------------------------------------------------
-    // Auth: Second OAuth2 step (if Step 1 token gets 401/403)
-    // -------------------------------------------------------------------------
+    /**
+     * Called from onResume() to detect Custom Tab dismissal.
+     * If a login is in progress and the user returns without completing auth,
+     * cancel the login after a short grace period.
+     */
+    fun checkLoginDismissal() {
+        val job = activeLoginJob ?: return
+        if (!job.isActive) return
 
-    private suspend fun startSecondAuthStep(firstAccessToken: String) {
-        val server = LocalhostAuthServer()
-        try {
-            val port = server.start()
-            val secondVerifier = PkceHelper.generateVerifier()
-            val secondState = PkceHelper.generateState()
-            val secondAuthUrl = oAuth2Manager.buildAuthUrl(secondVerifier, secondState, port)
-            AppLog.step("auth", "startSecondAuthStep: launching second Custom Tab on port $port")
-
-            // Open in Custom Tab
-            val customTabIntent = buildCustomTabIntent()
-            customTabIntent.intent.data = secondAuthUrl
-            orchestrator.actions?.launchIntent(customTabIntent.intent)
-
-            // Wait for localhost redirect
-            val result = server.awaitRedirect(120_000L)
-            when (result) {
-                is AuthCodeResult.Success -> {
-                    if (result.state != secondState) {
-                        AppLog.e("AUTH", "startSecondAuthStep: state mismatch")
-                        _currentScreen.value = AppScreen.AuthError("Security check failed")
-                        return
-                    }
-                    val secondTokens = oAuth2Manager.exchangeCodeForTokens(
-                        result.code, secondVerifier, "http://localhost:$port"
-                    )
-                    credentialManager.storeTokens(secondTokens)
-                    val characters = oAuth2Manager.fetchCharacters(secondTokens.accessToken)
-                    handleCharacters(characters, secondTokens.accessToken)
+        // Check Step 1 (jagex: scheme redirect)
+        if (awaitingStep1Auth) {
+            viewModelScope.launch {
+                delay(1000) // Longer grace period — jagex: redirect may take a moment
+                if (awaitingStep1Auth && job.isActive) {
+                    AppLog.step("auth", "checkLoginDismissal: Step 1 Custom Tab dismissed — cancelling login")
+                    job.cancel()
+                    activeLoginJob = null
+                    awaitingStep1Auth = false
+                    step1Deferred?.cancel()
+                    step1Deferred = null
+                    // Fix 7: Show "Login cancelled" message so the user knows why they landed here
+                    _currentScreen.value = AppScreen.AuthError("Login cancelled — tap Sign In to try again")
                 }
-                is AuthCodeResult.Error ->
-                    _currentScreen.value = AppScreen.AuthError(result.description)
-                is AuthCodeResult.Cancelled ->
-                    _currentScreen.value = AppScreen.Login
             }
-        } finally {
-            server.stop()
+            return
+        }
+
+        // Check Step 2 (consent server)
+        val server = activeConsentServer ?: return
+        viewModelScope.launch {
+            // Fix 3: 2000ms grace period — the 2-request JS flow (serve HTML -> browser executes
+            // JS -> POST /jws) needs more time than a simple redirect
+            delay(2000)
+            if (activeConsentServer === server && job.isActive) {
+                AppLog.step("auth", "checkLoginDismissal: Step 2 Custom Tab dismissed — cancelling login")
+                job.cancel()
+                activeConsentServer = null
+                activeLoginJob = null
+                server.stop()
+                // Fix 7: Show "Login cancelled" message so the user knows why they landed here
+                _currentScreen.value = AppScreen.AuthError("Login cancelled — tap Sign In to try again")
+            }
         }
     }
 
@@ -789,15 +917,16 @@ class SetupViewModel(
      * Check if the access token needs refreshing; refresh if so.
      * Called before launch to ensure credentials are fresh.
      */
-    suspend fun refreshIfNeeded(): AuthResult {
-        val expiry = credentialManager.getAccessTokenExpiry()
+    private suspend fun refreshIfNeeded(): AuthResult {
+        // Fix 8: credentialManager I/O must run off the Main thread
+        val expiry = withContext(Dispatchers.IO) { credentialManager.getAccessTokenExpiry() }
         val now = System.currentTimeMillis() / 1000L
         if (now < expiry - 60) {
             AppLog.step("auth", "refreshIfNeeded: token still valid, expires in ${expiry - now}s")
             return AuthResult.Valid
         }
 
-        val refreshToken = credentialManager.getRefreshToken()
+        val refreshToken = withContext(Dispatchers.IO) { credentialManager.getRefreshToken() }
         if (refreshToken == null) {
             AppLog.step("auth", "refreshIfNeeded: no refresh token -> NeedsLogin")
             return AuthResult.NeedsLogin
@@ -806,7 +935,7 @@ class SetupViewModel(
         return try {
             AppLog.step("auth", "refreshIfNeeded: token expired, refreshing")
             val response = oAuth2Manager.refreshTokens(refreshToken)
-            credentialManager.storeTokens(response)
+            withContext(Dispatchers.IO) { credentialManager.storeTokens(response) }
             AppLog.step("auth", "refreshIfNeeded: refresh succeeded")
             AuthResult.Refreshed
         } catch (e: OAuthException) {
@@ -970,10 +1099,30 @@ class SetupViewModel(
     // -------------------------------------------------------------------------
 
     /**
+     * Parse query parameters from a string like "code=XXX&state=YYY&intent=social_auth".
+     * Used to parse the jagex: URI which comes as jagex:code=XXX&state=YYY (no standard query format).
+     */
+    private fun parseQueryParams(paramsStr: String): Map<String, String> {
+        if (paramsStr.isBlank()) return emptyMap()
+        return paramsStr.split("&").mapNotNull { pair ->
+            val parts = pair.split("=", limit = 2)
+            if (parts.size == 2) {
+                parts[0] to java.net.URLDecoder.decode(parts[1], "UTF-8")
+            } else {
+                null
+            }
+        }.toMap()
+    }
+
+    /**
      * Escape a string for safe use inside single-quoted shell strings.
      * Replaces ' with '\'' so injection via credential values is not possible.
      */
-    private fun shellEscape(value: String): String = value.replace("'", "'\\''")
+    // Fix 5: Escape backslashes BEFORE single quotes — otherwise a backslash immediately before
+    // a single quote would be double-escaped in the wrong order
+    private fun shellEscape(value: String): String = value
+        .replace("\\", "\\\\")
+        .replace("'", "'\\''")
 
     /**
      * Build a CustomTabsIntent configured for the Jagex login flow.
