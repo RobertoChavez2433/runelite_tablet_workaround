@@ -3,14 +3,14 @@
     "app_name": "Runelite for Tablet",
     "app_version": "0.1.0",
     "description": "Android installer app that runs the real RuneLite client on Samsung Tab S10 Ultra via Termux + proot-distro",
-    "last_updated": "2026-02-22T23:00:00Z",
-    "session_notes": "Session 9: First real-device test on Tab S10 Ultra via ADB. App installs and launches but has zero logging. Designed comprehensive logging system (AppLog + CleanupManager). Design committed 5ae73b4."
+    "last_updated": "2026-02-23T12:00:00Z",
+    "session_notes": "Session 18: Brainstormed and implemented /implement skill redesign. New orchestrator agent pattern: pure supervisor main window, Opus orchestrator dispatches implementers/reviewers/fixers, file-based checkpoint for handoff, 5 quality gates (build, lint, code review, plan completeness, performance review). Design doc + skill file updated."
   },
   "current_phase": {
-    "phase_name": "MVP Development — Logging System + Device Testing",
-    "phase_status": "logging_design_approved_implementation_pending",
+    "phase_name": "MVP Development — Display/UX + Slice 2+3 Ready",
+    "phase_status": "display_ux_and_slice2_3_ready_to_implement",
     "phase_started": "2026-02-22",
-    "progress_percentage": 40
+    "progress_percentage": 45
   },
   "release_cycle": {
     "last_release": null,
@@ -19,7 +19,38 @@
     "next_release_version": "0.1.0"
   },
   "active_blockers": [],
-  "resolved_blockers": [],
+  "resolved_blockers": [
+    {
+      "id": "headless-jdk",
+      "description": "openjdk-11-jdk-headless missing AWT/X11 libs (libawt_xawt.so)",
+      "resolved": "2026-02-22",
+      "resolution": "Changed to openjdk-11-jdk in setup-environment.sh. Verified on device in Session 15."
+    },
+    {
+      "id": "proot-distro-exit-code",
+      "description": "proot-distro install ubuntu returns non-zero due to /proc/self/fd warnings, cleans up rootfs",
+      "resolved": "2026-02-22",
+      "resolution": "Manual rootfs extraction fallback + post-extraction config (DNS, hosts, env)"
+    },
+    {
+      "id": "apt-get-hang",
+      "description": "apt-get install hangs for 10+ minutes inside proot due to debconf prompts and missing DNS config",
+      "resolved": "2026-02-22",
+      "resolution": "DEBIAN_FRONTEND=noninteractive + resolv.conf in manual rootfs config"
+    },
+    {
+      "id": "service-lifecycle",
+      "description": "TermuxResultService onDestroy clearing static pendingResults",
+      "resolved": "2026-02-22",
+      "resolution": "Removed deferred cancellation from onDestroy, added stopSelfIfIdle"
+    },
+    {
+      "id": "termux-bundle",
+      "description": "Termux wraps results in Bundle extra, not flat extras",
+      "resolved": "2026-02-22",
+      "resolution": "Extract via getBundleExtra('result')"
+    }
+  ],
   "brainstorm_backlog": [],
   "completed_phases": [
     {
@@ -35,45 +66,38 @@
     {
       "phase_name": "Brainstorming / PRD Design",
       "completed": "2026-02-21",
-      "notes": "Full design doc approved. Architecture, UX, components, phasing, error handling, testing. Committed to .claude/plans/."
+      "notes": "Full design doc approved. Architecture, UX, components, phasing, error handling, testing."
     },
     {
       "phase_name": "Implementation Planning",
       "completed": "2026-02-22",
-      "notes": "MVP implementation plan approved. Vertical slices approach (5 slices, 23 tasks). Committed to .claude/plans/."
+      "notes": "MVP implementation plan approved. Vertical slices approach (5 slices, 23 tasks)."
     },
     {
-      "phase_name": "Slice 1 Detailed Design",
+      "phase_name": "Slice 1 Implementation + Hardening",
       "completed": "2026-02-22",
-      "notes": "Approach B (auto-install). 17 tasks, 6 phases. Termux RUN_COMMAND + PendingIntent, PackageInstaller, setup wizard UI. Committed to .claude/plans/."
+      "notes": "15 Kotlin files + 2 shell scripts. 3-round review-fix-verify. All P0/P1 fixed. Pushed."
     },
     {
-      "phase_name": "Slice 1 Implementation",
+      "phase_name": "Logging System",
       "completed": "2026-02-22",
-      "notes": "15 Kotlin files + 2 shell scripts. Full Gradle build. Code reviewed, all critical/medium fixes applied. APK builds clean."
+      "notes": "AppLog dual-output + CleanupManager. Instrumented all files. Committed and pushed."
     },
     {
-      "phase_name": "Slice 1 Commit Organization",
+      "phase_name": "On-Device Bug Fixes (Sessions 11-15)",
       "completed": "2026-02-22",
-      "notes": "Broke working tree into 6 logical commits by architectural layer."
+      "notes": "Fixed Termux Bundle extraction, service lifecycle, shell compatibility, proot-distro install, DNS config, DEBIAN_FRONTEND, X11 socket bind-mount, full JDK, direct RuneLite client launch. RuneLite running on tablet — login screen visible."
     },
     {
-      "phase_name": ".claude System Redesign Design",
+      "phase_name": "Slice 2+3 Design (Session 16)",
       "completed": "2026-02-22",
-      "notes": "4 research agents, 8-section brainstorm. 2 Opus agents (code-review, performance), /implement orchestrator, /systematic-debugging, upgraded skills. Design approved."
-    },
-    {
-      "phase_name": "Slice 1 Hardening",
-      "completed": "2026-02-22",
-      "notes": "3-round review-fix-verify loop. 8 agents (2 code review, 2 performance, 3 fix, 1 shell). 20 Kotlin fixes + 7 shell improvements. Quality + Performance gates passed. Pushed c967e4c."
+      "notes": "Comprehensive plan for setup persistence, modular scripts, seamless UX, and native OAuth2 auth. 5 research agents, 2 adversarial reviews, 7 P0 + 14 P1 issues found and resolved. Plan at .claude/plans/2026-02-22-slice2-3-implementation-plan.md."
     }
   ],
   "dependencies_at_risk": [],
   "team_context": {
     "primary_owner": "user",
-    "contributors": [
-      "Claude (AI assistant)"
-    ],
+    "contributors": ["Claude (AI assistant)"],
     "work_style": "Brainstorm-first — design before implementation"
   }
 }

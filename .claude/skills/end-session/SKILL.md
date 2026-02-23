@@ -2,7 +2,6 @@
 name: end-session
 description: End session with auto-archiving
 user-invocable: true
-disable-model-invocation: true
 ---
 
 # End Session

@@ -2,7 +2,30 @@
   "permissions": {
     "allow": [
       "WebSearch",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+
+      "Bash(adb:*)",
+
+      "Bash(cd:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(sleep:*)",
+      "Bash(mkdir:*)",
+      "Bash(chmod:*)",
+      "Bash(cp:*)",
+      "Bash(cat:*)",
+      "Bash(echo:*)",
+      "Bash(grep:*)",
+      "Bash(python3:*)",
+
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git show:*)",
+      "Bash(git add:*)",
+      "Bash(git branch:*)"
     ]
   }
 }

@@ -4,37 +4,36 @@ Max 7 active. Oldest rotates to `.claude/logs/defects-archive.md`.
 
 ## Active Patterns
 
-### [COROUTINE] 2026-02-22: TimeoutCancellationException extends CancellationException — catch order matters
-**Pattern**: Catching `CancellationException` before `TimeoutCancellationException` makes the timeout handler dead code, since `TimeoutCancellationException` IS a `CancellationException`. The timeout result is never returned and the deferred leaks.
-**Prevention**: Always catch `TimeoutCancellationException` FIRST, then `CancellationException` as a separate block that re-throws.
-**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/termux/TermuxCommandRunner.kt
-
-### [COROUTINE] 2026-02-22: OkHttp response.use{} required to prevent connection pool leaks
-**Pattern**: Calling `call.execute()` without wrapping the response in `response.use {}` leaks the HTTP connection back to the pool on error. Every failed API call or interrupted download leaks a connection.
-**Prevention**: Always wrap OkHttp responses in `response.use { resp -> ... }`. Response implements Closeable.
-**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/installer/ApkDownloader.kt
-
-### [ANDROID] 2026-02-22: Bare mutable fields accessed from multiple dispatchers need @Volatile
-**Pattern**: Plain `var` fields in ViewModel-scoped objects accessed from both Main and IO dispatchers are data races on ARM64 (torn pointer reads possible).
-**Prevention**: Use `@Volatile` for simple fields, `AtomicBoolean`/`AtomicInteger` for CAS operations, or `MutableStateFlow` for observable state.
+### [TERMUX] 2026-02-22: Env var injection via command string prefix doesn't work with Termux execve
+**Pattern**: Prepending `export VAR=val; bash script.sh` to the Termux RUN_COMMAND `commandPath` string doesn't work — Termux passes `commandPath` as the literal executable path to `execve()`, not to a shell. Credentials never reach the script.
+**Prevention**: Pass credentials via a temp file in app-private storage. Script sources and immediately `rm -f`s the file. Never pass secrets as command-line arguments (also visible in `ps`).
 **Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupOrchestrator.kt
 
-### [ANDROID] 2026-02-22: ViewModel created outside ViewModelProvider
-**Pattern**: Constructing ViewModel directly in onCreate() bypasses lifecycle management — state lost on config changes.
-**Prevention**: Always use `ViewModelProvider.Factory` + `by viewModels{}` delegate for ViewModels.
-**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/MainActivity.kt
+### [SHELL] 2026-02-22: Writing success marker after proot call, not after positive verification
+**Pattern**: Writing the marker file immediately after `proot-distro login -- <cmd>` succeeds (exit 0) — but proot returns non-zero even on successful operations due to `/proc/self/fd` warnings, so the script may have exited before writing the marker, OR the marker is written after a silently failed operation.
+**Prevention**: Always wrap proot calls with `|| true`, then run a positive verification (e.g., `which java`, file existence check), and write the marker ONLY after the verification passes.
+**Ref**: @runelite-tablet/app/src/main/assets/scripts/setup-environment.sh
 
-### [ANDROID] 2026-02-22: Activity reference held in long-lived object
-**Pattern**: Passing Activity to SetupOrchestrator (ViewModel-scoped) causes memory leak on config change.
-**Prevention**: Use callback interface (SetupActions) with bind/unbind in onResume/onPause.
+### [ANDROID] 2026-02-22: startActivity() from background context blocked on Android 10+
+**Pattern**: Calling `context.startActivity()` from `SetupOrchestrator` (which holds applicationContext) to bring Termux:X11 to the foreground. On Android 10+ this is silently dropped if the app is not in the foreground — no exception thrown.
+**Prevention**: Route all Activity starts through `SetupActions.launchIntent()` callback (goes through the Activity, which IS in the foreground when the user taps Launch).
 **Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupOrchestrator.kt
 
-### [INSTALLER] 2026-02-22: NeedsUserAction left step in InProgress with no recovery
-**Pattern**: PackageInstaller STATUS_PENDING_USER_ACTION returned false without setting Failed status — no Retry available.
-**Prevention**: Always set a terminal status (Failed/Completed) before returning false from step execution.
+### [SHELL] 2026-02-22: setupScriptRan guard silently routes refactored steps to old monolithic script
+**Pattern**: `SetupOrchestrator` has a `setupScriptRan: Boolean` guard in `executeStep()` that returns early for steps 4-6 after the first script run, routing them all to `runSetupScript()` (the old monolithic script). If this field is not explicitly deleted during the Slice 2 refactor, modular script calls are silently bypassed.
+**Prevention**: When refactoring to modular scripts, explicitly delete `setupScriptRan: Boolean` field AND `runSetupScript()` function — don't just add new dispatch logic around them.
 **Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupOrchestrator.kt
 
-### [INSTALLER] 2026-02-22: Static bare var for cross-thread CompletableDeferred
-**Pattern**: Using a single `var pendingResult` for install callbacks is not thread-safe and clobbers on concurrent installs.
-**Prevention**: Use `ConcurrentHashMap<Int, CompletableDeferred>` keyed by session/execution ID (same pattern as TermuxResultService).
-**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/installer/InstallResultReceiver.kt
+### [UX] 2026-02-22: RuneLite window is tiny — not filling tablet screen — DESIGNED
+**Pattern**: RuneLite renders at 1038x503 on a 2960x1711 X11 desktop. No window manager = windows open at default size.
+**Root cause**: Bare X11 with no window manager. OSRS defaults to 765x503 + sidebar.
+**Fix**: Install openbox WM in proot, configure auto-maximize + no decorations. Design at `.claude/plans/2026-02-22-display-and-launch-ux-design.md`.
+**Status**: DESIGNED — ready to implement.
+**Ref**: @runelite-tablet/app/src/main/assets/scripts/launch-runelite.sh
+
+### [UX] 2026-02-22: Termux/Termux:X11 workflow confusing — user must manually switch apps — DESIGNED
+**Pattern**: User must manually switch from the RuneLite Tablet app to Termux:X11 after tapping Launch. No in-app guidance; context switch is unintuitive.
+**Root cause**: No auto-switch logic. No fullscreen/immersive configuration.
+**Fix**: Kotlin sends CHANGE_PREFERENCE broadcast (fullscreen, no keyboard bar). Shell script polls X11 socket then runs `am start` to bring Termux:X11 to foreground. Design at `.claude/plans/2026-02-22-display-and-launch-ux-design.md`.
+**Status**: DESIGNED — ready to implement.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupOrchestrator.kt
