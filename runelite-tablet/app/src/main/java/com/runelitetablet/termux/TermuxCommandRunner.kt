@@ -37,7 +37,7 @@ class TermuxCommandRunner(private val context: Context) {
         const val SESSION_ACTION_SWITCH_NEW = "0"
         const val SESSION_ACTION_SWITCH_NEW_NO_ACTIVITY = "2"
 
-        const val TIMEOUT_SETUP_MS = 10L * 60 * 1000     // 10 minutes
+        const val TIMEOUT_SETUP_MS = 20L * 60 * 1000     // 20 minutes
         const val TIMEOUT_VERIFY_MS = 30L * 1000          // 30 seconds
 
         const val TERMUX_BIN_PATH = "/data/data/com.termux/files/usr/bin"
@@ -160,6 +160,9 @@ class TermuxCommandRunner(private val context: Context) {
             context.startService(intent)
             AppLog.cmd(0, "launch: startService success commandPath=$commandPath")
             true
+        } catch (e: SecurityException) {
+            AppLog.e("CMD", "launch: permission denied — is com.termux.permission.RUN_COMMAND granted? commandPath=$commandPath: ${e.message}", e)
+            false
         } catch (e: Exception) {
             AppLog.e("CMD", "launch: startService failed commandPath=$commandPath: ${e.message}", e)
             false
@@ -170,7 +173,7 @@ class TermuxCommandRunner(private val context: Context) {
         val intent = Intent(context, TermuxResultService::class.java).apply {
             putExtra("execution_id", executionId)
         }
-        val flags = PendingIntent.FLAG_ONE_SHOT or PendingIntentCompat.FLAGS
+        val flags = PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_CANCEL_CURRENT or PendingIntentCompat.FLAGS
         return PendingIntent.getService(context, executionId, intent, flags)
     }
 }

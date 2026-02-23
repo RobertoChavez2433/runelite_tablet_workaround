@@ -11,6 +11,8 @@ import com.runelitetablet.logging.AppLog
 import com.runelitetablet.termux.TermuxCommandRunner
 import com.runelitetablet.termux.TermuxPackageHelper
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,6 +24,7 @@ import kotlinx.coroutines.flow.update
  */
 interface SetupActions {
     fun requestInstallPermission()
+    fun requestTermuxPermission()
     fun launchIntent(intent: Intent)
 }
 
@@ -48,7 +51,12 @@ class SetupOrchestrator(
     val currentOutput: StateFlow<String?> = _currentOutput.asStateFlow()
 
     @Volatile private var failedStepIndex: Int = -1
-    @Volatile private var setupScriptRan: Boolean = false
+
+    init {
+        ApkInstaller.onNeedsUserAction = { intent ->
+            actions?.launchIntent(intent)
+        }
+    }
 
     suspend fun runSetup() {
         AppLog.cleanup("runSetup: starting — delegating to CleanupManager")
@@ -183,10 +191,14 @@ class SetupOrchestrator(
         if (isInstalled()) return true
 
         _currentOutput.value = "Downloading ${repo.name}..."
+        var lastEmittedPercent = -1
         val apkFile = apkDownloader.download(repo) { bytesRead, totalBytes ->
             if (totalBytes > 0) {
                 val percent = (bytesRead * 100 / totalBytes).toInt()
-                _currentOutput.value = "Downloading ${repo.name}... $percent%"
+                if (percent != lastEmittedPercent) {
+                    lastEmittedPercent = percent
+                    _currentOutput.value = "Downloading ${repo.name}... $percent%"
+                }
             }
         }
 
@@ -202,12 +214,11 @@ class SetupOrchestrator(
         return when (result) {
             is InstallResult.Success -> true
             is InstallResult.NeedsUserAction -> {
-                _currentOutput.value = "Waiting for install confirmation..."
-                actions?.launchIntent(result.intent)
-                // Set to failed so user can tap Retry after confirming install
-                updateCurrentStepStatus(
-                    StepStatus.Failed("Tap Retry after confirming the install")
-                )
+                // Defensive fallback — normally the receiver launches the confirm intent
+                // directly and the deferred stays alive for the final result. This branch
+                // is only reached if the confirm intent was null.
+                _currentOutput.value = "Install requires confirmation — please retry"
+                updateCurrentStepStatus(StepStatus.Failed("Install requires confirmation — please retry"))
                 false
             }
             is InstallResult.Failure -> {
@@ -226,12 +237,15 @@ class SetupOrchestrator(
     }
 
     private suspend fun handlePermissionsStep(): Boolean {
+        // Request the Termux RUN_COMMAND runtime permission before checking
+        actions?.requestTermuxPermission()
+
         val alreadyWorking = verifyPermissions()
         if (alreadyWorking) return true
 
         val instructions = listOf(
             "Open Termux and run:\necho \"allow-external-apps=true\" >> ~/.termux/termux.properties",
-            "Go to Settings > Apps > RuneLite for Tablet > Permissions > enable \"Run commands in Termux\"",
+            "Grant the \"Run commands in Termux\" permission when prompted (or via Settings > Apps > RuneLite for Tablet > Permissions)",
             "Go to Settings > Apps > Termux > Battery > Unrestricted"
         )
 
@@ -245,9 +259,6 @@ class SetupOrchestrator(
     }
 
     private suspend fun runSetupScript(): Boolean {
-        // Steps 4-6 are handled by a single script. Only run once.
-        if (setupScriptRan) return true
-
         val deployed = scriptManager.deployScripts()
         if (!deployed) {
             _currentOutput.value = "Failed to deploy scripts to Termux"
@@ -263,9 +274,17 @@ class SetupOrchestrator(
             timeoutMs = TermuxCommandRunner.TIMEOUT_SETUP_MS
         )
 
-        if (result.isSuccess) {
-            setupScriptRan = true
-            _currentOutput.value = result.stdout
+        // proot-distro commands return non-zero exit codes due to harmless
+        // /proc/self/fd binding warnings in background (no-PTY) mode. Check for
+        // the script's success marker in stdout instead of relying on exit code.
+        val scriptCompleted = result.stdout?.contains("=== Setup complete ===") == true
+
+        if (result.isSuccess || scriptCompleted) {
+            // Truncate to last 2000 chars — setup scripts can produce MB-scale output
+            _currentOutput.value = result.stdout?.let { if (it.length > 2000) it.takeLast(2000) else it }
+            if (!result.isSuccess) {
+                AppLog.w("STEP", "runSetupScript: non-zero exit (${result.exitCode}) but script completed — proot fd warnings likely")
+            }
             // Mark all three sub-steps as completed in one emission
             val oldSteps = _steps.value
             _steps.update { currentSteps ->
@@ -286,7 +305,7 @@ class SetupOrchestrator(
             return true
         } else {
             val errorOutput = result.stderr ?: result.error ?: "Unknown error"
-            AppLog.e("STEP", "runSetupScript: script failed errorOutput=$errorOutput")
+            AppLog.e("STEP", "runSetupScript: script failed exitCode=${result.exitCode} errorOutput=$errorOutput stdoutTail=${result.stdout?.takeLast(200)}")
             _currentOutput.value = errorOutput
             updateCurrentStepStatus(StepStatus.Failed(errorOutput))
             return false
@@ -297,10 +316,13 @@ class SetupOrchestrator(
         _currentOutput.value = "Verifying setup..."
 
         val checks = listOf(
-            "proot-distro list 2>/dev/null | grep -q ubuntu && echo 'PASS: proot' || echo 'FAIL: proot'",
-            "proot-distro login ubuntu -- which java && echo 'PASS: java' || echo 'FAIL: java'",
-            "proot-distro login ubuntu -- test -f /root/runelite/RuneLite.jar && echo 'PASS: runelite' || echo 'FAIL: runelite'",
-            "which termux-x11 && echo 'PASS: x11' || echo 'FAIL: x11'"
+            // Check rootfs directory directly — proot-distro list may not show manually-extracted rootfs
+            "[ -d \"\$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu\" ] && echo 'PASS: proot' || echo 'FAIL: proot'",
+            "proot-distro login ubuntu -- which java < /dev/null && echo 'PASS: java' || echo 'FAIL: java'",
+            "proot-distro login ubuntu -- test -f /root/runelite/RuneLite.jar < /dev/null && echo 'PASS: runelite' || echo 'FAIL: runelite'",
+            // Use command -v (POSIX) and check common x11 paths for background mode PATH issues
+            // Braces group the OR check so && applies to the whole condition (not just the second operand)
+            "{ command -v termux-x11 >/dev/null 2>&1 || [ -f \"\$PREFIX/bin/termux-x11\" ]; } && echo 'PASS: x11' || echo 'FAIL: x11'"
         )
 
         val verifyScript = checks.joinToString("\n")
@@ -323,13 +345,18 @@ class SetupOrchestrator(
             return false
         }
 
-        return result.isSuccess
+        // All PASS markers present — ignore exit code. proot commands return non-zero
+        // even on success due to /proc/self/fd binding warnings in background (no-PTY) mode.
+        if (result.exitCode != 0) {
+            AppLog.w("STEP", "runVerification: non-zero exit (${result.exitCode}) but all checks passed — proot fd warnings likely")
+        }
+        return true
     }
 
-    private fun evaluateCompletedSteps() {
+    private suspend fun evaluateCompletedSteps() {
         AppLog.step("setup", "evaluateCompletedSteps: checking pre-installed packages")
-        val termuxInstalled = termuxHelper.isTermuxInstalled()
-        val termuxX11Installed = termuxHelper.isTermuxX11Installed()
+        val termuxInstalled = withContext(Dispatchers.IO) { termuxHelper.isTermuxInstalled() }
+        val termuxX11Installed = withContext(Dispatchers.IO) { termuxHelper.isTermuxX11Installed() }
         AppLog.step("termux", "evaluateCompletedSteps: isTermuxInstalled=$termuxInstalled")
         AppLog.step("termux_x11", "evaluateCompletedSteps: isTermuxX11Installed=$termuxX11Installed")
 

@@ -30,11 +30,9 @@ class InstallResultReceiver : BroadcastReceiver() {
         val statusName = statusName(status)
         val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "Unknown error"
 
-        // Build a dump of all intent extras for full context
-        val extrasBundle = intent.extras
-        val extrasDump = extrasBundle?.keySet()?.joinToString(", ") { key ->
-            "$key=${extrasBundle.get(key)}"
-        } ?: "<none>"
+        // Log intent extra keys only — avoid deserializing values (Parcelables like EXTRA_INTENT
+        // trigger deserialization on the main thread, causing jank during install animations)
+        val extrasDump = intent.extras?.keySet()?.joinToString(", ") ?: "<none>"
 
         AppLog.install(
             "onReceive: sessionId=$sessionId status=$status statusName=$statusName " +
@@ -44,6 +42,39 @@ class InstallResultReceiver : BroadcastReceiver() {
         if (sessionId == -1) {
             AppLog.e("INSTALL", "onReceive: missing session_id in intent extras — cannot complete deferred")
             return
+        }
+
+        // STATUS_PENDING_USER_ACTION: launch the confirm intent directly and keep the
+        // deferred alive so it receives the final SUCCESS/FAILURE callback from the system.
+        if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+            val confirmIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(Intent.EXTRA_INTENT)
+            }
+            if (confirmIntent != null) {
+                confirmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                val callback = ApkInstaller.onNeedsUserAction
+                if (callback != null) {
+                    AppLog.install("onReceive: STATUS_PENDING_USER_ACTION sessionId=$sessionId — routing via Activity callback, keeping deferred alive")
+                    callback(confirmIntent)
+                } else {
+                    AppLog.install("onReceive: STATUS_PENDING_USER_ACTION sessionId=$sessionId — no callback set, fallback to direct startActivity")
+                    try {
+                        context.startActivity(confirmIntent)
+                    } catch (e: Exception) {
+                        AppLog.e("INSTALL", "onReceive: failed to start confirm activity sessionId=$sessionId: ${e.message}", e)
+                        pendingResults.remove(sessionId)?.complete(
+                            InstallResult.Failure("Could not start install confirmation: ${e.message}")
+                        )
+                    }
+                }
+                return
+            } else {
+                AppLog.e("INSTALL", "onReceive: STATUS_PENDING_USER_ACTION but confirmIntent is null sessionId=$sessionId — completing as failure")
+                // Fall through to remove deferred and complete with Failure
+            }
         }
 
         val deferred = pendingResults.remove(sessionId)
@@ -63,21 +94,6 @@ class InstallResultReceiver : BroadcastReceiver() {
             PackageInstaller.STATUS_SUCCESS -> {
                 AppLog.install("onReceive: install STATUS_SUCCESS sessionId=$sessionId")
                 InstallResult.Success
-            }
-            PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                val confirmIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
-                } else {
-                    @Suppress("DEPRECATION")
-                    intent.getParcelableExtra(Intent.EXTRA_INTENT)
-                }
-                if (confirmIntent != null) {
-                    AppLog.install("onReceive: STATUS_PENDING_USER_ACTION sessionId=$sessionId confirmIntent present")
-                    InstallResult.NeedsUserAction(confirmIntent)
-                } else {
-                    AppLog.e("INSTALL", "onReceive: STATUS_PENDING_USER_ACTION but confirmIntent is null sessionId=$sessionId")
-                    InstallResult.Failure("User action required but no intent provided")
-                }
             }
             else -> {
                 AppLog.install("onReceive: install FAILURE status=$status statusName=$statusName message='$message' sessionId=$sessionId")

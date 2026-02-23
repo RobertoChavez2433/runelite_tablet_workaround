@@ -23,6 +23,15 @@ sealed class InstallResult {
 
 class ApkInstaller(private val context: Context) {
 
+    companion object {
+        /**
+         * Callback invoked when PackageInstaller requires user confirmation (STATUS_PENDING_USER_ACTION).
+         * Routes the confirmation dialog through an Activity context (required on Android 10+).
+         * Set by SetupOrchestrator when actions are bound; null when unbound.
+         */
+        var onNeedsUserAction: ((Intent) -> Unit)? = null
+    }
+
     fun canInstallPackages(): Boolean {
         val result = context.packageManager.canRequestPackageInstalls()
         AppLog.install("canInstallPackages: result=$result")
@@ -41,17 +50,19 @@ class ApkInstaller(private val context: Context) {
         try {
             val packageInstaller = context.packageManager.packageInstaller
 
-            // Clean up any abandoned sessions
+            // Clean up any abandoned sessions (guard avoids unnecessary Binder IPC on clean installs)
             val abandonedSessions = packageInstaller.mySessions
-            AppLog.install(
-                "abandoned sessions cleanup: count=${abandonedSessions.size} " +
-                    "sessionIds=${abandonedSessions.map { it.sessionId }}"
-            )
-            abandonedSessions.forEach { sessionInfo ->
-                try {
-                    packageInstaller.abandonSession(sessionInfo.sessionId)
-                } catch (e: Exception) {
-                    if (e is CancellationException) throw e
+            if (abandonedSessions.isNotEmpty()) {
+                AppLog.install(
+                    "abandoned sessions cleanup: count=${abandonedSessions.size} " +
+                        "sessionIds=${abandonedSessions.map { it.sessionId }}"
+                )
+                abandonedSessions.forEach { sessionInfo ->
+                    try {
+                        packageInstaller.abandonSession(sessionInfo.sessionId)
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                    }
                 }
             }
 
@@ -103,18 +114,22 @@ class ApkInstaller(private val context: Context) {
             } catch (e: TimeoutCancellationException) {
                 AppLog.install("install: timeout waitedMs=120000 sessionId=$sessionId")
                 InstallResultReceiver.pendingResults.remove(sessionId)
+                if (sessionId != -1) try { context.packageManager.packageInstaller.abandonSession(sessionId) } catch (_: Exception) {}
                 InstallResult.Failure("Installation timed out after 2 minutes")
             }
         } catch (e: CancellationException) {
             InstallResultReceiver.pendingResults.remove(sessionId)
+            if (sessionId != -1) try { context.packageManager.packageInstaller.abandonSession(sessionId) } catch (_: Exception) {}
             throw e
         } catch (e: IOException) {
             AppLog.e("INSTALL", "install: IOException sessionId=$sessionId message=${e.message}", e)
             InstallResultReceiver.pendingResults.remove(sessionId)
+            if (sessionId != -1) try { context.packageManager.packageInstaller.abandonSession(sessionId) } catch (_: Exception) {}
             return InstallResult.Failure("Install failed: ${e.message}")
         } catch (e: SecurityException) {
             AppLog.e("INSTALL", "install: SecurityException sessionId=$sessionId message=${e.message}", e)
             InstallResultReceiver.pendingResults.remove(sessionId)
+            if (sessionId != -1) try { context.packageManager.packageInstaller.abandonSession(sessionId) } catch (_: Exception) {}
             return InstallResult.Failure("Install permission denied: ${e.message}")
         }
     }

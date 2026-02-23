@@ -1,6 +1,7 @@
 package com.runelitetablet.setup
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -43,6 +44,7 @@ class SetupViewModel(
     val permissionInstructions: StateFlow<List<String>> = _permissionInstructions.asStateFlow()
 
     private val setupStarted = AtomicBoolean(false)
+    private val isRetrying = AtomicBoolean(false)
 
     fun startSetup() {
         val wasAlreadyStarted = !setupStarted.compareAndSet(false, true)
@@ -59,12 +61,17 @@ class SetupViewModel(
     }
 
     fun retry() {
+        if (!isRetrying.compareAndSet(false, true)) return
         val failedStep = orchestrator.steps.value.firstOrNull { it.status is StepStatus.Failed }
         AppLog.step(failedStep?.step?.id ?: "unknown", "retry requested for step=${failedStep?.step?.id}")
         viewModelScope.launch {
-            AppLog.perf("retry: coroutine started")
-            orchestrator.retryCurrentStep()
-            AppLog.perf("retry: coroutine completed")
+            try {
+                AppLog.perf("retry: coroutine started")
+                orchestrator.retryCurrentStep()
+                AppLog.perf("retry: coroutine completed")
+            } finally {
+                isRetrying.set(false)
+            }
         }
     }
 
@@ -99,25 +106,37 @@ class SetupViewModel(
     }
 
     fun verifyPermissions() {
+        if (!isRetrying.compareAndSet(false, true)) return
         viewModelScope.launch {
-            _showPermissionsSheet.value = false
-            val verified = orchestrator.verifyPermissions()
-            if (verified) {
-                orchestrator.retryCurrentStep()
+            try {
+                _showPermissionsSheet.value = false
+                val verified = orchestrator.verifyPermissions()
+                if (verified) {
+                    orchestrator.retryCurrentStep()
+                }
+            } finally {
+                isRetrying.set(false)
             }
         }
     }
 
     fun recheckPermissions() {
-        // Re-evaluate completed steps on return from settings/install screens
+        // Re-evaluate completed steps on return from settings/install screens.
+        // Guard with isRetrying to prevent concurrent retryCurrentStep() calls if the user
+        // navigates back rapidly (e.g., quick back-press from install confirmation screen).
+        if (!isRetrying.compareAndSet(false, true)) return
         viewModelScope.launch {
-            val currentSteps = orchestrator.steps.value
-            val hasFailedInstall = currentSteps.any {
-                (it.step == SetupStep.InstallTermux || it.step == SetupStep.InstallTermuxX11) &&
-                    it.status is StepStatus.Failed
-            }
-            if (hasFailedInstall) {
-                orchestrator.retryCurrentStep()
+            try {
+                val currentSteps = orchestrator.steps.value
+                val hasFailedInstall = currentSteps.any {
+                    (it.step == SetupStep.InstallTermux || it.step == SetupStep.InstallTermuxX11) &&
+                        it.status is StepStatus.Failed
+                }
+                if (hasFailedInstall) {
+                    orchestrator.retryCurrentStep()
+                }
+            } finally {
+                isRetrying.set(false)
             }
         }
     }
@@ -132,6 +151,13 @@ class SetupViewModel(
                 activity.startActivity(intent)
             }
 
+            override fun requestTermuxPermission() {
+                val permission = "com.termux.permission.RUN_COMMAND"
+                if (activity.checkSelfPermission(permission) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    activity.requestPermissions(arrayOf(permission), REQUEST_TERMUX_PERMISSION)
+                }
+            }
+
             override fun launchIntent(intent: Intent) {
                 activity.startActivity(intent)
             }
@@ -142,13 +168,21 @@ class SetupViewModel(
         orchestrator.actions = null
     }
 
+    companion object {
+        const val REQUEST_TERMUX_PERMISSION = 1001
+    }
+
     class Factory(
-        private val activity: Activity,
+        activity: Activity,
         private val httpClient: OkHttpClient
     ) : ViewModelProvider.Factory {
+        // Store applicationContext only — storing Activity would leak it across config changes
+        // since ViewModelProvider retains the Factory for the lifetime of the ViewModelStore.
+        private val appContext: Context = activity.applicationContext
+
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            val context = activity.applicationContext
+            val context = appContext
             val termuxHelper = TermuxPackageHelper(context)
             val apkDownloader = ApkDownloader(context, httpClient)
             val apkInstaller = ApkInstaller(context)

@@ -2,8 +2,6 @@ package com.runelitetablet.termux
 
 import android.app.Service
 import android.content.Intent
-import android.os.Handler
-import android.os.HandlerThread
 import android.os.IBinder
 import com.runelitetablet.logging.AppLog
 import kotlinx.coroutines.CompletableDeferred
@@ -21,6 +19,7 @@ class TermuxResultService : Service() {
         private const val EXTRA_EXIT_CODE = "exitCode"
         private const val EXTRA_ERROR = "err"
         private const val EXTRA_ERROR_MSG = "errmsg"
+        private const val EXTRA_RESULT_BUNDLE = "result"
         private val counter = AtomicInteger(0)
 
         private const val STDOUT_PREVIEW_LEN = 200
@@ -28,40 +27,33 @@ class TermuxResultService : Service() {
         fun createExecutionId(): Int = counter.incrementAndGet()
     }
 
-    private lateinit var handlerThread: HandlerThread
-    private lateinit var handler: Handler
-
     override fun onCreate() {
         super.onCreate()
-        handlerThread = HandlerThread("TermuxResultHandler")
-        handlerThread.start()
-        handler = Handler(handlerThread.looper)
-        AppLog.lifecycle("TermuxResultService.onCreate: HandlerThread started looper=${handlerThread.looper}")
+        AppLog.lifecycle("TermuxResultService.onCreate")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent == null) {
-            AppLog.cmd(-1, "onStartCommand: null intent received — stopping self startId=$startId")
-            stopSelf(startId)
+            AppLog.cmd(-1, "onStartCommand: null intent received — pendingResults=${pendingResults.size} startId=$startId")
+            stopSelfIfIdle(startId)
             return START_NOT_STICKY
         }
 
         val executionId = intent.getIntExtra(EXTRA_EXECUTION_ID, -1)
-        val stdoutPreview = intent.getStringExtra(EXTRA_STDOUT)?.take(STDOUT_PREVIEW_LEN) ?: "<absent>"
-        val stderrPreview = intent.getStringExtra(EXTRA_STDERR)?.take(STDOUT_PREVIEW_LEN) ?: "<absent>"
-        val exitCode = intent.getIntExtra(EXTRA_EXIT_CODE, Int.MIN_VALUE)
-        val error = intent.getStringExtra(EXTRA_ERROR) ?: intent.getStringExtra(EXTRA_ERROR_MSG)
+        val resultBundle = intent.getBundleExtra(EXTRA_RESULT_BUNDLE)
+        val stdoutPreview = resultBundle?.getString(EXTRA_STDOUT)?.take(STDOUT_PREVIEW_LEN) ?: "<absent>"
+        val stderrPreview = resultBundle?.getString(EXTRA_STDERR)?.take(STDOUT_PREVIEW_LEN) ?: "<absent>"
+        val exitCode = resultBundle?.getInt(EXTRA_EXIT_CODE, Int.MIN_VALUE) ?: Int.MIN_VALUE
+        val errCode = resultBundle?.getInt(EXTRA_ERROR, -1) ?: -1
+        val errmsg = resultBundle?.getString(EXTRA_ERROR_MSG)
         AppLog.cmd(
             executionId,
-            "onStartCommand: executionId=$executionId exitCode=$exitCode error=$error " +
+            "onStartCommand: executionId=$executionId exitCode=$exitCode errCode=$errCode errmsg=$errmsg " +
                 "stdoutPreview='$stdoutPreview' stderrPreview='$stderrPreview' " +
-                "pendingResultsSize=${pendingResults.size}"
+                "resultBundle=${resultBundle != null} pendingResultsSize=${pendingResults.size}"
         )
 
-        handler.post {
-            handleResult(intent, startId)
-        }
-
+        handleResult(intent, startId)
         return START_NOT_STICKY
     }
 
@@ -69,20 +61,23 @@ class TermuxResultService : Service() {
         val executionId = intent.getIntExtra(EXTRA_EXECUTION_ID, -1)
         if (executionId == -1) {
             AppLog.e("CMD", "handleResult: missing execution_id in intent extras — dropping result")
-            stopSelf(startId)
+            stopSelfIfIdle(startId)
             return
         }
 
-        val stdout = intent.getStringExtra(EXTRA_STDOUT)
-        val stderr = intent.getStringExtra(EXTRA_STDERR)
-        val exitCode = intent.getIntExtra(EXTRA_EXIT_CODE, -1)
-        val error = intent.getStringExtra(EXTRA_ERROR) ?: intent.getStringExtra(EXTRA_ERROR_MSG)
+        val resultBundle = intent.getBundleExtra(EXTRA_RESULT_BUNDLE)
+        val stdout = resultBundle?.getString(EXTRA_STDOUT)
+        val stderr = resultBundle?.getString(EXTRA_STDERR)
+        val exitCode = resultBundle?.getInt(EXTRA_EXIT_CODE, -1) ?: -1
+        val errCode = resultBundle?.getInt(EXTRA_ERROR, -1) ?: -1
+        val errmsg = resultBundle?.getString(EXTRA_ERROR_MSG)
+        val error = errmsg ?: if (errCode > 0) "Termux error code: $errCode" else null
 
         val stdoutPreview = stdout?.take(STDOUT_PREVIEW_LEN) ?: "<null>"
         val stderrPreview = stderr?.take(STDOUT_PREVIEW_LEN) ?: "<null>"
         AppLog.cmd(
             executionId,
-            "handleResult: executionId=$executionId exitCode=$exitCode error=$error " +
+            "handleResult: executionId=$executionId exitCode=$exitCode errCode=$errCode errmsg=$errmsg " +
                 "stdoutLen=${stdout?.length ?: 0} stdoutPreview='$stdoutPreview' " +
                 "stderrLen=${stderr?.length ?: 0} stderrPreview='$stderrPreview'"
         )
@@ -102,20 +97,23 @@ class TermuxResultService : Service() {
             AppLog.cmd(executionId, "handleResult: deferred NOT found in pendingResults (already removed?) mapSize=${pendingResults.size}")
         }
 
-        stopSelf(startId)
+        stopSelfIfIdle(startId)
+    }
+
+    private fun stopSelfIfIdle(startId: Int) {
+        if (pendingResults.isEmpty()) {
+            AppLog.lifecycle("TermuxResultService.stopSelfIfIdle: no pending results — stopSelf(startId=$startId)")
+            stopSelf(startId)
+        } else {
+            AppLog.lifecycle("TermuxResultService.stopSelfIfIdle: ${pendingResults.size} pending result(s) — staying alive " +
+                "pendingIds=${pendingResults.keys}")
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
         super.onDestroy()
-        val pendingCount = pendingResults.size
-        AppLog.lifecycle("TermuxResultService.onDestroy: canceling $pendingCount pending result(s)")
-        pendingResults.entries.forEach { (execId, deferred) ->
-            AppLog.cmd(execId, "onDestroy: canceling pending deferred execId=$execId")
-            deferred.completeExceptionally(IllegalStateException("Service destroyed"))
-        }
-        pendingResults.clear()
-        handlerThread.quitSafely()
+        AppLog.lifecycle("TermuxResultService.onDestroy: pendingResults=${pendingResults.size} (not clearing — deferreds are static, outlive service instances)")
     }
 }
