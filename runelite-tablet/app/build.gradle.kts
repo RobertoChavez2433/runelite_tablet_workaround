@@ -61,6 +61,11 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
+    // Auth: Chrome Custom Tab for Jagex OAuth2 login
+    implementation("androidx.browser:browser:1.8.0")
+    // Auth: Encrypted storage for Jagex credentials
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 

@@ -1,6 +1,13 @@
 #!/data/data/com.termux/files/usr/bin/bash
 set -euo pipefail
 
+# DEPRECATED — This monolithic script is no longer called by the app.
+# Steps 3-5 are now handled by modular scripts:
+#   install-proot.sh    (Step 3)
+#   install-java.sh     (Step 4)
+#   download-runelite.sh (Step 5)
+# Kept for reference only. Do not call directly.
+
 # Retry helper: up to 3 attempts with 5s backoff for apt network operations.
 # Transient DNS failures, 503 from mirror CDN, or GPG timeout can cause apt to
 # fail non-zero. Under set -euo pipefail this would abort the entire script.

@@ -34,6 +34,19 @@ sealed class StepStatus {
         }
 }
 
+/**
+ * Top-level setup state. Controls which screen/content is shown.
+ * Reconciling prevents step-flicker during startup marker check.
+ */
+sealed class SetupState {
+    /** Loading cached state, reconciling against markers. Buttons disabled. */
+    object Reconciling : SetupState()
+    /** Setup wizard is active (steps running or waiting). */
+    object SetupInProgress : SetupState()
+    /** All setup steps completed. */
+    object SetupComplete : SetupState()
+}
+
 data class StepState(
     val step: SetupStep,
     val status: StepStatus = StepStatus.Pending

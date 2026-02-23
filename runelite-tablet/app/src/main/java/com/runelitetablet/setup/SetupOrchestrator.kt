@@ -12,6 +12,7 @@ import com.runelitetablet.termux.TermuxCommandRunner
 import com.runelitetablet.termux.TermuxPackageHelper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,9 +36,16 @@ class SetupOrchestrator(
     private val apkInstaller: ApkInstaller,
     private val commandRunner: TermuxCommandRunner,
     private val scriptManager: ScriptManager,
-    private val cleanupManager: CleanupManager
+    private val cleanupManager: CleanupManager,
+    private val stateStore: SetupStateStore
 ) {
     @Volatile var actions: SetupActions? = null
+        set(value) {
+            field = value
+            ApkInstaller.onNeedsUserAction = if (value != null) {
+                { intent -> value.launchIntent(intent) }
+            } else null
+        }
 
     private val _steps = MutableStateFlow(
         SetupStep.allSteps.map { StepState(it) }
@@ -50,20 +58,42 @@ class SetupOrchestrator(
     private val _currentOutput = MutableStateFlow<String?>(null)
     val currentOutput: StateFlow<String?> = _currentOutput.asStateFlow()
 
+    private val _setupState = MutableStateFlow<SetupState>(SetupState.Reconciling)
+    val setupState: StateFlow<SetupState> = _setupState.asStateFlow()
+
     @Volatile private var failedStepIndex: Int = -1
 
-    init {
-        ApkInstaller.onNeedsUserAction = { intent ->
-            actions?.launchIntent(intent)
-        }
+    companion object {
+        /** Timeout for check-markers.sh reconciliation on startup */
+        private const val MARKER_CHECK_TIMEOUT_MS = 10_000L
+
+        /** Map of setup step to its marker key and script name */
+        private val MODULAR_STEPS = mapOf(
+            SetupStep.InstallProot to Pair("step-proot", "install-proot.sh"),
+            SetupStep.InstallJava to Pair("step-java", "install-java.sh"),
+            SetupStep.DownloadRuneLite to Pair("step-runelite", "download-runelite.sh")
+        )
     }
 
     suspend fun runSetup() {
+        _setupState.value = SetupState.Reconciling
         AppLog.cleanup("runSetup: starting — delegating to CleanupManager")
         cleanupManager.cleanup()
-        AppLog.step("setup", "runSetup: cleanup complete, evaluating pre-checks")
+
+        // Version check: if stored version is stale, clear all cached state and re-run from scratch
+        if (!stateStore.isVersionCurrent()) {
+            AppLog.step("setup", "runSetup: version mismatch (stored=${stateStore.getStoredVersion()} current=${SetupStateStore.CURRENT_SCRIPT_VERSION}) — clearing all state")
+            stateStore.clearAll()
+        }
+
+        AppLog.step("setup", "runSetup: evaluating completed steps (suspend)")
         evaluateCompletedSteps()
-        AppLog.step("setup", "runSetup: pre-checks done, starting from index 0")
+
+        AppLog.step("setup", "runSetup: reconciling against markers")
+        reconcileWithMarkers()
+
+        _setupState.value = SetupState.SetupInProgress
+        AppLog.step("setup", "runSetup: reconciliation done, starting from index 0")
         runSetupFrom(0)
     }
 
@@ -159,6 +189,7 @@ class SetupOrchestrator(
             }
         }
         AppLog.step("setup", "runSetupFrom: loop complete, all steps done")
+        _setupState.value = SetupState.SetupComplete
         val oldCurrentStep = _currentStep.value
         _currentStep.value = null
         AppLog.state("runSetupFrom: currentStep ${oldCurrentStep?.id} -> null")
@@ -177,10 +208,62 @@ class SetupOrchestrator(
                 termuxHelper.isTermuxX11Installed()
             }
             SetupStep.EnablePermissions -> handlePermissionsStep()
-            SetupStep.InstallProot,
-            SetupStep.InstallJava,
-            SetupStep.DownloadRuneLite -> runSetupScript()
+            SetupStep.InstallProot -> executeModularScript("install-proot.sh", "step-proot")
+            SetupStep.InstallJava -> executeModularScript("install-java.sh", "step-java")
+            SetupStep.DownloadRuneLite -> executeModularScript("download-runelite.sh", "step-runelite")
             SetupStep.VerifySetup -> runVerification()
+        }
+    }
+
+    /**
+     * Execute a modular setup shell script. Deploys scripts first if needed,
+     * then runs the specified script and marks the step complete in the state store.
+     */
+    private suspend fun executeModularScript(scriptName: String, markerKey: String): Boolean {
+        val deployed = scriptManager.deployScripts()
+        if (!deployed) {
+            _currentOutput.value = "Failed to deploy scripts to Termux"
+            updateCurrentStepStatus(StepStatus.Failed("Script deployment failed"))
+            return false
+        }
+
+        val configsDeployed = scriptManager.deployConfigs()
+        if (!configsDeployed) {
+            _currentOutput.value = "Failed to deploy configs to Termux"
+            updateCurrentStepStatus(StepStatus.Failed("Config deployment failed"))
+            return false
+        }
+
+        _currentOutput.value = "Running $scriptName (this may take several minutes)..."
+
+        val result = commandRunner.execute(
+            commandPath = scriptManager.getScriptPath(scriptName),
+            background = true,
+            timeoutMs = TermuxCommandRunner.TIMEOUT_SETUP_MS
+        )
+
+        // Check for the script's completion marker in stdout.
+        // proot-distro commands return non-zero exit codes due to harmless
+        // /proc/self/fd binding warnings in background (no-PTY) mode.
+        val completionMarker = "=== ${scriptName.removeSuffix(".sh")} complete ==="
+        val scriptCompleted = result.stdout?.contains(completionMarker) == true
+
+        if (result.isSuccess || scriptCompleted) {
+            // Truncate to last 2000 chars — setup scripts can produce MB-scale output
+            _currentOutput.value = result.stdout?.let { if (it.length > 2000) it.takeLast(2000) else it }
+            if (!result.isSuccess) {
+                AppLog.w("STEP", "executeModularScript: non-zero exit (${result.exitCode}) for $scriptName but script completed — proot fd warnings likely")
+            }
+            stateStore.markCompleted(markerKey)
+            stateStore.setStoredVersion(SetupStateStore.CURRENT_SCRIPT_VERSION)
+            AppLog.step(markerKey, "executeModularScript: $scriptName completed, marker '$markerKey' written to state store")
+            return true
+        } else {
+            val errorOutput = result.stderr ?: result.error ?: "Unknown error"
+            AppLog.e("STEP", "executeModularScript: $scriptName failed exitCode=${result.exitCode} errorOutput=$errorOutput stdoutTail=${result.stdout?.takeLast(200)}")
+            _currentOutput.value = errorOutput
+            updateCurrentStepStatus(StepStatus.Failed(errorOutput))
+            return false
         }
     }
 
@@ -214,9 +297,6 @@ class SetupOrchestrator(
         return when (result) {
             is InstallResult.Success -> true
             is InstallResult.NeedsUserAction -> {
-                // Defensive fallback — normally the receiver launches the confirm intent
-                // directly and the deferred stays alive for the final result. This branch
-                // is only reached if the confirm intent was null.
                 _currentOutput.value = "Install requires confirmation — please retry"
                 updateCurrentStepStatus(StepStatus.Failed("Install requires confirmation — please retry"))
                 false
@@ -258,77 +338,13 @@ class SetupOrchestrator(
         return false
     }
 
-    private suspend fun runSetupScript(): Boolean {
-        val deployed = scriptManager.deployScripts()
-        if (!deployed) {
-            _currentOutput.value = "Failed to deploy scripts to Termux"
-            updateCurrentStepStatus(StepStatus.Failed("Script deployment failed"))
-            return false
-        }
-
-        val configsDeployed = scriptManager.deployConfigs()
-        if (!configsDeployed) {
-            _currentOutput.value = "Failed to deploy configs to Termux"
-            updateCurrentStepStatus(StepStatus.Failed("Config deployment failed"))
-            return false
-        }
-
-        _currentOutput.value = "Running setup (this may take several minutes)..."
-
-        val result = commandRunner.execute(
-            commandPath = scriptManager.getScriptPath("setup-environment.sh"),
-            background = true,
-            timeoutMs = TermuxCommandRunner.TIMEOUT_SETUP_MS
-        )
-
-        // proot-distro commands return non-zero exit codes due to harmless
-        // /proc/self/fd binding warnings in background (no-PTY) mode. Check for
-        // the script's success marker in stdout instead of relying on exit code.
-        val scriptCompleted = result.stdout?.contains("=== Setup complete ===") == true
-
-        if (result.isSuccess || scriptCompleted) {
-            // Truncate to last 2000 chars — setup scripts can produce MB-scale output
-            _currentOutput.value = result.stdout?.let { if (it.length > 2000) it.takeLast(2000) else it }
-            if (!result.isSuccess) {
-                AppLog.w("STEP", "runSetupScript: non-zero exit (${result.exitCode}) but script completed — proot fd warnings likely")
-            }
-            // Mark all three sub-steps as completed in one emission
-            val oldSteps = _steps.value
-            _steps.update { currentSteps ->
-                currentSteps.toMutableList().also { list ->
-                    listOf(SetupStep.InstallProot, SetupStep.InstallJava, SetupStep.DownloadRuneLite).forEach { step ->
-                        val index = list.indexOfFirst { it.step == step }
-                        if (index >= 0) {
-                            list[index] = list[index].copy(status = StepStatus.Completed)
-                        }
-                    }
-                }
-            }
-            AppLog.state(
-                "runSetupScript: batch-completed proot/java/runelite steps; " +
-                    "steps changed from ${oldSteps.map { "${it.step.id}=${it.status::class.simpleName}" }} " +
-                    "to ${_steps.value.map { "${it.step.id}=${it.status::class.simpleName}" }}"
-            )
-            return true
-        } else {
-            val errorOutput = result.stderr ?: result.error ?: "Unknown error"
-            AppLog.e("STEP", "runSetupScript: script failed exitCode=${result.exitCode} errorOutput=$errorOutput stdoutTail=${result.stdout?.takeLast(200)}")
-            _currentOutput.value = errorOutput
-            updateCurrentStepStatus(StepStatus.Failed(errorOutput))
-            return false
-        }
-    }
-
     private suspend fun runVerification(): Boolean {
         _currentOutput.value = "Verifying setup..."
 
         val checks = listOf(
-            // Check rootfs directory directly — proot-distro list may not show manually-extracted rootfs
             "[ -d \"\$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu\" ] && echo 'PASS: proot' || echo 'FAIL: proot'",
             "proot-distro login ubuntu -- which java < /dev/null && echo 'PASS: java' || echo 'FAIL: java'",
             "proot-distro login ubuntu -- test -f /root/runelite/RuneLite.jar < /dev/null && echo 'PASS: runelite' || echo 'FAIL: runelite'",
-            // Use command -v (POSIX) and check common x11 paths for background mode PATH issues
-            // Braces group the OR check so && applies to the whole condition (not just the second operand)
             "{ command -v termux-x11 >/dev/null 2>&1 || [ -f \"\$PREFIX/bin/termux-x11\" ]; } && echo 'PASS: x11' || echo 'FAIL: x11'"
         )
 
@@ -338,7 +354,7 @@ class SetupOrchestrator(
             commandPath = "${TermuxCommandRunner.TERMUX_BIN_PATH}/bash",
             arguments = arrayOf("-c", verifyScript),
             background = true,
-            timeoutMs = 60L * 1000  // 60 seconds for verification (proot commands are slow)
+            timeoutMs = 60L * 1000
         )
 
         val output = result.stdout ?: ""
@@ -352,16 +368,17 @@ class SetupOrchestrator(
             return false
         }
 
-        // All PASS markers present — ignore exit code. proot commands return non-zero
-        // even on success due to /proc/self/fd binding warnings in background (no-PTY) mode.
         if (result.exitCode != 0) {
             AppLog.w("STEP", "runVerification: non-zero exit (${result.exitCode}) but all checks passed — proot fd warnings likely")
         }
         return true
     }
 
+    /**
+     * Evaluate pre-completed steps: check package installations and load cached state from SharedPreferences.
+     */
     private suspend fun evaluateCompletedSteps() {
-        AppLog.step("setup", "evaluateCompletedSteps: checking pre-installed packages")
+        AppLog.step("setup", "evaluateCompletedSteps: checking pre-installed packages and cached state")
         val termuxInstalled = withContext(Dispatchers.IO) { termuxHelper.isTermuxInstalled() }
         val termuxX11Installed = withContext(Dispatchers.IO) { termuxHelper.isTermuxX11Installed() }
         AppLog.step("termux", "evaluateCompletedSteps: isTermuxInstalled=$termuxInstalled")
@@ -382,9 +399,115 @@ class SetupOrchestrator(
                             stepState.copy(status = StepStatus.Completed)
                         } else stepState
                     }
+                    SetupStep.InstallProot -> {
+                        if (stateStore.isCompleted("step-proot")) {
+                            AppLog.step("proot", "evaluateCompletedSteps: marking proot as Completed (cached state)")
+                            stepState.copy(status = StepStatus.Completed)
+                        } else stepState
+                    }
+                    SetupStep.InstallJava -> {
+                        if (stateStore.isCompleted("step-java")) {
+                            AppLog.step("java", "evaluateCompletedSteps: marking java as Completed (cached state)")
+                            stepState.copy(status = StepStatus.Completed)
+                        } else stepState
+                    }
+                    SetupStep.DownloadRuneLite -> {
+                        if (stateStore.isCompleted("step-runelite")) {
+                            AppLog.step("runelite", "evaluateCompletedSteps: marking runelite as Completed (cached state)")
+                            stepState.copy(status = StepStatus.Completed)
+                        } else stepState
+                    }
                     else -> stepState
                 }
             }
+        }
+    }
+
+    /**
+     * Reconcile SharedPreferences cache against actual marker files in Termux.
+     * Runs check-markers.sh with a 10-second timeout. On failure (Termux not running, timeout),
+     * keeps cached state as-is and logs a warning.
+     */
+    private suspend fun reconcileWithMarkers() {
+        // Deploy scripts first so check-markers.sh is available
+        val deployed = scriptManager.deployScripts()
+        if (!deployed) {
+            AppLog.w("STEP", "reconcileWithMarkers: script deployment failed, keeping cached state")
+            return
+        }
+
+        try {
+            val result = commandRunner.execute(
+                commandPath = scriptManager.getScriptPath("check-markers.sh"),
+                background = true,
+                timeoutMs = MARKER_CHECK_TIMEOUT_MS
+            )
+
+            if (!result.isSuccess) {
+                AppLog.w("STEP", "reconcileWithMarkers: check-markers.sh returned non-zero (${result.exitCode}), keeping cached state")
+                return
+            }
+
+            val output = result.stdout ?: ""
+            AppLog.step("setup", "reconcileWithMarkers: output=$output")
+
+            // Parse marker output
+            val lines = output.lines()
+
+            // Check version mismatch from markers
+            val versionLine = lines.find { it.startsWith("VERSION ") }
+            val markerVersion = versionLine?.removePrefix("VERSION ")?.trim() ?: "none"
+            if (markerVersion != "none" && markerVersion != SetupStateStore.CURRENT_SCRIPT_VERSION) {
+                AppLog.step("setup", "reconcileWithMarkers: marker version mismatch (marker=$markerVersion expected=${SetupStateStore.CURRENT_SCRIPT_VERSION}) — clearing all state")
+                stateStore.clearAll()
+                // Reset all modular steps to Pending
+                _steps.update { steps ->
+                    steps.map { stepState ->
+                        if (MODULAR_STEPS.containsKey(stepState.step)) {
+                            stepState.copy(status = StepStatus.Pending)
+                        } else stepState
+                    }
+                }
+                return
+            }
+
+            // Reconcile each step
+            for (line in lines) {
+                when {
+                    line.startsWith("PRESENT ") -> {
+                        val key = line.removePrefix("PRESENT ").trim()
+                        val step = MODULAR_STEPS.entries.find { it.value.first == key }?.key
+                        if (step != null) {
+                            stateStore.markCompleted(key)
+                            val index = _steps.value.indexOfFirst { it.step == step }
+                            if (index >= 0) {
+                                updateStepStatus(index, StepStatus.Completed)
+                                AppLog.step(key, "reconcileWithMarkers: PRESENT — upgraded to Completed")
+                            }
+                        }
+                    }
+                    line.startsWith("ABSENT ") -> {
+                        val key = line.removePrefix("ABSENT ").trim()
+                        val step = MODULAR_STEPS.entries.find { it.value.first == key }?.key
+                        if (step != null) {
+                            // Downgrade: marker missing means step hasn't actually completed
+                            val index = _steps.value.indexOfFirst { it.step == step }
+                            if (index >= 0 && _steps.value[index].status is StepStatus.Completed) {
+                                updateStepStatus(index, StepStatus.Pending)
+                                AppLog.step(key, "reconcileWithMarkers: ABSENT — downgraded to Pending")
+                            }
+                        }
+                    }
+                }
+            }
+
+            stateStore.setStoredVersion(SetupStateStore.CURRENT_SCRIPT_VERSION)
+        } catch (e: TimeoutCancellationException) {
+            AppLog.w("STEP", "reconcileWithMarkers: timeout after ${MARKER_CHECK_TIMEOUT_MS}ms, keeping cached state")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.w("STEP", "reconcileWithMarkers: exception (${e.message}), keeping cached state")
         }
     }
 

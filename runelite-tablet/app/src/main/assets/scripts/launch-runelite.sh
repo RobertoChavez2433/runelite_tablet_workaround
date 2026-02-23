@@ -7,6 +7,25 @@ LOGFILE="$HOME/runelite-launch.log"
 X11_SOCKET_DIR="$PREFIX/tmp/.X11-unix"
 echo "=== RuneLite launch $(date) ===" | tee "$LOGFILE"
 
+# --- Credential injection via temp env file ---
+# The Android app writes JX_* env vars to a temp file and passes its path as $1.
+# Source it here (in the outer Termux shell) so we can forward the vars into proot.
+# The file is deleted immediately after sourcing for security.
+ENV_FILE="${1:-}"
+if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
+    echo "Sourcing credentials from env file..." | tee -a "$LOGFILE"
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    rm -f "$ENV_FILE"
+    # Never log credential values — only confirm presence
+    [ -n "${JX_SESSION_ID:-}" ] && echo "  JX_SESSION_ID=***" | tee -a "$LOGFILE"
+    [ -n "${JX_CHARACTER_ID:-}" ] && echo "  JX_CHARACTER_ID=***" | tee -a "$LOGFILE"
+    [ -n "${JX_DISPLAY_NAME:-}" ] && echo "  JX_DISPLAY_NAME=***" | tee -a "$LOGFILE"
+    [ -n "${JX_ACCESS_TOKEN:-}" ] && echo "  JX_ACCESS_TOKEN=***" | tee -a "$LOGFILE"
+else
+    echo "No credentials env file provided — RuneLite will show its own login" | tee -a "$LOGFILE"
+fi
+
 # Start PulseAudio for game audio
 echo "Starting PulseAudio..." | tee -a "$LOGFILE"
 pulseaudio --start --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1" \
@@ -49,32 +68,57 @@ am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity 2>&1 | tee -a "$
 
 # Set Termux:X11 preferences from the shell as backup.
 # The primary mechanism is the CHANGE_PREFERENCE broadcast sent from the Kotlin launch() method.
-# timeout guards against the CLI tool hanging if the activity hasn't fully initialized yet.
 echo "Setting Termux:X11 preferences (shell backup)..." | tee -a "$LOGFILE"
 timeout 5 termux-x11-preference "fullscreen"="true" 2>&1 | tee -a "$LOGFILE" || true
 timeout 5 termux-x11-preference "showAdditionalKbd"="false" 2>&1 | tee -a "$LOGFILE" || true
 timeout 5 termux-x11-preference "displayResolutionMode"="native" 2>&1 | tee -a "$LOGFILE" || true
 
+# Build credential env var forwarding for proot.
+# Env vars set in the outer Termux shell are NOT inherited by proot-distro login (Spike C result).
+# We write a temp env file inside proot and source it in the bash -c block.
+PROOT_ENV_FILE=""
+if [ -n "${JX_SESSION_ID:-}" ]; then
+    PROOT_ENV_FILE="/tmp/.rlt-creds-$$.sh"
+    # Write the env file into the Termux tmp dir (which gets bind-mounted into proot as /tmp)
+    TERMUX_ENV_FILE="$PREFIX/tmp/.rlt-creds-$$.sh"
+    {
+        printf "export JX_SESSION_ID=%q\n" "${JX_SESSION_ID}"
+        [ -n "${JX_CHARACTER_ID:-}" ] && printf "export JX_CHARACTER_ID=%q\n" "${JX_CHARACTER_ID}"
+        [ -n "${JX_DISPLAY_NAME:-}" ] && printf "export JX_DISPLAY_NAME=%q\n" "${JX_DISPLAY_NAME}"
+        [ -n "${JX_ACCESS_TOKEN:-}" ] && printf "export JX_ACCESS_TOKEN=%q\n" "${JX_ACCESS_TOKEN}"
+        [ -n "${JX_REFRESH_TOKEN:-}" ] && printf "export JX_REFRESH_TOKEN=%q\n" "${JX_REFRESH_TOKEN}"
+    } > "$TERMUX_ENV_FILE"
+    chmod 600 "$TERMUX_ENV_FILE"
+    echo "Credential env file written for proot forwarding" | tee -a "$LOGFILE"
+fi
+
 # Launch RuneLite inside proot.
 # Bind-mount Termux's X11 socket directory into proot so DISPLAY=:0 can find it.
-# Without this, proot's /tmp is isolated and the X11 socket is invisible to RuneLite.
-# Use heredoc (bash -s) to avoid single-quote escaping issues with embedded config.
 echo "Launching RuneLite..." | tee -a "$LOGFILE"
-proot-distro login ubuntu --bind "$PREFIX/tmp/.X11-unix:/tmp/.X11-unix" -- bash -s << 'PROOT_SCRIPT' 2>&1 | tee -a "$LOGFILE"
+proot-distro login ubuntu --bind "$PREFIX/tmp/.X11-unix:/tmp/.X11-unix" --bind "$PREFIX/tmp:/tmp" -- bash -c "
     export DISPLAY=:0
-    # Explicit port 4713 — avoids silent failure if PulseAudio uses a non-default port
     export PULSE_SERVER=tcp:127.0.0.1:4713
 
+    # Source credentials if available (Spike C: must source INSIDE proot)
+    if [ -n '${PROOT_ENV_FILE}' ] && [ -f '${PROOT_ENV_FILE}' ]; then
+        source '${PROOT_ENV_FILE}'
+        rm -f '${PROOT_ENV_FILE}'
+    fi
+
+    # Set display resolution via xrandr for Tab S10 Ultra (2960x1848)
+    # xrandr is installed by install-java.sh (x11-xserver-utils package)
+    # These commands are best-effort — display works at default res if they fail
+    sleep 0.5  # Brief delay for X11 to initialize
+    xrandr --output default --mode 2960x1848 2>/dev/null || true
+
     # Start openbox window manager so RuneLite is maximized to fill the display.
-    # Without a WM, X11 windows default to 1038x503 (OSRS default) on bare X11.
-    # The rc.xml rule maximizes all windows and removes decorations for full-screen gaming.
     mkdir -p /root/.config/openbox
     cat > /root/.config/openbox/rc.xml << 'OBCFG'
-<?xml version="1.0" encoding="UTF-8"?>
-<openbox_config xmlns="http://openbox.org/3.4/rc"
-    xmlns:xi="http://www.w3.org/2001/XInclude">
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<openbox_config xmlns=\"http://openbox.org/3.4/rc\"
+    xmlns:xi=\"http://www.w3.org/2001/XInclude\">
   <applications>
-    <application class="*" groupclass="*">
+    <application class=\"*\" groupclass=\"*\">
       <decor>no</decor>
       <maximized>yes</maximized>
     </application>
@@ -87,27 +131,30 @@ OBCFG
     cd /root/runelite
 
     # Build classpath from repository2 jars downloaded by the launcher
-    REPO_DIR="/root/.runelite/repository2"
-    if [ -d "$REPO_DIR" ] && ls "$REPO_DIR"/*.jar > /dev/null 2>&1; then
-        CP=$(echo "$REPO_DIR"/*.jar | tr " " ":")
-        echo "Running RuneLite client directly (classpath: $CP)" >&2
+    REPO_DIR=\"/root/.runelite/repository2\"
+    if [ -d \"\$REPO_DIR\" ] && ls \"\$REPO_DIR\"/*.jar > /dev/null 2>&1; then
+        CP=\$(echo \"\$REPO_DIR\"/*.jar | tr ' ' ':')
+        echo 'Running RuneLite client directly (classpath found)' >&2
         exec java -Xmx2g -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=50 \
             -Dsun.java2d.opengl=false \
+            -Dsun.java2d.uiScale=2.0 \
             -Drunelite.launcher.version=2.7.6 \
-            -cp "$CP" \
+            -cp \"\$CP\" \
             net.runelite.client.RuneLite --insecure-write-credentials
     else
-        echo "No client jars found — running launcher to download them first" >&2
+        echo 'No client jars found — running launcher to download them first' >&2
         java -Xmx2g -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=50 \
+            -Dsun.java2d.uiScale=2.0 \
             -jar RuneLite.jar --insecure-write-credentials
     fi
-PROOT_SCRIPT
+" 2>&1 | tee -a "$LOGFILE"
 
 # PIPESTATUS[0] captures proot-distro exit code, not tee's exit code.
-# Under pipefail, $? after a pipe reflects tee (rightmost), which exits 0 even when
-# proot fails, causing spurious "RuneLite failed" messages.
 EXIT_CODE=${PIPESTATUS[0]}
 echo "RuneLite exited with code: $EXIT_CODE" | tee -a "$LOGFILE"
+
+# Clean up any lingering credential files
+rm -f "$PREFIX/tmp/.rlt-creds-"*.sh 2>/dev/null || true
 
 if [ $EXIT_CODE -ne 0 ]; then
     echo "" | tee -a "$LOGFILE"

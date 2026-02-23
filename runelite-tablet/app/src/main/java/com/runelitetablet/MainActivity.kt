@@ -1,5 +1,6 @@
 package com.runelitetablet
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -46,5 +47,21 @@ class MainActivity : ComponentActivity() {
         AppLog.lifecycle("MainActivity.onPause: unbindActions called")
         AppLog.perf("onPause: ${AppLog.perfSnapshot(applicationContext)}")
         viewModel.unbindActions()
+    }
+
+    /**
+     * Fallback for auth redirect handling.
+     *
+     * In the normal flow, the Chrome Custom Tab intercepts the redirect via
+     * CustomTabsCallback.onNavigationEvent before the browser ever navigates away.
+     * This override handles the edge case where the browser delivers the redirect
+     * URL to the Activity as a new Intent (e.g. if the custom scheme was registered
+     * by something else or a tab was pre-warmed differently).
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        val uri = intent.data ?: return
+        AppLog.lifecycle("MainActivity.onNewIntent: received URI with host=${uri.host}")
+        viewModel.onAuthRedirect(uri)
     }
 }
