@@ -54,7 +54,8 @@ class ScriptManager(
         val assetReadStartMs = System.currentTimeMillis()
         val scriptContent = withContext(Dispatchers.IO) {
             context.assets.open("scripts/$scriptName").use {
-                it.bufferedReader().readText()
+                // Strip \r to ensure LF-only line endings — CRLF breaks shebang on Termux
+                it.bufferedReader().readText().replace("\r", "")
             }
         }
         val assetReadDurationMs = System.currentTimeMillis() - assetReadStartMs
