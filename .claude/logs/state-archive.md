@@ -48,3 +48,15 @@ Session history archive. See `.claude/autoload/_state.md` for current state (las
 **Work**: Fixed TermuxResultService lifecycle (onDestroy clearing static deferreds, stopSelfIfIdle). Fixed 5 shell script compatibility issues. Hit proot-distro install blocker.
 **Decisions**: Removed deferred cancellation from onDestroy. Used `|| true` + verification checks.
 **Next**: Fix proot-distro install exit code issue. (Fixed Session 14)
+
+### Session 14 (2026-02-22)
+**Work**: Fixed proot-distro install (manual rootfs extraction fallback). Fixed DNS, DEBIAN_FRONTEND, X11 socket. Hit headless-JDK blocker.
+**Next**: Fix JDK + launch RuneLite. (Fixed Session 15)
+
+### Session 15 (2026-02-22)
+**Work**: RuneLite running on tablet! Fixed 3 launch blockers (full JDK, X11 socket, direct client launch).
+**Next**: Display size + UX improvements. (Designed Session 17)
+
+### Session 16 (2026-02-22)
+**Work**: Designed Slice 2+3 plan. 5 parallel agents for research + adversarial review.
+**Next**: Investigate display/launch UX defects. (Session 17)
