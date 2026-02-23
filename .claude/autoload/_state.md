@@ -1,88 +1,84 @@
 # Session State
 
-**Last Updated**: 2026-02-23 | **Session**: 22
+**Last Updated**: 2026-02-23 | **Session**: 28
 
 ## Current Phase
-- **Phase**: MVP Development — Security Hardened, Slice 4+5 Ready
-- **Status**: Full security review completed (3 agents, 10-category checklist). All 15 findings (2 P0, 10 P1, 3 P2) fixed and verified through 6 quality gates. Pushed in 5 commits.
+- **Phase**: MVP Development — On-Device Testing & Bug Fixing
+- **Status**: OAuth login broken — wrong client_id used for Step 1. Correct 2-step flow researched and documented. Custom Tabs + Cloudflare fix confirmed working (Chrome opens, Jagex page loads). Sessions 25-26 code uncommitted. Session 28 research only (no code changes).
 
 ## HOT CONTEXT - Resume Here
 
 ### EXACTLY WHERE WE LEFT OFF
 
-**Security hardening complete.** 3 security review agents found 15 issues across auth, IPC, network, and build layers. All fixed via `/implement` orchestrator (4 phases, 16 files modified). 6 quality gates passed (build, lint, P1 fixes, full code review, completeness, performance).
+**Session 28: Discovered OAuth uses wrong client_id. Researched correct 2-step flow. No code changes.**
 
-**5 commits pushed:**
-1. `3257de2` — Auth hardening (error body sanitization, in-memory access_token, toString redaction, loopback binding)
-2. `4baa186` — Activity/ViewModel hardening (URI validation, onCleared, private credentialManager)
-3. `7e723cd` — IPC hardening (FLAG_ONE_SHOT, APK verification, APK cleanup, env file cleanup, credential scrubbing)
-4. `c75850b` — Network/build hardening (cleartext block, R8 minification, debug-only file logging)
-5. `98f2d29` — Tooling (security plan + archived slice 2+3 plan)
+On-device test confirmed:
+- Chrome Custom Tabs works (Cloudflare passes)
+- Jagex returns "Sorry, something went wrong" — server-side rejection
 
-**Key security improvements:**
-- OAuth2 error bodies sanitized (truncated + token patterns stripped)
-- access_token in-memory only (not persisted to EncryptedSharedPreferences)
-- toString() overrides on JagexCredentials, TokenResponse, AuthCodeResult.Success, OAuthException
-- LocalhostAuthServer bound to 127.0.0.1 only
-- onNewIntent validates redirect URI host
-- ViewModel onCleared() wipes auth state
-- FLAG_ONE_SHOT on install PendingIntent
-- APK package name verified before install
-- Stale credential env files cleaned on startup
-- Credential patterns scrubbed from log previews
-- network_security_config.xml blocks cleartext
-- R8 minification + ProGuard log stripping for release
-- AppLog file logging gated behind BuildConfig.DEBUG
+Root cause: Our code uses `1fddee4e-...` (Step 2 consent client) for Step 1 (initial login). Jagex OAuth is a **two-step, two-client-ID flow**:
+
+| Step | Client ID | Redirect | Scopes |
+|------|-----------|----------|--------|
+| 1. Account auth | `com_jagex_auth_desktop_launcher` | `launcher-redirect` → `jagex:` protocol | `openid offline gamesso.token.create user.profile.read` |
+| 2. Consent | `1fddee4e-b100-4f4e-b2b0-097f9088f9d2` | `http://localhost` | `openid offline` (response_type=`id_token code`) |
+
+The `launcher-redirect` page triggers a `jagex:` custom protocol redirect. On Android, register an intent filter for `jagex:` scheme to capture the auth code.
 
 ### What Needs to Happen Next
 
-1. **On-device test** — install APK, run full flow (setup -> auth -> launch) to validate security changes don't break anything
-2. **Implement Slice 4+5** — use `/implement` with plan at `.claude/plans/2026-02-23-slice4-5-implementation-plan.md`
-3. **Address remaining unstaged changes** — shell script `< /dev/null` removal, SetupStep.kt getter change (pre-existing, not security-related)
+1. **Rewrite OAuth to correct 2-step flow** — see `.claude/research/jagex-oauth2-two-step-flow.md`
+   - Step 1: `com_jagex_auth_desktop_launcher` + `jagex:` intent scheme capture
+   - Step 2: `1fddee4e-...` + localhost + implicit/hybrid flow with forwarder HTML
+   - AndroidManifest: register `jagex:` scheme handler Activity
+   - LocalhostAuthServer: add POST handling for `/authcode`, forwarder HTML for Step 2 fragment capture
+2. **Test on device** — verify full login flow completes
+3. **Commit** all changes from Sessions 25-28
 
 ## Blockers
 
-- None
+- **OAuth client_id mismatch** — Step 1 needs `com_jagex_auth_desktop_launcher` with `jagex:` protocol capture. Full design in `.claude/research/jagex-oauth2-two-step-flow.md`.
 
 ## Recent Sessions
 
-### Session 22 (2026-02-23)
-**Work**: Full security review (3 parallel agents) + fix all 15 findings via `/implement`. 4 phases, 16 files, 6 quality gates passed. 5 commits pushed.
-**Decisions**: sanitizeErrorBody() helper, in-memory access_token, loopback-only auth server, allowedHosts for onNewIntent, APK package verification via getPackageArchiveInfo, R8 + ProGuard for release builds.
-**Next**: On-device test, then implement Slice 4+5.
+### Session 28 (2026-02-23)
+**Work**: Built and installed app on tablet. Custom Tabs auth opened Chrome successfully (Cloudflare passed). Jagex returned "Sorry, something went wrong" — server-side rejection. Researched 3 open-source launchers (aitoiaita, melxin, Bolt) via `gh api` to extract exact OAuth parameters. Discovered Jagex uses 2-step, 2-client-ID flow: Step 1 uses `com_jagex_auth_desktop_launcher` with `launcher-redirect` → `jagex:` protocol, Step 2 uses `1fddee4e-...` with localhost. Wrote comprehensive research doc. Updated defects with new blocker.
+**Decisions**: Must rewrite OAuth to correct 2-step flow. `jagex:` intent scheme for Step 1 capture. No more guessing at parameters — all values verified from working implementations.
+**Next**: Rewrite OAuth flow, test on device, commit.
 
-### Session 21 (2026-02-23)
-**Work**: Brainstormed and designed Slice 4+5 combined implementation plan. Explored codebase to understand current state. Wrote plan with 14 phases covering update manager + polish.
-**Decisions**: Shell script for updates (not Kotlin), pre-launch auto-download, display settings in SettingsScreen, all 4 polish items in scope.
-**Next**: On-device test of Slice 2+3, then implement Slice 4+5.
+### Session 27 (2026-02-23)
+**Work**: Deep research into Cloudflare WebView block (5 parallel agents). Discovered root cause: TLS fingerprint mismatch, X-Requested-With header, canvas fingerprinting, missing JS APIs. Stripping `; wv` actually worsened detection. Researched Bolt, melxin, aitoiaita, rislah launchers. Brainstormed 3 approaches, designed Chrome Custom Tabs + localhost solution.
+**Decisions**: Delete AuthWebViewActivity, use Chrome Custom Tabs with second client_id + localhost redirect for both OAuth steps. WebView is unfixable for Cloudflare.
+**Next**: Implement Custom Tabs auth design, test on device, commit Sessions 25-27, Slice 4+5.
 
-### Session 20 (2026-02-23)
-**Work**: Resumed `/implement` — re-ran Gates 5+6 (completeness + performance). Both passed. Committed all Slice 2+3 code (22 files) + tooling updates (6 files) in two commits.
-**Decisions**: None (verification-only session).
-**Next**: On-device test, push to remote.
+### Session 26 (2026-02-23)
+**Work**: Implemented Phase 1 UX revert via `/implement` (clipboard copy-paste + extra keys config). Fixed 3 on-device issues: (1) auto-return via `am start` in pasted command, (2) TermuxConfig phase advance without runtime permission, (3) CRLF line endings in 5 shell scripts breaking shebang. Full setup flow verified on device — all 7 steps pass. Login hit Cloudflare block.
+**Decisions**: `am start` for smart auto-return (not hardcoded delay), unconditional Phase 1 advance, `.gitattributes` for LF enforcement, defensive `\r` stripping in ScriptManager.
+**Next**: Wait for Cloudflare block to expire, test login, commit, Slice 4+5.
 
-### Session 19 (2026-02-23)
-**Work**: Implemented full Slice 2+3 via `/implement` skill. Ran 3 spikes via ADB. Completed all 15 phases. Fixed 8 P1s from code review.
-**Decisions**: Option 2 for redirect (CustomTab callback), both OAuth2 paths, env file inside proot.
-**Next**: Check gates 5+6. Commit everything.
+### Session 25 (2026-02-23)
+**Work**: On-device test found 3 bugs: StepState NPE (lazy init fix), SecurityException in verifyPermissions (catch), isPermissionStepActive always false (MutableStateFlow). Fixed all 3. Iterated on Phase 1 UX — clipboard quotes corrupted, simplified command, tried MediaStore typing approach (user rejected).
+**Decisions**: Use `by lazy` for sealed class companion vals, MutableStateFlow for reactive boolean state, no-quotes command for Termux config. User prefers copy-paste over typing.
+**Next**: Revert MediaStore UI to copy-paste, finish on-device test, commit, Slice 4+5.
 
-### Session 18 (2026-02-23)
-**Work**: Brainstormed and implemented redesign of `/implement` skill. New orchestrator agent pattern.
-**Next**: Implement Slice 2+3 (completed in Session 19).
+### Session 24 (2026-02-23)
+**Work**: Fixed Cloudflare WebView block (remove `; wv` UA token). Brainstormed + implemented permissions automation (5 phases, 5 files, 6 quality gates, 4 P1s fixed).
+**Decisions**: Copy-paste flow for Termux config (can't automate), auto-poll on resume, permissions before Termux work, strip `; wv` from WebView UA.
+**Next**: On-device test of permissions + login, commit, then Slice 4+5.
 
 ## Active Plans
 
-- **Security Hardening** — **COMPLETE**. All 15 findings fixed and verified. Plan at `.claude/plans/2026-02-23-security-fixes.md`.
-- **Slice 4+5 Implementation** — **DESIGNED**. Plan committed. Ready to implement.
-- **Slice 2+3 Implementation** — **COMPLETE**. Committed + security hardened. Awaiting on-device test.
-- **Brainstorming PRD** — COMPLETE
-- **MVP Implementation Plan** — COMPLETE
-- **Slice 1 Code** — COMPLETE + HARDENED
-- **/implement Skill Redesign** — COMPLETE + IMPROVED
+- **Phase 1 UX Revert + Extra Keys** — **COMPLETE**. Verified on device.
+- **Permissions Automation** — **COMPLETE**. All 3 phases work, auto-advance verified.
+- **Custom Tabs Auth (Cloudflare Fix)** — **NEEDS REWRITE**. Custom Tabs work (Cloudflare passes), but wrong client_id for Step 1. Must implement correct 2-step flow with `jagex:` protocol capture.
+- **OAuth Login Fix** — **SUPERSEDED by Custom Tabs rewrite**.
+- **Security Hardening** — **COMPLETE**. All 15 findings fixed and verified.
+- **Slice 4+5 Implementation** — **DESIGNED**. Plan committed. Blocked by auth fix.
+- **Slice 2+3 Implementation** — **COMPLETE**. Committed + security hardened + OAuth fixed.
 
 ## Reference
-- **Security fixes plan**: `.claude/plans/2026-02-23-security-fixes.md`
+- **OAuth 2-step flow research**: `.claude/research/jagex-oauth2-two-step-flow.md` (**NEW** — key reference for rewrite)
+- **Custom Tabs auth plan**: `.claude/plans/2026-02-23-custom-tabs-auth-design.md` (partially correct — Custom Tabs part good, client_id wrong)
 - **Slice 4+5 plan**: `.claude/plans/2026-02-23-slice4-5-implementation-plan.md`
-- **Slice 2+3 plan**: `.claude/plans/completed/2026-02-22-slice2-3-implementation-plan.md`
 - **Source code**: `runelite-tablet/app/src/main/java/com/runelitetablet/`
-- **Research**: `.claude/research/` (6 files + README)
+- **Research**: `.claude/research/` (7 files + README)

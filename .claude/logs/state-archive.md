@@ -6,6 +6,16 @@ Session history archive. See `.claude/autoload/_state.md` for current state (las
 
 ## February 2026
 
+### Session 23 (2026-02-23)
+**Work**: Diagnosed and fixed OAuth login redirect failure. Chrome Custom Tabs callback unreliable — replaced with localhost server capture. Committed and pushed both OAuth fix + remaining unstaged changes.
+**Decisions**: Localhost server for both auth steps (not just second). Removed CustomTabAuthCapture entirely.
+**Next**: On-device test of OAuth fix, then implement Slice 4+5.
+
+### Session 22 (2026-02-23)
+**Work**: Full security review (3 parallel agents) + fix all 15 findings via `/implement`. 4 phases, 16 files, 6 quality gates passed. 5 commits pushed.
+**Decisions**: sanitizeErrorBody() helper, in-memory access_token, loopback-only auth server, allowedHosts for onNewIntent, APK package verification via getPackageArchiveInfo, R8 + ProGuard for release builds.
+**Next**: On-device test, then implement Slice 4+5.
+
 ### Session 1 (2026-02-21)
 **Work**: Initial project setup. Created .claude directory with full state management system.
 **Decisions**: Adopted Field Guide App's state management pattern.
@@ -64,3 +74,17 @@ Session history archive. See `.claude/autoload/_state.md` for current state (las
 ### Session 17 (2026-02-22)
 **Work**: Investigated display size + launch UX defects via ADB. Designed openbox WM + fullscreen + auto-switch approach.
 **Next**: Redesign /implement skill. (Session 18)
+
+### Session 18 (2026-02-23)
+**Work**: Brainstormed and implemented redesign of `/implement` skill. New orchestrator agent pattern.
+**Next**: Implement Slice 2+3 (completed in Session 19).
+
+### Session 19 (2026-02-23)
+**Work**: Implemented full Slice 2+3 via `/implement` skill. Ran 3 spikes via ADB. Completed all 15 phases. Fixed 8 P1s from code review.
+**Decisions**: Option 2 for redirect (CustomTab callback), both OAuth2 paths, env file inside proot.
+**Next**: Check gates 5+6. Commit everything.
+
+### Session 20 (2026-02-23)
+**Work**: Resumed `/implement` — re-ran Gates 5+6 (completeness + performance). Both passed. Committed all Slice 2+3 code (22 files) + tooling updates (6 files) in two commits.
+**Decisions**: None (verification-only session).
+**Next**: On-device test, push to remote.

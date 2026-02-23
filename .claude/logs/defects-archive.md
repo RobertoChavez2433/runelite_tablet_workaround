@@ -4,6 +4,33 @@ Older/resolved defects rotated from per-feature files in `.claude/defects/`.
 
 ---
 
+## Rotated 2026-02-23 (Session 26)
+
+### [TERMUX] 2026-02-22: Env var injection via command string prefix doesn't work with Termux execve
+**Pattern**: Prepending `export VAR=val; bash script.sh` to the Termux RUN_COMMAND `commandPath` string doesn't work — Termux passes `commandPath` as the literal executable path to `execve()`, not to a shell. Credentials never reach the script.
+**Prevention**: Pass credentials via a temp file in app-private storage. Script sources and immediately `rm -f`s the file. Never pass secrets as command-line arguments (also visible in `ps`).
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupOrchestrator.kt
+
+---
+
+## Rotated 2026-02-23 (Session 25)
+
+### [ANDROID] 2026-02-22: startActivity() from background context blocked on Android 10+
+**Pattern**: Calling `context.startActivity()` from `SetupOrchestrator` (which holds applicationContext) to bring Termux:X11 to the foreground. On Android 10+ this is silently dropped if the app is not in the foreground — no exception thrown.
+**Prevention**: Route all Activity starts through `SetupActions.launchIntent()` callback (goes through the Activity, which IS in the foreground when the user taps Launch).
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupOrchestrator.kt
+
+---
+
+### [UX] 2026-02-22: RuneLite window is tiny — not filling tablet screen — DESIGNED
+**Pattern**: RuneLite renders at 1038x503 on a 2960x1711 X11 desktop. No window manager = windows open at default size.
+**Root cause**: Bare X11 with no window manager. OSRS defaults to 765x503 + sidebar.
+**Fix**: Install openbox WM in proot, configure auto-maximize + no decorations.
+**Status**: DESIGNED — ready to implement.
+**Ref**: @runelite-tablet/app/src/main/assets/scripts/launch-runelite.sh
+
+---
+
 ### [SHELL] 2026-02-22: openjdk-11-jdk-headless missing AWT/X11 libs — FIXED
 **Pattern**: RuneLite launcher crashes with `UnsatisfiedLinkError: libawt_xawt.so`. Headless JDK excludes AWT/Swing/X11.
 **Fix**: Changed `openjdk-11-jdk-headless` to `openjdk-11-jdk` in setup-environment.sh.
@@ -48,3 +75,18 @@ Older/resolved defects rotated from per-feature files in `.claude/defects/`.
 **Pattern**: X11 socket at `$PREFIX/tmp/.X11-unix/X0`, not `/tmp/.X11-unix/X0`.
 **Fix**: Changed socket path to use `$PREFIX/tmp`.
 **Ref**: @runelite-tablet/app/src/main/assets/scripts/launch-runelite.sh
+
+### [UX] 2026-02-22: Termux/Termux:X11 workflow confusing — user must manually switch apps — DESIGNED
+**Pattern**: User must manually switch from the RuneLite Tablet app to Termux:X11 after tapping Launch. No in-app guidance; context switch is unintuitive.
+**Fix**: Kotlin sends CHANGE_PREFERENCE broadcast (fullscreen, no keyboard bar). Shell script polls X11 socket then runs `am start` to bring Termux:X11 to foreground.
+**Status**: DESIGNED — implemented in Slice 4+5.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupOrchestrator.kt
+
+---
+
+## Rotated 2026-02-23 (Session 28)
+
+### [WINDOWS] 2026-02-23: CRLF line endings in shell scripts break shebang on Termux
+**Pattern**: Windows git auto-converts LF to CRLF on checkout. Shell scripts deployed to Termux via `cat > file` retain `\r` in the shebang line. Kernel returns ENOENT.
+**Prevention**: `.gitattributes` with `*.sh text eol=lf`, defensive `replace("\r", "")` in ScriptManager.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/ScriptManager.kt, @.gitattributes

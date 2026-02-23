@@ -3,9 +3,7 @@
     "allow": [
       "WebSearch",
       "WebFetch(domain:github.com)",
-
       "Bash(adb:*)",
-
       "Bash(cd:*)",
       "Bash(ls:*)",
       "Bash(find:*)",
@@ -19,16 +17,18 @@
       "Bash(echo:*)",
       "Bash(grep:*)",
       "Bash(python3:*)",
-
       "Bash(./gradlew:*)",
       "Bash(./gradlew *)",
-
       "Bash(git status:*)",
       "Bash(git log:*)",
       "Bash(git diff:*)",
       "Bash(git show:*)",
       "Bash(git add:*)",
-      "Bash(git branch:*)"
+      "Bash(git branch:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(gh api repos/aitoiaita/linux-jagex-launcher/contents/src/forwarder.html --jq '.content' 2>/dev/null | base64 -d 2>/dev/null)",
+      "Bash(cd \"C:\\\\Users\\\\rseba\\\\Projects\\\\Runelite for Tablet\" && gh api repos/aitoiaita/linux-jagex-launcher/contents/src/daemon/consent_client.rs --jq '.content' 2>/dev/null | base64 -d 2>/dev/null)",
+      "Bash(pwsh:*)"
     ]
   }
 }

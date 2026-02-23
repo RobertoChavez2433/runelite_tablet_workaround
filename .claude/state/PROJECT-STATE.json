@@ -3,14 +3,14 @@
     "app_name": "Runelite for Tablet",
     "app_version": "0.1.0",
     "description": "Android installer app that runs the real RuneLite client on Samsung Tab S10 Ultra via Termux + proot-distro",
-    "last_updated": "2026-02-23T23:30:00Z",
-    "session_notes": "Session 22: Full security review (3 agents, 10-category checklist). Fixed all 15 findings (2 P0, 10 P1, 3 P2) via /implement. 4 phases, 16 files, 6 quality gates passed. 5 commits pushed."
+    "last_updated": "2026-02-23T20:30:00Z",
+    "session_notes": "Session 28: On-device test — Custom Tabs passes Cloudflare but Jagex rejects login (wrong client_id). Researched 3 open-source launchers. Discovered Jagex uses 2-step, 2-client-ID OAuth flow. Step 1 needs com_jagex_auth_desktop_launcher + jagex: protocol. Research doc written. Auth rewrite needed."
   },
   "current_phase": {
-    "phase_name": "MVP Development — Security Hardened, Slice 4+5 Ready",
-    "phase_status": "security_hardened_slice_4_5_ready",
+    "phase_name": "MVP Development — On-Device Testing & Bug Fixing",
+    "phase_status": "oauth_client_id_fix_needed",
     "phase_started": "2026-02-22",
-    "progress_percentage": 75
+    "progress_percentage": 83
   },
   "release_cycle": {
     "last_release": null,
@@ -18,8 +18,45 @@
     "next_release_target": null,
     "next_release_version": "0.1.0"
   },
-  "active_blockers": [],
+  "active_blockers": [
+    {
+      "id": "oauth-wrong-client-id",
+      "description": "OAuth Step 1 uses wrong client_id (1fddee4e consent client instead of com_jagex_auth_desktop_launcher). Jagex rejects with 'something went wrong'. Must implement correct 2-step, 2-client-ID flow with jagex: protocol capture for Step 1.",
+      "severity": "P0",
+      "plan": ".claude/research/jagex-oauth2-two-step-flow.md"
+    }
+  ],
   "resolved_blockers": [
+    {
+      "id": "permissions-npe",
+      "description": "StepState NPE crash on launch — sealed class companion val eager init returns null objects",
+      "resolved": "2026-02-23",
+      "resolution": "Changed SetupStep.allSteps from eager val to by lazy"
+    },
+    {
+      "id": "permissions-security-exception",
+      "description": "SecurityException crash when verifyPermissions() runs before RUN_COMMAND permission granted",
+      "resolved": "2026-02-23",
+      "resolution": "Added try/catch SecurityException in verifyPermissions() returning false"
+    },
+    {
+      "id": "permissions-ui-not-showing",
+      "description": "isPermissionStepActive always false because awaitingPermissionCompletion was @Volatile var not observable",
+      "resolved": "2026-02-23",
+      "resolution": "Changed to MutableStateFlow<Boolean> and used combine() in ViewModel derivation"
+    },
+    {
+      "id": "cloudflare-webview",
+      "description": "Cloudflare blocks Android WebView auth page due to ; wv User-Agent token — persistent 9+ hour block",
+      "resolved": "2026-02-23",
+      "resolution": "Stripped ; wv from WebView UA string, enabled cookies/DOM storage for Cloudflare challenge pages"
+    },
+    {
+      "id": "oauth-redirect",
+      "description": "Chrome Custom Tabs onNavigationEvent doesn't reliably provide redirect URL — OAuth login stuck on Jagex redirect page",
+      "resolved": "2026-02-23",
+      "resolution": "Replaced CustomTabAuthCapture with LocalhostAuthServer for first auth step. Same pattern already used for second auth step."
+    },
     {
       "id": "headless-jdk",
       "description": "openjdk-11-jdk-headless missing AWT/X11 libs (libawt_xawt.so)",
@@ -51,7 +88,12 @@
       "resolution": "Extract via getBundleExtra('result')"
     }
   ],
-  "brainstorm_backlog": [],
+  "brainstorm_backlog": [
+    {
+      "topic": "Phase 1 permissions UX — best approach for Termux config paste",
+      "notes": "User wants copy-paste (not typing). Need to handle clipboard quote corruption. Brainstorm next session."
+    }
+  ],
   "completed_phases": [
     {
       "phase_name": "Project Setup",
@@ -102,6 +144,16 @@
       "phase_name": "Security Hardening (Session 22)",
       "completed": "2026-02-23",
       "notes": "3-agent security review (10-category checklist). 15 findings fixed (2 P0, 10 P1, 3 P2). 16 files, 4 phases, 6 quality gates. 5 commits pushed."
+    },
+    {
+      "phase_name": "OAuth Login Fix (Session 23)",
+      "completed": "2026-02-23",
+      "notes": "Replaced unreliable CustomTabs callback with localhost server for OAuth redirect capture. 4 files modified. Committed and pushed."
+    },
+    {
+      "phase_name": "Permissions Automation + Cloudflare Fix (Session 24)",
+      "completed": "2026-02-23",
+      "notes": "3-phase guided permissions flow (copy-paste + auto dialogs). Cloudflare WebView fix (strip ; wv from UA). 6 files modified, 6 quality gates passed. Awaiting on-device test + commit."
     }
   ],
   "dependencies_at_risk": [],
