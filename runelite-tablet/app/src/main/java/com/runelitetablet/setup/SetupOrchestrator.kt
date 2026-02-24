@@ -2,6 +2,8 @@ package com.runelitetablet.setup
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.PowerManager
 import com.runelitetablet.cleanup.CleanupManager
 import com.runelitetablet.installer.ApkDownloader
@@ -27,9 +29,12 @@ import kotlinx.coroutines.flow.update
 interface SetupActions {
     fun requestInstallPermission()
     fun requestTermuxPermission()
+    fun requestNotificationPermission()
     fun requestBatteryOptimization(packageName: String)
     fun openAppSettings(packageName: String)
     fun launchIntent(intent: Intent)
+    /** Launch an Activity for result using the registered ActivityResultLauncher. */
+    fun launchAuthActivity(intent: Intent)
 }
 
 class SetupOrchestrator(
@@ -83,7 +88,8 @@ class SetupOrchestrator(
         private val MODULAR_STEPS = mapOf(
             SetupStep.InstallProot to Pair("step-proot", "install-proot.sh"),
             SetupStep.InstallJava to Pair("step-java", "install-java.sh"),
-            SetupStep.DownloadRuneLite to Pair("step-runelite", "download-runelite.sh")
+            SetupStep.DownloadRuneLite to Pair("step-runelite", "download-runelite.sh"),
+            SetupStep.InstallGpuDrivers to Pair("step-gpu", "setup-gpu.sh")
         )
     }
 
@@ -228,6 +234,7 @@ class SetupOrchestrator(
             SetupStep.InstallProot -> executeModularScript("install-proot.sh", "step-proot")
             SetupStep.InstallJava -> executeModularScript("install-java.sh", "step-java")
             SetupStep.DownloadRuneLite -> executeModularScript("download-runelite.sh", "step-runelite")
+            SetupStep.InstallGpuDrivers -> executeGpuStep()
             SetupStep.VerifySetup -> runVerification()
         }
     }
@@ -475,6 +482,19 @@ class SetupOrchestrator(
     }
 
     /**
+     * Check if notification permission is granted. On Android 12 and below,
+     * this always returns true (no runtime permission needed).
+     */
+    fun hasNotificationPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+    }
+
+    /**
      * Check if a package is exempt from battery optimization.
      */
     fun isBatteryOptimized(packageName: String): Boolean {
@@ -492,6 +512,51 @@ class SetupOrchestrator(
             updateStepStatus(stepIndex, StepStatus.Completed)
             AppLog.step("permissions", "completePermissionsStep: permissions step completed, resuming setup")
             runSetupFrom(stepIndex + 1)
+        }
+    }
+
+    /**
+     * GPU driver installation step. Non-blocking: if it fails, setup continues
+     * and RuneLite falls back to software rendering at launch time.
+     */
+    private suspend fun executeGpuStep(): Boolean {
+        // Check if already done
+        if (stateStore.isCompleted("step-gpu")) {
+            AppLog.step("gpu", "executeGpuStep: already completed (cached)")
+            return true
+        }
+
+        val deployed = scriptManager.deployScripts()
+        if (!deployed) {
+            AppLog.w("STEP", "executeGpuStep: script deployment failed, skipping GPU setup")
+            // Non-blocking: return true to continue setup
+            return true
+        }
+
+        _currentOutput.value = "Installing GPU drivers (this may take several minutes)..."
+
+        val result = commandRunner.execute(
+            commandPath = scriptManager.getScriptPath("setup-gpu.sh"),
+            background = true,
+            timeoutMs = TermuxCommandRunner.TIMEOUT_SETUP_MS
+        )
+
+        val completionMarker = "GPU_SETUP_COMPLETE"
+        val scriptCompleted = result.stdout?.contains(completionMarker) == true
+
+        if (result.isSuccess || scriptCompleted) {
+            _currentOutput.value = result.stdout?.let { if (it.length > 2000) it.takeLast(2000) else it }
+            stateStore.markCompleted("step-gpu")
+            AppLog.step("gpu", "executeGpuStep: GPU drivers installed successfully")
+            return true
+        } else {
+            // GPU setup failed — non-blocking, continue with software rendering
+            val errorOutput = result.stderr ?: result.error ?: "Unknown error"
+            AppLog.w("STEP", "executeGpuStep: GPU setup failed (non-blocking): $errorOutput")
+            _currentOutput.value = "GPU driver installation failed (software rendering will be used). Error: $errorOutput"
+            // Mark as completed anyway — we don't want to block setup
+            stateStore.markCompleted("step-gpu")
+            return true
         }
     }
 
@@ -571,6 +636,12 @@ class SetupOrchestrator(
                     SetupStep.DownloadRuneLite -> {
                         if (stateStore.isCompleted("step-runelite")) {
                             AppLog.step("runelite", "evaluateCompletedSteps: marking runelite as Completed (cached state)")
+                            stepState.copy(status = StepStatus.Completed)
+                        } else stepState
+                    }
+                    SetupStep.InstallGpuDrivers -> {
+                        if (stateStore.isCompleted("step-gpu")) {
+                            AppLog.step("gpu", "evaluateCompletedSteps: marking gpu as Completed (cached state)")
                             stepState.copy(status = StepStatus.Completed)
                         } else stepState
                     }

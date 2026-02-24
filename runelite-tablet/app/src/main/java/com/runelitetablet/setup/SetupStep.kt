@@ -7,13 +7,14 @@ sealed class SetupStep(val id: String, val label: String) {
     object InstallProot : SetupStep("proot", "Install Linux Environment")
     object InstallJava : SetupStep("java", "Install Java Runtime")
     object DownloadRuneLite : SetupStep("runelite", "Download RuneLite")
+    object InstallGpuDrivers : SetupStep("gpu", "Install GPU Drivers")
     object VerifySetup : SetupStep("verify", "Verify Setup")
 
     companion object {
         val allSteps: List<SetupStep> by lazy {
             listOf(
                 InstallTermux, InstallTermuxX11, EnablePermissions,
-                InstallProot, InstallJava, DownloadRuneLite, VerifySetup
+                InstallProot, InstallJava, DownloadRuneLite, InstallGpuDrivers, VerifySetup
             )
         }
     }
