@@ -21,6 +21,8 @@ class SetupStateStore(private val context: Context) {
 
     fun markCompleted(key: String) = prefs.edit().putBoolean(key, true).apply()
 
+    fun clearCompleted(key: String) = prefs.edit().remove(key).apply()
+
     fun isCompleted(key: String): Boolean = prefs.getBoolean(key, false)
 
     fun getStoredVersion(): String = prefs.getString("script_version", "0") ?: "0"

@@ -735,7 +735,8 @@ class SetupOrchestrator(
                             val index = _steps.value.indexOfFirst { it.step == step }
                             if (index >= 0 && _steps.value[index].status is StepStatus.Completed) {
                                 updateStepStatus(index, StepStatus.Pending)
-                                AppLog.step(key, "reconcileWithMarkers: ABSENT — downgraded to Pending")
+                                stateStore.clearCompleted(key)
+                                AppLog.step(key, "reconcileWithMarkers: ABSENT — downgraded to Pending and cleared stateStore")
                             }
                         }
                     }
