@@ -5,6 +5,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import com.runelitetablet.logging.AppLog
 import com.runelitetablet.setup.SetupViewModel
@@ -14,6 +16,18 @@ import com.runelitetablet.ui.theme.RuneLiteTabletTheme
 class MainActivity : ComponentActivity() {
     private val viewModel: SetupViewModel by viewModels {
         SetupViewModel.Factory(this, (application as RuneLiteTabletApp).httpClient)
+    }
+
+    /**
+     * ActivityResultLauncher for the GeckoView auth flow.
+     * Must be registered during Activity creation (before onStart).
+     * Result is forwarded to ViewModel.handleAuthResult().
+     */
+    private val authLauncher: ActivityResultLauncher<Intent> = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        AppLog.step("auth", "MainActivity: auth result received — resultCode=${result.resultCode}")
+        viewModel.handleAuthResult(result)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,21 +52,20 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         val uri = intent.data
         AppLog.lifecycle("MainActivity.onNewIntent: scheme=${uri?.scheme} data=$uri")
+        // Keep jagex: intent filter as safety net — in production, GeckoView intercepts this
         if (uri?.scheme == "jagex") {
-            AppLog.step("auth", "Captured jagex: URI — forwarding to ViewModel")
-            viewModel.handleJagexRedirect(uri)
+            AppLog.step("auth", "Captured jagex: URI via intent filter (safety net)")
         }
         setIntent(intent)
     }
 
     override fun onResume() {
         super.onResume()
-        AppLog.lifecycle("MainActivity.onResume: bindActions + recheckPermissions triggered")
+        AppLog.lifecycle("MainActivity.onResume: bindActions + recheckPermissions + checkSession triggered")
         AppLog.perf("onResume: ${AppLog.perfSnapshot(applicationContext)}")
-        viewModel.bindActions(this)
+        viewModel.bindActions(this, authLauncher)
         viewModel.recheckPermissions()
-        // Detect if user dismissed a Custom Tab without completing login
-        viewModel.checkLoginDismissal()
+        viewModel.checkSession()
     }
 
     override fun onPause() {

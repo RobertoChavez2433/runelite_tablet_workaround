@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import com.runelitetablet.logging.AppLog
 import com.runelitetablet.setup.AppScreen
 import com.runelitetablet.BuildConfig
+import com.runelitetablet.session.SessionState
 import com.runelitetablet.setup.HealthCheckResult
 import com.runelitetablet.setup.LaunchState
 import com.runelitetablet.setup.PermissionPhase
@@ -61,6 +62,8 @@ fun SetupScreen(viewModel: SetupViewModel) {
     val launchState by viewModel.launchState.collectAsState()
     val healthStatus by viewModel.healthStatus.collectAsState()
     val showHealthDialog by viewModel.showHealthDialog.collectAsState()
+    val sessionState by viewModel.sessionState.collectAsState()
+    val sessionStartTime by viewModel.sessionStartTime.collectAsState()
 
     when (val screen = currentScreen) {
         is AppScreen.Setup -> SetupWizardContent(viewModel)
@@ -85,9 +88,19 @@ fun SetupScreen(viewModel: SetupViewModel) {
             displayName = viewModel.getDisplayName(),
             healthStatus = healthStatus,
             launchState = launchState,
+            sessionState = sessionState,
+            sessionStartTime = sessionStartTime,
             onLaunch = {
                 AppLog.ui("SetupScreen: Launch RuneLite button clicked")
                 viewModel.launchRuneLite()
+            },
+            onSwitchToGame = {
+                AppLog.ui("SetupScreen: Switch to Game button clicked")
+                viewModel.switchToGame()
+            },
+            onStopSession = {
+                AppLog.ui("SetupScreen: Stop Game button clicked")
+                viewModel.stopSession()
             },
             onSettings = {
                 AppLog.ui("SetupScreen: Settings button clicked")
@@ -315,7 +328,11 @@ private fun LaunchScreen(
     displayName: String?,
     healthStatus: HealthCheckResult?,
     launchState: LaunchState,
+    sessionState: SessionState,
+    sessionStartTime: Long,
     onLaunch: () -> Unit,
+    onSwitchToGame: () -> Unit,
+    onStopSession: () -> Unit,
     onSettings: () -> Unit,
     onViewLogs: () -> Unit
 ) {
@@ -412,33 +429,115 @@ private fun LaunchScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Launch button or progress
-            when (val state = launchState) {
-                is LaunchState.Idle -> {
-                    Button(
-                        onClick = onLaunch,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
+            // Session status card (shown when session is running)
+            if (sessionState is SessionState.Running) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFF1B5E20).copy(alpha = 0.15f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(16.dp)
                     ) {
-                        Text(
-                            text = "Launch RuneLite",
-                            style = MaterialTheme.typography.labelLarge
+                        Icon(
+                            Icons.Default.Circle,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = Color(0xFF4CAF50)
                         )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "RuneLite is running",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if (sessionStartTime > 0L) {
+                                val elapsedMin = ((System.currentTimeMillis() - sessionStartTime) / 60_000).toInt()
+                                val timeText = if (elapsedMin < 60) "$elapsedMin min"
+                                    else "${elapsedMin / 60}h ${elapsedMin % 60}m"
+                                Text(
+                                    text = "Playing for $timeText",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
-                is LaunchState.CheckingUpdate -> LaunchProgress("Checking for updates...")
-                is LaunchState.Updating -> LaunchProgress(
-                    "Updating RuneLite (${state.fromVersion} -> ${state.toVersion})..."
+            }
+
+            if (sessionState is SessionState.Stopped) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Last session ended",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                is LaunchState.CheckingHealth -> LaunchProgress("Verifying environment...")
-                is LaunchState.RefreshingTokens -> LaunchProgress("Refreshing session...")
-                is LaunchState.Launching -> LaunchProgress("Launching RuneLite...")
-                is LaunchState.Failed -> {
+            }
+
+            if (sessionState is SessionState.Error) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = (sessionState as SessionState.Error).message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Launch button, session controls, or progress
+            when {
+                // Session running: show Switch + Stop buttons
+                sessionState is SessionState.Running -> {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = onSwitchToGame,
+                            modifier = Modifier.weight(1f).height(56.dp)
+                        ) {
+                            Text(
+                                text = "Switch to Game",
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        OutlinedButton(
+                            onClick = onStopSession,
+                            modifier = Modifier.weight(1f).height(56.dp)
+                        ) {
+                            Text(
+                                text = "Stop Game",
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    }
+                }
+                // Session starting: show spinner
+                sessionState is SessionState.Starting -> {
+                    LaunchProgress("Starting RuneLite...")
+                }
+                // Launch state is active (checking updates, etc.)
+                launchState !is LaunchState.Idle && launchState !is LaunchState.Failed -> {
+                    when (val state = launchState) {
+                        is LaunchState.CheckingUpdate -> LaunchProgress("Checking for updates...")
+                        is LaunchState.Updating -> LaunchProgress(
+                            "Updating RuneLite (${state.fromVersion} -> ${state.toVersion})..."
+                        )
+                        is LaunchState.CheckingHealth -> LaunchProgress("Verifying environment...")
+                        is LaunchState.RefreshingTokens -> LaunchProgress("Refreshing session...")
+                        is LaunchState.Launching -> LaunchProgress("Launching RuneLite...")
+                        else -> {} // Idle and Failed handled elsewhere
+                    }
+                }
+                // Launch failed
+                launchState is LaunchState.Failed -> {
+                    val failedState = launchState as LaunchState.Failed
                     Text(
-                        text = state.message,
+                        text = failedState.message,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(bottom = 16.dp)
@@ -457,6 +556,20 @@ private fun LaunchScreen(
                         ) {
                             Text("Try Again")
                         }
+                    }
+                }
+                // Default: show Launch button
+                else -> {
+                    Button(
+                        onClick = onLaunch,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                    ) {
+                        Text(
+                            text = "Launch RuneLite",
+                            style = MaterialTheme.typography.labelLarge
+                        )
                     }
                 }
             }
