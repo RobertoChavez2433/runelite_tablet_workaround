@@ -51,7 +51,8 @@ fun LogViewerScreen(
             val latestLog = logDir.listFiles()
                 ?.filter { it.name.startsWith("rlt-session-") && it.name.endsWith(".log") }
                 ?.maxByOrNull { it.lastModified() }
-            latestLog?.readText() ?: "No logs found"
+            val rawContent = latestLog?.readLines()?.takeLast(500)?.joinToString("\n") ?: "No logs found"
+            scrubCredentials(rawContent)
         }
     }
 
@@ -102,4 +103,12 @@ private fun shareLog(context: Context, text: String) {
         putExtra(Intent.EXTRA_SUBJECT, "RuneLite Tablet Session Log")
     }
     context.startActivity(Intent.createChooser(intent, "Share log via"))
+}
+
+private fun scrubCredentials(text: String): String {
+    return text
+        .replace(Regex("(JX_[A-Z_]+=)[\"']?\\S+"), "$1***")
+        .replace(Regex("(Bearer )\\S+"), "$1***")
+        .replace(Regex("(\"sessionId\"\\s*:\\s*\")([^\"]+)"), "$1***")
+        .replace(Regex("eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]+"), "[JWT_REDACTED]")
 }

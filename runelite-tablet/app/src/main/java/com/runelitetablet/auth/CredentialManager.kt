@@ -30,6 +30,7 @@ class CredentialManager(private val context: Context) {
     }
 
     private var _prefs: SharedPreferences? = null
+    private var prefsRecreateAttempted = false
 
     /**
      * Access token is kept in memory only — never persisted to EncryptedSharedPreferences.
@@ -58,17 +59,51 @@ class CredentialManager(private val context: Context) {
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             ).also { _prefs = it }
         } catch (e: GeneralSecurityException) {
-            AppLog.e("AUTH", "CredentialManager: Keystore unavailable: ${e.message}", e)
-            null
+            AppLog.e("AUTH", "CredentialManager: Keystore error: ${e.message}", e)
+            // Corrupted prefs file — delete it and retry once
+            return tryDeleteAndRecreatePrefs(e)
         } catch (e: Exception) {
             AppLog.e("AUTH", "CredentialManager: Failed to init EncryptedSharedPreferences: ${e.message}", e)
-            null
+            // Corrupted prefs file — delete it and retry once
+            return tryDeleteAndRecreatePrefs(e)
         }
     }
 
     /**
      * Check if we have stored credentials (at minimum, a session ID).
      */
+    /**
+     * Handle corrupted EncryptedSharedPreferences file by deleting and retrying once.
+     * Prevents permanent bricking of credential storage after power loss or disk corruption.
+     */
+    private fun tryDeleteAndRecreatePrefs(originalError: Exception): SharedPreferences? {
+        if (prefsRecreateAttempted) {
+            AppLog.e("AUTH", "CredentialManager: already attempted prefs recreation — giving up")
+            return null
+        }
+        prefsRecreateAttempted = true
+        AppLog.w("AUTH", "CredentialManager: deleting corrupted prefs file and retrying")
+        try {
+            val prefsFile = java.io.File(context.filesDir.parent, "shared_prefs/$PREFS_NAME.xml")
+            if (prefsFile.exists()) prefsFile.delete()
+        } catch (e: Exception) {
+            AppLog.e("AUTH", "CredentialManager: failed to delete corrupted prefs file: ${e.message}")
+        }
+        return try {
+            val key = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+            EncryptedSharedPreferences.create(
+                context, PREFS_NAME, key,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            ).also { _prefs = it }
+        } catch (e: Exception) {
+            AppLog.e("AUTH", "CredentialManager: prefs recreation also failed: ${e.message}")
+            null
+        }
+    }
+
     fun hasCredentials(): Boolean {
         return getPrefs()?.getString(KEY_SESSION_ID, null) != null
     }

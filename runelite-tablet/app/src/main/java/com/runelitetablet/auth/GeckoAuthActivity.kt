@@ -128,6 +128,20 @@ class GeckoAuthActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         AppLog.lifecycle("GeckoAuthActivity.onCreate")
 
+        // Prevent login page from appearing in Android recent apps screenshots
+        window.setFlags(
+            android.view.WindowManager.LayoutParams.FLAG_SECURE,
+            android.view.WindowManager.LayoutParams.FLAG_SECURE
+        )
+
+        // Process death during auth flow loses all state (GeckoSession, PKCE verifier, etc.)
+        // The only safe action is to cancel and let the user restart auth
+        if (savedInstanceState != null) {
+            AppLog.w("AUTH", "GeckoAuthActivity: restored after process death — cancelling auth")
+            finishWithError("Authentication was interrupted. Please try again.")
+            return
+        }
+
         // Extract required parameters from intent
         step1Url = intent.getStringExtra(EXTRA_STEP1_URL)
             ?: return finishWithError("Missing step1_url")
@@ -188,7 +202,11 @@ class GeckoAuthActivity : ComponentActivity() {
         super.onDestroy()
         AppLog.lifecycle("GeckoAuthActivity.onDestroy")
         if (::session.isInitialized) {
-            session.close()
+            try {
+                session.close()
+            } catch (e: Exception) {
+                // Session may not have been fully opened; safe to ignore
+            }
         }
     }
 

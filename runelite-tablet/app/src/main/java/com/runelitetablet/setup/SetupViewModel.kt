@@ -31,7 +31,6 @@ import com.runelitetablet.ui.DisplayPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -377,11 +376,11 @@ class SetupViewModel(
             try {
                 val termuxEnvPath = "${TermuxCommandRunner.TERMUX_HOME_PATH}/.rlt-launch-env.sh"
                 val content = buildString {
-                    appendLine("export JX_SESSION_ID='${shellEscape(creds.sessionId)}'")
-                    appendLine("export JX_CHARACTER_ID='${shellEscape(creds.characterId)}'")
-                    appendLine("export JX_DISPLAY_NAME='${shellEscape(creds.displayName)}'")
-                    creds.accessToken?.let { appendLine("export JX_ACCESS_TOKEN='${shellEscape(it)}'") }
-                    creds.refreshToken?.let { appendLine("export JX_REFRESH_TOKEN='${shellEscape(it)}'") }
+                    appendLine("export JX_SESSION_ID=\"${shellEscape(creds.sessionId)}\"")
+                    appendLine("export JX_CHARACTER_ID=\"${shellEscape(creds.characterId)}\"")
+                    appendLine("export JX_DISPLAY_NAME=\"${shellEscape(creds.displayName)}\"")
+                    creds.accessToken?.let { appendLine("export JX_ACCESS_TOKEN=\"${shellEscape(it)}\"") }
+                    creds.refreshToken?.let { appendLine("export JX_REFRESH_TOKEN=\"${shellEscape(it)}\"") }
                 }
                 val deployCommand = "cat > $termuxEnvPath && chmod 600 $termuxEnvPath"
                 val result = commandRunner.execute(
@@ -492,6 +491,8 @@ class SetupViewModel(
     fun resetSetup() {
         viewModelScope.launch {
             stateStore.clearAll()
+            scriptManager.invalidateDeployCache()
+            orchestrator.resetState()
             setupStarted.set(false)
             _currentScreen.value = AppScreen.Setup
         }
@@ -510,7 +511,8 @@ class SetupViewModel(
 
     fun runSetupForHealth() {
         _showHealthDialog.value = null
-        // Navigate to setup screen — the failures indicate which steps to re-run
+        // Reset setup state so startSetup() re-runs via LaunchedEffect
+        setupStarted.set(false)
         _currentScreen.value = AppScreen.Setup
     }
 
@@ -529,13 +531,11 @@ class SetupViewModel(
                 AppLog.w("UPDATE", "runUpdateCheck: script deployment failed")
                 return ""
             }
-            val result = withTimeout(60_000L) {
-                commandRunner.execute(
-                    commandPath = scriptManager.getScriptPath("update-runelite.sh"),
-                    background = true,
-                    timeoutMs = 60L * 1000
-                )
-            }
+            val result = commandRunner.execute(
+                commandPath = scriptManager.getScriptPath("update-runelite.sh"),
+                background = true,
+                timeoutMs = 60L * 1000
+            )
             val output = result.stdout ?: ""
             AppLog.step("update", "runUpdateCheck: exitCode=${result.exitCode} output=$output")
             output
@@ -564,13 +564,11 @@ class SetupViewModel(
                 AppLog.w("HEALTH", "runHealthCheck: script deployment failed")
                 return HealthCheckResult.Inconclusive
             }
-            val result = withTimeout(10_000L) {
-                commandRunner.execute(
-                    commandPath = scriptManager.getScriptPath("health-check.sh"),
-                    background = true,
-                    timeoutMs = 10L * 1000
-                )
-            }
+            val result = commandRunner.execute(
+                commandPath = scriptManager.getScriptPath("health-check.sh"),
+                background = true,
+                timeoutMs = 10L * 1000
+            )
             val output = result.stdout ?: ""
             AppLog.step("health", "runHealthCheck: exitCode=${result.exitCode} output=$output")
 
@@ -994,14 +992,19 @@ class SetupViewModel(
     // -------------------------------------------------------------------------
 
     /**
-     * Escape a string for safe use inside single-quoted shell strings.
-     * Replaces ' with '\'' so injection via credential values is not possible.
+     * Escape a string for safe use inside double-quoted shell strings.
+     * Escapes all shell metacharacters: \, ", $, `, !
+     * Safe against injection when the env file is `source`d by bash.
      */
-    // Fix 5: Escape backslashes BEFORE single quotes — otherwise a backslash immediately before
-    // a single quote would be double-escaped in the wrong order
     private fun shellEscape(value: String): String = value
+        .replace("\u0000", "")  // Strip null bytes
+        .replace("\n", "")      // Strip newlines (prevent line injection)
+        .replace("\r", "")      // Strip carriage returns
         .replace("\\", "\\\\")
-        .replace("'", "'\\''")
+        .replace("\"", "\\\"")
+        .replace("\$", "\\\$")
+        .replace("`", "\\`")
+        .replace("!", "\\!")
 
 
     companion object {

@@ -268,7 +268,7 @@ class RuneLiteSessionService : Service() {
             Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
             },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntentCompat.FLAGS
+            PendingIntentCompat.IMMUTABLE_FLAGS
         )
 
         // "Switch to Game" action
@@ -277,7 +277,7 @@ class RuneLiteSessionService : Service() {
             Intent(this, RuneLiteSessionService::class.java).apply {
                 action = ACTION_SWITCH_TO_GAME
             },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntentCompat.FLAGS
+            PendingIntentCompat.IMMUTABLE_FLAGS
         )
 
         // "Stop Game" action
@@ -286,7 +286,7 @@ class RuneLiteSessionService : Service() {
             Intent(this, RuneLiteSessionService::class.java).apply {
                 action = ACTION_STOP_SESSION
             },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntentCompat.FLAGS
+            PendingIntentCompat.IMMUTABLE_FLAGS
         )
 
         return Notification.Builder(this, NOTIFICATION_CHANNEL_ID)

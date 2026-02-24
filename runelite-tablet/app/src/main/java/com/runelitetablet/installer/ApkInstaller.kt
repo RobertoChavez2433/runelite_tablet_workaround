@@ -29,7 +29,7 @@ class ApkInstaller(private val context: Context) {
          * Routes the confirmation dialog through an Activity context (required on Android 10+).
          * Set by SetupOrchestrator when actions are bound; null when unbound.
          */
-        var onNeedsUserAction: ((Intent) -> Unit)? = null
+        @Volatile var onNeedsUserAction: ((Intent) -> Unit)? = null
     }
 
     fun canInstallPackages(): Boolean {

@@ -173,7 +173,7 @@ class TermuxCommandRunner(private val context: Context) {
         val intent = Intent(context, TermuxResultService::class.java).apply {
             putExtra("execution_id", executionId)
         }
-        val flags = PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_CANCEL_CURRENT or PendingIntentCompat.FLAGS
+        val flags = PendingIntent.FLAG_ONE_SHOT or PendingIntentCompat.FLAGS
         return PendingIntent.getService(context, executionId, intent, flags)
     }
 }

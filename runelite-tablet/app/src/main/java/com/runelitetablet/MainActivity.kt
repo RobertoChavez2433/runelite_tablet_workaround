@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         val uri = intent.data
-        AppLog.lifecycle("MainActivity.onNewIntent: scheme=${uri?.scheme} data=$uri")
+        AppLog.lifecycle("MainActivity.onNewIntent: scheme=${uri?.scheme} host=${uri?.host}")
         // Keep jagex: intent filter as safety net — in production, GeckoView intercepts this
         if (uri?.scheme == "jagex") {
             AppLog.step("auth", "Captured jagex: URI via intent filter (safety net)")
