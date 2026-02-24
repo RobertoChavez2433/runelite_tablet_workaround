@@ -3,14 +3,14 @@
     "app_name": "Runelite for Tablet",
     "app_version": "0.1.0",
     "description": "Android installer app that runs the real RuneLite client on Samsung Tab S10 Ultra via Termux + proot-distro",
-    "last_updated": "2026-02-23T22:30:00Z",
-    "session_notes": "Session 29: Brainstormed OAuth 2-step rewrite. 3 verification agents + 1 adversarial reviewer. 4 on-device tests confirmed: consent client can't work standalone, jagex: scheme works on Android Chrome. Design approved. Found game session API bug. Committed 5 logical commits + pushed all 7 to origin."
+    "last_updated": "2026-02-24T05:00:00Z",
+    "session_notes": "Session 37: 6-wave review-fix-verify cycle (12 review agents, 21 fixes, 17 files). Standard + production-scrutiny reviews. Shell injection fix, deployment caching, credential scrubbing, process death handling, corruption recovery. 4 logical commits."
   },
   "current_phase": {
-    "phase_name": "MVP Development — On-Device Testing & Bug Fixing",
-    "phase_status": "oauth_2step_rewrite_designed",
+    "phase_name": "MVP Development — Production Hardened",
+    "phase_status": "hardened_awaiting_device_test",
     "phase_started": "2026-02-22",
-    "progress_percentage": 85
+    "progress_percentage": 98
   },
   "release_cycle": {
     "last_release": null,
@@ -18,24 +18,41 @@
     "next_release_target": null,
     "next_release_version": "0.1.0"
   },
-  "active_blockers": [
-    {
-      "id": "oauth-2step-not-implemented",
-      "description": "OAuth 2-step flow design approved but code not yet written. Must rewrite JagexOAuth2Manager (2 client IDs, fix game session API), add forwarder HTML to LocalhostAuthServer, orchestrate 2-step flow in SetupViewModel.",
-      "severity": "P0",
-      "plan": ".claude/plans/2026-02-23-oauth-2step-rewrite-design.md"
-    }
-  ],
+  "active_blockers": [],
   "resolved_blockers": [
     {
-      "id": "oauth-wrong-client-id",
-      "description": "OAuth Step 1 uses wrong client_id (1fddee4e consent client instead of com_jagex_auth_desktop_launcher). Jagex rejects with 'something went wrong'.",
+      "id": "geckoview-auth-integration",
+      "description": "GeckoView auth integration designed and approved (Session 33). Needed implementation and on-device verification.",
       "resolved": "2026-02-23",
-      "resolution": "Root cause identified. 2-step flow design approved. Implementation pending."
+      "resolution": "Implemented in Session 34. All 3 phases complete, 6 quality gates passed. Fragment capture confirmed working in onLoadRequest. Full end-to-end auth flow verified on device."
+    },
+    {
+      "id": "cross-app-file-access",
+      "description": "Credential env file written to app's private filesDir was not readable by Termux (different UID).",
+      "resolved": "2026-02-23",
+      "resolution": "Deploy env file via TermuxCommandRunner.execute() with stdin, writing to Termux home dir."
+    },
+    {
+      "id": "port-80-android",
+      "description": "Android blocks bind() to port 80 for ALL apps. Jagex consent redirect goes to http://localhost (port 80).",
+      "resolved": "2026-02-23",
+      "resolution": "GeckoView intercepts navigation at engine level before network request. No port 80 needed."
+    },
+    {
+      "id": "oauth-2step-not-implemented",
+      "description": "OAuth 2-step flow design approved but code not yet written.",
+      "resolved": "2026-02-23",
+      "resolution": "Full implementation completed in Session 30. Replaced with GeckoView auth in Session 34."
+    },
+    {
+      "id": "oauth-wrong-client-id",
+      "description": "OAuth Step 1 uses wrong client_id.",
+      "resolved": "2026-02-23",
+      "resolution": "Fixed in 2-step flow rewrite."
     },
     {
       "id": "permissions-npe",
-      "description": "StepState NPE crash on launch — sealed class companion val eager init returns null objects",
+      "description": "StepState NPE crash on launch",
       "resolved": "2026-02-23",
       "resolution": "Changed SetupStep.allSteps from eager val to by lazy"
     },
@@ -47,39 +64,39 @@
     },
     {
       "id": "permissions-ui-not-showing",
-      "description": "isPermissionStepActive always false because awaitingPermissionCompletion was @Volatile var not observable",
+      "description": "isPermissionStepActive always false",
       "resolved": "2026-02-23",
-      "resolution": "Changed to MutableStateFlow<Boolean> and used combine() in ViewModel derivation"
+      "resolution": "Changed to MutableStateFlow<Boolean> and used combine()"
     },
     {
       "id": "cloudflare-webview",
-      "description": "Cloudflare blocks Android WebView auth page — unfixable due to TLS/canvas/JS fingerprint mismatch",
+      "description": "Cloudflare blocks Android WebView auth page",
       "resolved": "2026-02-23",
-      "resolution": "Replaced with Chrome Custom Tabs (runs in real Chrome process, passes Cloudflare)"
+      "resolution": "Replaced with GeckoView (Firefox engine)"
     },
     {
       "id": "oauth-redirect",
       "description": "Chrome Custom Tabs onNavigationEvent doesn't reliably provide redirect URL",
       "resolved": "2026-02-23",
-      "resolution": "Replaced with localhost ServerSocket + jagex: intent scheme capture"
+      "resolution": "Replaced with GeckoView NavigationDelegate"
     },
     {
       "id": "headless-jdk",
-      "description": "openjdk-11-jdk-headless missing AWT/X11 libs (libawt_xawt.so)",
+      "description": "openjdk-11-jdk-headless missing AWT/X11 libs",
       "resolved": "2026-02-22",
-      "resolution": "Changed to openjdk-11-jdk in setup-environment.sh"
+      "resolution": "Changed to openjdk-11-jdk"
     },
     {
       "id": "proot-distro-exit-code",
-      "description": "proot-distro install ubuntu returns non-zero due to /proc/self/fd warnings",
+      "description": "proot-distro install returns non-zero due to /proc/self/fd warnings",
       "resolved": "2026-02-22",
-      "resolution": "Manual rootfs extraction fallback + post-extraction config"
+      "resolution": "Manual rootfs extraction fallback"
     },
     {
       "id": "apt-get-hang",
-      "description": "apt-get install hangs inside proot due to debconf prompts and missing DNS",
+      "description": "apt-get install hangs inside proot",
       "resolved": "2026-02-22",
-      "resolution": "DEBIAN_FRONTEND=noninteractive + resolv.conf in manual rootfs config"
+      "resolution": "DEBIAN_FRONTEND=noninteractive + resolv.conf"
     },
     {
       "id": "service-lifecycle",
@@ -160,6 +177,41 @@
       "phase_name": "OAuth 2-Step Flow Research + Design (Sessions 27-29)",
       "completed": "2026-02-23",
       "notes": "Cloudflare WebView incompatibility discovered. Custom Tabs + localhost approach designed. Wrong client_id identified. Full 2-step flow researched from 3 launchers. 4 on-device tests. Design approved."
+    },
+    {
+      "phase_name": "OAuth 2-Step Implementation + Hardening (Session 30)",
+      "completed": "2026-02-23",
+      "notes": "Full 2-step, 2-client-ID OAuth rewrite. 4 phases via /implement orchestrator. 3-agent review. 14 fixes."
+    },
+    {
+      "phase_name": "Port 80 Debugging + GeckoView PoC (Sessions 31-32)",
+      "completed": "2026-02-23",
+      "notes": "Exhaustive port 80 investigation. GeckoView PoC passes Cloudflare. Port 80 blocker solved."
+    },
+    {
+      "phase_name": "GeckoView Auth Design (Session 33)",
+      "completed": "2026-02-23",
+      "notes": "6 design decisions, 6 sections. Design doc written and approved."
+    },
+    {
+      "phase_name": "GeckoView Auth Implementation + On-Device Verification (Session 34)",
+      "completed": "2026-02-23",
+      "notes": "3 phases via /implement (6 quality gates). Cross-app file access bug fixed. Full auth flow verified on device. Process cleanup added. Perf logging enabled."
+    },
+    {
+      "phase_name": "Performance Analysis + Lifecycle/GPU Design (Session 35)",
+      "completed": "2026-02-23",
+      "notes": "3 parallel research agents. Perf logs analyzed (GC/CPU/mem/resolution). Quick wins applied. Combined lifecycle + GPU design brainstormed and approved. Design doc committed."
+    },
+    {
+      "phase_name": "Lifecycle + GPU Implementation (Session 36)",
+      "completed": "2026-02-24",
+      "notes": "3 phases via /implement (6 quality gates). Foreground service, health monitor, shutdown script, GPU setup, runtime detection. GeckoView auth committed. 4 logical commits."
+    },
+    {
+      "phase_name": "Production Hardening (Session 37)",
+      "completed": "2026-02-24",
+      "notes": "6-wave review-fix-verify loop with 12 review agents. 21 fixes across 17 files: shell injection, deployment caching, credential scrubbing, PendingIntent flags, process death handling, corruption recovery. All quality gates pass."
     }
   ],
   "dependencies_at_risk": [],

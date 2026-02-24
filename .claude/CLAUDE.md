@@ -149,3 +149,16 @@ Source root: `runelite-tablet/app/src/main/java/com/runelitetablet/`
 | plans/completed/ | Completed plans (reference only) |
 | research/ | Research findings (6 files + README) |
 | memory/ | Key learnings and patterns (MEMORY.md) |
+
+## Unique Solved Problems
+
+1. Termux results are in `getBundleExtra("result")` not flat extras; PendingIntent MUST be FLAG_MUTABLE or extras silently vanish
+2. Jagex OAuth is 2 steps, 2 client IDs (`com_jagex_auth_desktop_launcher` then `1fddee4e-...`); `jagex:` URI uses commas not `&`; POST id_token to `/sessions` FIRST, GET `/accounts` with sessionId SECOND
+3. WebView is permanently Cloudflare-blocked; port 80 is kernel-blocked on Android — GeckoView solves both by intercepting navigation before network
+4. App's `filesDir` is unreadable by Termux (different UID) — deploy everything via TermuxCommandRunner stdin
+5. proot exit codes lie (`/proc/self/fd` warnings = non-zero on success, triggers rootfs self-deletion) — verify with marker files or `which`, never exitCode
+6. proot `--kill-on-exit` kills child JVMs — bypass JvmLauncher with `exec java -cp` so the process replaces, not spawns
+7. Windows git CRLF breaks shebangs on Termux/Linux — `.gitattributes` with `eol=lf` + defensive `replace("\r","")`
+8. `@Volatile var` is NOT reactive — `combine()`/`map()` won't re-evaluate when it changes; use `MutableStateFlow`
+9. Sealed class companion `val` referencing its own subclass objects is null during ART static init — always `by lazy`
+10. Catch `TimeoutCancellationException` BEFORE `CancellationException` (it's a subclass — wrong order = dead catch block)

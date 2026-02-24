@@ -4,6 +4,36 @@ Older/resolved defects rotated from per-feature files in `.claude/defects/`.
 
 ---
 
+## Rotated 2026-02-24 (Session 37)
+
+### [ANDROID] 2026-02-23: Android clipboard corrupts single quotes when pasting into Termux
+**Pattern**: Android or keyboard substitutes curly/smart quotes for straight quotes, breaking shell syntax.
+**Prevention**: Avoid single quotes in commands users must paste. Use no-quote alternatives or double quotes.
+
+### [ANDROID] 2026-02-23: `@Volatile var` is not reactive — StateFlow derivations won't re-evaluate
+**Pattern**: `@Volatile var` read inside `Flow.map{}` or `combine{}` won't trigger re-evaluation when changed.
+**Prevention**: Use `MutableStateFlow<Boolean>` instead. Combine with `combine()` for reactive derivations.
+
+### [ANDROID] 2026-02-23: Android WebView is fundamentally incompatible with Cloudflare — use GeckoView
+**Pattern**: Cloudflare multi-layer detection blocks WebView permanently.
+**Prevention**: Use GeckoView (Firefox engine) for Cloudflare-protected pages.
+
+## Rotated 2026-02-23 (Session 34)
+
+### [SECURITY] 2026-02-23: Localhost forwarder HTML needs CSRF token — any local process can POST
+**Pattern**: Without a per-request CSRF token, any app on the device that knows the port can POST to `/jws` and inject a token.
+**Prevention**: Generate a random CSRF token, embed in forwarder HTML, validate in POST handler before accepting params.
+**Status**: OBSOLETE — AuthRedirectCapture.kt deleted in Session 34. GeckoView replaces localhost forwarder entirely.
+**Ref**: (deleted) auth/AuthRedirectCapture.kt
+
+### [ANDROID] 2026-02-23: Android port 80 — ALL approaches exhaustively dead except GeckoView
+**Pattern**: Android blocks bind() to privileged ports (<1024) for ALL apps. VpnService can't intercept loopback. Intent filters for `http://localhost` dead on Android 12+. proot does NOT translate bind() for privileged ports.
+**Prevention**: Use GeckoView `NavigationDelegate.onLoadRequest()` to intercept redirect at engine level before network. No port 80 needed.
+**Status**: RESOLVED — GeckoView auth implemented in Session 34. Port 80 not needed.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/GeckoAuthActivity.kt
+
+---
+
 ## Rotated 2026-02-23 (Session 26)
 
 ### [TERMUX] 2026-02-22: Env var injection via command string prefix doesn't work with Termux execve
@@ -95,6 +125,28 @@ Older/resolved defects rotated from per-feature files in `.claude/defects/`.
 **Pattern**: Auto-generated `toString()` includes ALL fields. Accidental logging exposes plaintext secrets.
 **Prevention**: Always add `override fun toString() = "ClassName([REDACTED])"` to data classes with sensitive fields.
 **Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/CredentialManager.kt
+
+---
+
+## Rotated 2026-02-23 (Session 30)
+
+### [AUTH] 2026-02-23: Game session API calls use wrong auth method — accessToken vs id_token/sessionId
+**Pattern**: `fetchCharacters()` and `createGameSession()` pass `accessToken` as Bearer header. Real flow: POST `{"idToken":"<jwt>"}` to `/sessions` (returns sessionId), then GET `/accounts` with Bearer `<sessionId>`. Order is also reversed — `/sessions` must come before `/accounts`.
+**Prevention**: Verify API call signatures against reference implementations (aitoiaita `game_session.rs`).
+**Status**: FIXED in Session 30.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/JagexOAuth2Manager.kt
+
+### [AUTH] 2026-02-23: Consent client_id cannot initiate standalone login — returns unsupported_response_type
+**Pattern**: Using `1fddee4e-...` consent client_id with `response_type=code` or `id_token code` for the initial OAuth login. Jagex server returns `unsupported_response_type` error. The consent client only works for Step 2 after Step 1 session is established.
+**Prevention**: Always use `com_jagex_auth_desktop_launcher` for Step 1. Consent client is Step 2 only.
+**Status**: FIXED in Session 30.
+**Ref**: `.claude/plans/2026-02-23-oauth-2step-rewrite-design.md`
+
+### [AUTH-BLOCKER] 2026-02-23: OAuth uses wrong client_id for Step 1 — Jagex rejects with "something went wrong"
+**Pattern**: `JagexOAuth2Manager.kt` used `1fddee4e-...` (Step 2 consent client) for Step 1. Jagex rejected.
+**Prevention**: Implement correct 2-step flow with 2 client IDs.
+**Status**: FIXED in Session 30.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/JagexOAuth2Manager.kt
 
 ---
 

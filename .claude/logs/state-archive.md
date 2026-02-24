@@ -6,6 +6,16 @@ Session history archive. See `.claude/autoload/_state.md` for current state (las
 
 ## February 2026
 
+### Session 30 (2026-02-23)
+**Work**: Implemented OAuth 2-step rewrite via `/implement` orchestrator (4 phases, 6 quality gates). 3 independent review agents. Fixed all findings: 1 P0 (JSON injection), 10 P1s, 3 completeness gaps.
+**Decisions**: suspendCancellableCoroutine for OkHttp, CSRF token on forwarder HTML, specific exception types.
+**Next**: On-device test of full login flow.
+
+### Session 29 (2026-02-23)
+**Work**: Brainstormed OAuth 2-step rewrite. 3 verification agents + 1 adversarial reviewer. 4 on-device tests (consent client standalone, jagex: scheme capture). Confirmed full 2-step flow required and jagex: scheme works. Designed complete implementation. 5 logical commits pushed.
+**Decisions**: Full 2-step flow (not consent-client-only shortcut). jagex: intent scheme for Step 1. Forwarder HTML for Step 2 fragment capture. Game session API order reversed.
+**Next**: Implement OAuth 2-step rewrite, test on device.
+
 ### Session 24 (2026-02-23)
 **Work**: Fixed Cloudflare WebView block (remove `; wv` UA token). Brainstormed + implemented permissions automation (5 phases, 5 files, 6 quality gates, 4 P1s fixed).
 **Decisions**: Copy-paste flow for Termux config (can't automate), auto-poll on resume, permissions before Termux work, strip `; wv` from WebView UA.
@@ -93,3 +103,23 @@ Session history archive. See `.claude/autoload/_state.md` for current state (las
 **Work**: Resumed `/implement` — re-ran Gates 5+6 (completeness + performance). Both passed. Committed all Slice 2+3 code (22 files) + tooling updates (6 files) in two commits.
 **Decisions**: None (verification-only session).
 **Next**: On-device test, push to remote.
+
+### Session 28 (2026-02-23)
+**Work**: Built and installed app on tablet. Custom Tabs auth opened Chrome successfully (Cloudflare passed). Jagex returned "Sorry, something went wrong" — server-side rejection. Researched 3 open-source launchers (aitoiaita, melxin, Bolt) via `gh api` to extract exact OAuth parameters. Discovered Jagex uses 2-step, 2-client-ID flow. Wrote comprehensive research doc.
+**Decisions**: Must rewrite OAuth to correct 2-step flow. `jagex:` intent scheme for Step 1 capture.
+**Next**: Rewrite OAuth flow, test on device, commit.
+
+### Session 25 (2026-02-23)
+**Work**: On-device test found 3 bugs: StepState NPE (lazy init fix), SecurityException in verifyPermissions (catch), isPermissionStepActive always false (MutableStateFlow). Fixed all 3. Iterated on Phase 1 UX — clipboard quotes corrupted, simplified command.
+**Decisions**: Use `by lazy` for sealed class companion vals, MutableStateFlow for reactive boolean state.
+**Next**: Finish on-device test, commit.
+
+### Session 31 (2026-02-23)
+**Work**: Built and tested on device. Found 3 bugs: (1) jagex: URI uses comma separators. (2) redirect_uri had port suffix. (3) Port 80 blocked on Android for ALL apps. Started intent filter approach.
+**Decisions**: Intent filter for `http://localhost` is the right Android-native approach.
+**Next**: Wire up intent filter handler, test on device.
+
+### Session 32 (2026-02-23)
+**Work**: Systematic debugging of port 80 blocker. Exhaustive investigation. Confirmed VpnService dead (loopback bypasses TUN). Tested proot port 80 (PermissionError). Built GeckoView PoC — passes Cloudflare, user logged in.
+**Decisions**: GeckoView replaces Chrome Custom Tabs for auth. Both steps in GeckoView for cookie continuity.
+**Next**: Integrate GeckoView into actual auth flow, verify fragment capture.

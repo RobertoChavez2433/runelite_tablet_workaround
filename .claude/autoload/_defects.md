@@ -4,37 +4,37 @@ Max 7 active. Oldest rotates to `.claude/logs/defects-archive.md`.
 
 ## Active Patterns
 
-### [AUTH] 2026-02-23: Game session API calls use wrong auth method — accessToken vs id_token/sessionId
-**Pattern**: `fetchCharacters()` and `createGameSession()` pass `accessToken` as Bearer header. Real flow: POST `{"idToken":"<jwt>"}` to `/sessions` (returns sessionId), then GET `/accounts` with Bearer `<sessionId>`. Order is also reversed — `/sessions` must come before `/accounts`.
-**Prevention**: Verify API call signatures against reference implementations (aitoiaita `game_session.rs`). The adversarial reviewer caught this.
-**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/JagexOAuth2Manager.kt
+### [SECURITY] 2026-02-24: shellEscape must cover ALL bash metacharacters including newlines
+**Pattern**: Single-quote escaping (`'\''`) misses `$()`, backtick, and other expansions when file is `source`d. Newlines in credential values break out of quoted strings entirely, enabling shell injection.
+**Prevention**: Use double-quote escaping for all 5 metacharacters (`\`, `"`, `$`, `` ` ``, `!`) PLUS strip `\n`, `\r`, `\0`. Or use `printf %q` (bash-native).
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupViewModel.kt (shellEscape)
 
-### [AUTH] 2026-02-23: Consent client_id cannot initiate standalone login — returns unsupported_response_type
-**Pattern**: Using `1fddee4e-...` consent client_id with `response_type=code` or `id_token code` and `redirect_uri=http://localhost` for the initial OAuth login. Jagex server returns `unsupported_response_type` error. The consent client only works for Step 2 after Step 1 session is established.
-**Prevention**: Always use `com_jagex_auth_desktop_launcher` for Step 1. Consent client is Step 2 only. Verified by on-device test (Session 29).
-**Ref**: `.claude/plans/2026-02-23-oauth-2step-rewrite-design.md`
+### [ANDROID] 2026-02-24: GeckoAuthActivity must handle process death — check savedInstanceState
+**Pattern**: GeckoView sessions and `lateinit` vars cannot survive process death. Restored Activity crashes with `UninitializedPropertyAccessException`.
+**Prevention**: Check `savedInstanceState != null` in `onCreate` and finish with error. Also add `FLAG_SECURE` to prevent login page appearing in recents.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/GeckoAuthActivity.kt
 
-### [AUTH-BLOCKER] 2026-02-23: OAuth uses wrong client_id for Step 1 — Jagex rejects with "something went wrong"
-**Pattern**: Our `JagexOAuth2Manager.kt` uses `1fddee4e-b100-4f4e-b2b0-097f9088f9d2` (the Step 2 consent client) for the initial browser login (Step 1). Jagex's OAuth server returns a generic "Sorry, something went wrong" error page.
-**Fix Required**: Implement correct 2-step flow. Design approved: `.claude/plans/2026-02-23-oauth-2step-rewrite-design.md`
-**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/JagexOAuth2Manager.kt
+### [ANDROID] 2026-02-24: EncryptedSharedPreferences corruption bricks credential storage permanently
+**Pattern**: Power loss or disk corruption can break the encrypted prefs XML file. Next `create()` call throws `GeneralSecurityException` and returns null forever — user must uninstall app.
+**Prevention**: On exception, delete the corrupted file and retry once. Guard with a `prefsRecreateAttempted` flag to prevent infinite loops.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/CredentialManager.kt
 
-### [ANDROID] 2026-02-23: Android clipboard corrupts single quotes when pasting into Termux
-**Pattern**: Android or keyboard substitutes curly/smart quotes for straight quotes, breaking shell syntax.
-**Prevention**: Avoid single quotes in commands users must paste. Use no-quote alternatives or double quotes.
+### [ANDROID] 2026-02-24: resetSetup/runSetupForHealth must reset orchestrator + setupStarted flag
+**Pattern**: `resetSetup()` clears stateStore but leaves orchestrator's `_permissionPhase`, `_awaitingPermissionCompletion`, and `failedStepIndex` stale. `runSetupForHealth()` doesn't reset `setupStarted` so `startSetup()` no-ops on re-entry.
+**Prevention**: Add `orchestrator.resetState()` method and call it from resetSetup. Reset `setupStarted.set(false)` from runSetupForHealth.
 **Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupViewModel.kt
 
-### [ANDROID] 2026-02-23: `@Volatile var` is not reactive — StateFlow derivations won't re-evaluate
-**Pattern**: `@Volatile var` read inside `Flow.map{}` or `combine{}` won't trigger re-evaluation when changed.
-**Prevention**: Use `MutableStateFlow<Boolean>` instead. Combine with `combine()` for reactive derivations.
-**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupOrchestrator.kt
+### [ANDROID] 2026-02-24: Cross-app file access — app's private filesDir is not readable by Termux
+**Pattern**: Writing a file to `context.filesDir` (`/data/user/0/com.runelitetablet/files/`) and passing the path to Termux. Termux runs as a different UID and cannot read it — `[ -f "$path" ]` silently fails.
+**Prevention**: Deploy files to Termux via `TermuxCommandRunner.execute()` with stdin (same pattern as script deployment). File lands in Termux's home dir where it's accessible.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupViewModel.kt (performLaunch)
 
-### [ANDROID] 2026-02-23: Sealed class companion `val` can be null during static init (ART)
-**Pattern**: Eagerly initialized `val` in companion referencing sealed subclass objects can be null during ART static init.
-**Prevention**: Use `by lazy` for companion `val` properties referencing sealed class object subclasses.
-**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupStep.kt
+### [SHELL] 2026-02-24: Termux processes survive Android app force-stop — must explicitly kill
+**Pattern**: `am force-stop com.runelitetablet` only kills our app. Termux is a separate process — Java/proot/openbox/PulseAudio/X11 keep running as zombies.
+**Prevention**: Run `cleanup_previous()` at launch script start that pkills all known process patterns. Add comprehensive EXIT trap for clean shutdown.
+**Ref**: @runelite-tablet/app/src/main/assets/scripts/launch-runelite.sh
 
-### [ANDROID] 2026-02-23: Android WebView is fundamentally incompatible with Cloudflare — cannot be fixed
-**Pattern**: Cloudflare multi-layer detection (TLS fingerprint, X-Requested-With, canvas, missing JS APIs) blocks WebView permanently.
-**Prevention**: Never use WebView for Cloudflare-protected pages. Use Chrome Custom Tabs or system browser.
-**Ref**: `.claude/plans/completed/2026-02-23-custom-tabs-auth-design.md`
+### [SECURITY] 2026-02-24: OkHttp .execute() blocks IO thread on coroutine cancellation — use executeCancellable
+**Pattern**: `httpClient.newCall(request).execute()` is a blocking call that does not respond to coroutine cancellation.
+**Prevention**: Use `suspendCancellableCoroutine` + `call.enqueue()` + `invokeOnCancellation { call.cancel() }`.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/JagexOAuth2Manager.kt
