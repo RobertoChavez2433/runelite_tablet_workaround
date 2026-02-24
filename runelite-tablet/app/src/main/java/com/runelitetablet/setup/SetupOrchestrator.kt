@@ -76,7 +76,19 @@ class SetupOrchestrator(
     private val _awaitingPermissionCompletion = MutableStateFlow(false)
     val awaitingPermissionCompletion: StateFlow<Boolean> = _awaitingPermissionCompletion.asStateFlow()
 
-    @Volatile private var failedStepIndex: Int = -1
+    // Only accessed from viewModelScope (Main dispatcher) — no @Volatile needed
+    private var failedStepIndex: Int = -1
+
+    /** Reset all transient state for a fresh setup run (called by resetSetup/runSetupForHealth). */
+    fun resetState() {
+        _steps.value = SetupStep.allSteps.map { StepState(it) }
+        _currentStep.value = null
+        _currentOutput.value = null
+        _setupState.value = SetupState.Reconciling
+        _permissionPhase.value = PermissionPhase.TermuxConfig
+        _awaitingPermissionCompletion.value = false
+        failedStepIndex = -1
+    }
 
     companion object {
         const val TERMUX_PACKAGE = "com.termux"
@@ -601,8 +613,9 @@ class SetupOrchestrator(
      */
     private suspend fun evaluateCompletedSteps() {
         AppLog.step("setup", "evaluateCompletedSteps: checking pre-installed packages and cached state")
-        val termuxInstalled = withContext(Dispatchers.IO) { termuxHelper.isTermuxInstalled() }
-        val termuxX11Installed = withContext(Dispatchers.IO) { termuxHelper.isTermuxX11Installed() }
+        val (termuxInstalled, termuxX11Installed) = withContext(Dispatchers.IO) {
+            Pair(termuxHelper.isTermuxInstalled(), termuxHelper.isTermuxX11Installed())
+        }
         AppLog.step("termux", "evaluateCompletedSteps: isTermuxInstalled=$termuxInstalled")
         AppLog.step("termux_x11", "evaluateCompletedSteps: isTermuxX11Installed=$termuxX11Installed")
 

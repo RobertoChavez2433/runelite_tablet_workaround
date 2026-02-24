@@ -23,7 +23,28 @@ class ScriptManager(
         private val CONFIG_NAMES = listOf("openbox-rc.xml")
     }
 
+    /** Cache: once scripts are deployed successfully, skip re-deployment */
+    @Volatile private var scriptsDeployed = false
+
+    /** Cache: once configs are deployed successfully, skip re-deployment */
+    @Volatile private var configsDeployed = false
+
+    /** Cache script content after first APK asset read to avoid repeated decompression */
+    private val scriptContentCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /** Reset deployment cache, e.g. after an error that may have left scripts in a bad state */
+    fun invalidateDeployCache() {
+        scriptsDeployed = false
+        configsDeployed = false
+        scriptContentCache.clear()
+        AppLog.script("invalidateDeployCache: deployment and content caches cleared")
+    }
+
     suspend fun deployScripts(): Boolean {
+        if (scriptsDeployed) {
+            AppLog.script("deployScripts: skipping — already deployed (cached)")
+            return true
+        }
         AppLog.script("deployScripts: starting scriptCount=${SCRIPT_NAMES.size} scripts=${SCRIPT_NAMES}")
         for (scriptName in SCRIPT_NAMES) {
             val success = deployScript(scriptName)
@@ -33,10 +54,15 @@ class ScriptManager(
             }
         }
         AppLog.script("deployScripts: all scripts deployed successfully")
+        scriptsDeployed = true
         return true
     }
 
     suspend fun deployConfigs(): Boolean {
+        if (configsDeployed) {
+            AppLog.script("deployConfigs: skipping — already deployed (cached)")
+            return true
+        }
         AppLog.script("deployConfigs: starting configCount=${CONFIG_NAMES.size} configs=${CONFIG_NAMES}")
         for (configName in CONFIG_NAMES) {
             val success = deployConfig(configName)
@@ -46,6 +72,7 @@ class ScriptManager(
             }
         }
         AppLog.script("deployConfigs: all configs deployed successfully")
+        configsDeployed = true
         return true
     }
 
@@ -53,10 +80,12 @@ class ScriptManager(
 
     private suspend fun deployScript(scriptName: String): Boolean {
         val assetReadStartMs = System.currentTimeMillis()
-        val scriptContent = withContext(Dispatchers.IO) {
-            context.assets.open("scripts/$scriptName").use {
-                // Strip \r to ensure LF-only line endings — CRLF breaks shebang on Termux
-                it.bufferedReader().readText().replace("\r", "")
+        val scriptContent = scriptContentCache.getOrPut(scriptName) {
+            withContext(Dispatchers.IO) {
+                context.assets.open("scripts/$scriptName").use {
+                    // Strip \r to ensure LF-only line endings — CRLF breaks shebang on Termux
+                    it.bufferedReader().readText().replace("\r", "")
+                }
             }
         }
         val assetReadDurationMs = System.currentTimeMillis() - assetReadStartMs

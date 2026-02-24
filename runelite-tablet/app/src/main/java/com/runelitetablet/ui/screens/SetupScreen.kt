@@ -31,7 +31,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -182,14 +181,6 @@ private fun SetupWizardContent(viewModel: SetupViewModel) {
     val permissionPhase by viewModel.permissionPhase.collectAsState()
 
     val hasFailed = steps.any { it.status is StepStatus.Failed }
-
-    SideEffect {
-        AppLog.ui(
-            "SetupWizardContent: canLaunch=$canLaunch hasFailed=$hasFailed " +
-                "isPermissionStepActive=$isPermissionStepActive phase=${permissionPhase::class.simpleName} " +
-                "hasOutput=${currentOutput != null}"
-        )
-    }
 
     LaunchedEffect(Unit) {
         viewModel.startSetup()
