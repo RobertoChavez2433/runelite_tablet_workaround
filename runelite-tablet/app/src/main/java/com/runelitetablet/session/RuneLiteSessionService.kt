@@ -348,8 +348,12 @@ class RuneLiteSessionService : Service() {
                     pkill -f 'proot-distro' 2>/dev/null || true
                     pkill -f 'proot --' 2>/dev/null || true
                     pulseaudio --kill 2>/dev/null || true
+                    pkill -f 'virgl_test_server' 2>/dev/null || true
                     pkill -f 'termux-x11' 2>/dev/null || true
                     rm -f "${'$'}HOME/.rlt-session.pid" 2>/dev/null || true
+                    rm -f "${'$'}PREFIX/tmp/.rlt-creds-"*.sh 2>/dev/null || true
+                    rm -f "${'$'}PREFIX/tmp/.rlt-session-alive" 2>/dev/null || true
+                    rm -f "${'$'}HOME/.rlt-launch-env.sh" 2>/dev/null || true
                 """.trimIndent()),
                 background = true,
                 timeoutMs = 10_000L

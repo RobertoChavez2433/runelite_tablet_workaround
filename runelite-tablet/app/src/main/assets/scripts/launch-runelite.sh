@@ -41,9 +41,13 @@ cleanup_previous() {
     # Kill previous perf monitor if still running
     pkill -f 'perf-monitor.log' 2>/dev/null && killed=$((killed+1))
 
+    # Kill virgl server
+    pkill -f 'virgl_test_server' 2>/dev/null && killed=$((killed+1))
+
     # Clean up stale credential, PID, and sentinel files
+    # NOTE: Do NOT delete $HOME/.rlt-launch-env.sh here — it hasn't been read yet.
+    # It gets cleaned up after sourcing (line 115) and in cleanup_on_exit().
     rm -f "$PREFIX/tmp/.rlt-creds-"*.sh 2>/dev/null || true
-    rm -f "$HOME/.rlt-launch-env.sh" 2>/dev/null || true
     rm -f "$PREFIX/tmp/.rlt-session-alive" 2>/dev/null || true
 
     # Brief pause to let processes die
@@ -80,6 +84,10 @@ cleanup_on_exit() {
 
     # Stop PulseAudio
     pulseaudio --kill 2>/dev/null || true
+
+    # Kill virgl server
+    [ -n "${VIRGL_PID:-}" ] && kill "$VIRGL_PID" 2>/dev/null
+    pkill -f 'virgl_test_server' 2>/dev/null || true
 
     # Kill X11 server
     [ -n "${X11_PID:-}" ] && kill "$X11_PID" 2>/dev/null
@@ -183,20 +191,93 @@ if [ -n "${JX_SESSION_ID:-}" ]; then
     echo "Credential env file written for proot forwarding" | tee -a "$LOGFILE"
 fi
 
+# ===================================================================
+# GPU acceleration setup
+# ===================================================================
+SCRIPTS_DIR="$HOME/scripts"
+GPU_VENDOR=$("$SCRIPTS_DIR/detect-gpu.sh" 2>/dev/null || echo "unknown")
+echo "GPU vendor detected: $GPU_VENDOR" | tee -a "$LOGFILE"
+
+GPU_BIND=""
+VIRGL_PID=""
+PROOT_GPU_ENV=""
+
+if [ "$GPU_VENDOR" = "adreno" ]; then
+    # Adreno: bind kgsl device node for Zink+Turnip
+    if [ -e /dev/kgsl-3d0 ]; then
+        GPU_BIND="--bind /dev/kgsl-3d0:/dev/kgsl-3d0"
+        PROOT_GPU_ENV="adreno"
+        echo "Adreno GPU: binding /dev/kgsl-3d0" | tee -a "$LOGFILE"
+    fi
+elif [ "$GPU_VENDOR" = "mali" ]; then
+    # Mali: start VirGL server (ANGLE backend first, then native GLES fallback)
+    pkill -f virgl_test_server 2>/dev/null || true
+    sleep 0.5
+
+    if command -v virgl_test_server_android >/dev/null 2>&1; then
+        # Tier 1: VirGL + ANGLE (Vulkan backend)
+        echo "Starting VirGL+ANGLE server..." | tee -a "$LOGFILE"
+        virgl_test_server_android --angle-gl &
+        VIRGL_PID=$!
+
+        # Wait for server to be ready (PID alive + socket exists)
+        VIRGL_READY=false
+        for i in $(seq 1 20); do
+            if kill -0 $VIRGL_PID 2>/dev/null; then
+                VIRGL_READY=true
+                break
+            fi
+            sleep 0.1
+        done
+
+        if [ "$VIRGL_READY" = true ]; then
+            echo "VirGL+ANGLE server started (PID $VIRGL_PID)" | tee -a "$LOGFILE"
+            PROOT_GPU_ENV="mali-angle"
+        else
+            echo "VirGL+ANGLE failed, trying native GLES..." | tee -a "$LOGFILE"
+            # Tier 2: VirGL + native GLES
+            virgl_test_server_android &
+            VIRGL_PID=$!
+
+            VIRGL_READY=false
+            for i in $(seq 1 20); do
+                if kill -0 $VIRGL_PID 2>/dev/null; then
+                    VIRGL_READY=true
+                    break
+                fi
+                sleep 0.1
+            done
+
+            if [ "$VIRGL_READY" = true ]; then
+                echo "VirGL native GLES server started (PID $VIRGL_PID)" | tee -a "$LOGFILE"
+                PROOT_GPU_ENV="mali-native"
+            else
+                echo "VirGL unavailable, using software rendering" | tee -a "$LOGFILE"
+                VIRGL_PID=""
+                PROOT_GPU_ENV=""
+            fi
+        fi
+    else
+        echo "virgl_test_server_android not found — software rendering" | tee -a "$LOGFILE"
+    fi
+else
+    echo "Unknown GPU vendor ($GPU_VENDOR) — software rendering" | tee -a "$LOGFILE"
+fi
+
 # Launch RuneLite inside proot.
 # Bind-mount Termux's X11 socket directory into proot so DISPLAY=:0 can find it.
 # Bind-mount GPU device node for hardware acceleration (silent failure if unavailable).
-GPU_BIND=""
-if [ -e /dev/kgsl-3d0 ]; then
-    GPU_BIND="--bind /dev/kgsl-3d0:/dev/kgsl-3d0"
-    echo "GPU device node found — binding /dev/kgsl-3d0" | tee -a "$LOGFILE"
-else
-    echo "GPU device node not found — software rendering only" | tee -a "$LOGFILE"
-fi
 # Create sentinel file for health monitoring (SessionHealthMonitor checks this)
 # $PREFIX/tmp is bind-mounted into proot as /tmp, so both sides can see it.
 touch "$PREFIX/tmp/.rlt-session-alive"
 echo "Session sentinel created" | tee -a "$LOGFILE"
+
+# Re-check VirGL server is still alive (it may have crashed after initial health check)
+if [ -n "$VIRGL_PID" ] && ! kill -0 "$VIRGL_PID" 2>/dev/null; then
+    echo "WARNING: VirGL server died before launch — falling back to software rendering" | tee -a "$LOGFILE"
+    VIRGL_PID=""
+    PROOT_GPU_ENV=""
+fi
 
 echo "Launching RuneLite..." | tee -a "$LOGFILE"
 proot-distro login ubuntu --bind "$PREFIX/tmp/.X11-unix:/tmp/.X11-unix" --bind "$PREFIX/tmp:/tmp" $GPU_BIND -- bash -c "
@@ -216,26 +297,64 @@ proot-distro login ubuntu --bind "$PREFIX/tmp/.X11-unix:/tmp/.X11-unix" --bind "
     xrandr --output default --mode 2960x1848 2>/dev/null || true
 
     # ---------------------------------------------------------------
-    # GPU acceleration detection (Zink + Turnip)
+    # GPU acceleration detection
     # ---------------------------------------------------------------
     GPU_AVAILABLE=false
-    if [ -e /dev/kgsl-3d0 ]; then
+    PROOT_GPU_ENV='${PROOT_GPU_ENV}'
+
+    if [ \"\$PROOT_GPU_ENV\" = \"adreno\" ]; then
+        # Adreno: Zink + Turnip
         export MESA_LOADER_DRIVER_OVERRIDE=zink
         export GALLIUM_DRIVER=zink
         export TU_DEBUG=noconform
         export MESA_NO_ERROR=1
         export ZINK_DESCRIPTORS=lazy
 
-        GL_RENDERER=\$(glxinfo 2>/dev/null | grep -i 'opengl renderer' || true)
-        if echo \"\$GL_RENDERER\" | grep -qi 'zink'; then
+        GL_RENDERER=\$(glxinfo 2>/dev/null | grep -i \"opengl renderer\" || true)
+        if echo \"\$GL_RENDERER\" | grep -qi \"zink\"; then
             GPU_AVAILABLE=true
-            echo 'GPU acceleration: ENABLED (Zink+Turnip)' >&2
+            echo \"GPU acceleration: ENABLED (Zink+Turnip)\" >&2
         else
-            echo 'GPU acceleration: FAILED (falling back to software)' >&2
+            echo \"GPU acceleration: Zink failed, falling back to software\" >&2
             unset MESA_LOADER_DRIVER_OVERRIDE GALLIUM_DRIVER TU_DEBUG MESA_NO_ERROR ZINK_DESCRIPTORS
         fi
+
+    elif [ \"\$PROOT_GPU_ENV\" = \"mali-angle\" ]; then
+        # Mali: VirGL + ANGLE — check actual GL version first, then override
+        export GALLIUM_DRIVER=virpipe
+        export MESA_NO_ERROR=1
+
+        GL_VERSION=\$(glxinfo 2>/dev/null | grep \"OpenGL version\" | head -1 || true)
+        echo \"GL check (before override): \$GL_VERSION\" >&2
+        GL_MAJOR=\$(echo \"\$GL_VERSION\" | grep -Eo '[0-9]+\.[0-9]+' | head -1 | cut -d. -f1)
+        if [ \"\${GL_MAJOR:-0}\" -ge 2 ]; then
+            # VirGL is working — apply version override for RuneLite GPU plugin compatibility
+            export MESA_GL_VERSION_OVERRIDE=4.1COMPAT
+            GPU_AVAILABLE=true
+            echo \"GPU acceleration: ENABLED (VirGL+ANGLE, override to 4.1)\" >&2
+        else
+            echo \"GPU acceleration: GL version too low (\$GL_VERSION), falling back to software\" >&2
+            unset GALLIUM_DRIVER MESA_NO_ERROR
+        fi
+
+    elif [ \"\$PROOT_GPU_ENV\" = \"mali-native\" ]; then
+        # Mali: VirGL + native GLES — check actual GL version first, then override
+        export GALLIUM_DRIVER=virpipe
+        export MESA_NO_ERROR=1
+
+        GL_VERSION=\$(glxinfo 2>/dev/null | grep \"OpenGL version\" | head -1 || true)
+        echo \"GL check (before override): \$GL_VERSION\" >&2
+        GL_MAJOR=\$(echo \"\$GL_VERSION\" | grep -Eo '[0-9]+\.[0-9]+' | head -1 | cut -d. -f1)
+        if [ \"\${GL_MAJOR:-0}\" -ge 2 ]; then
+            export MESA_GL_VERSION_OVERRIDE=3.1COMPAT
+            GPU_AVAILABLE=true
+            echo \"GPU acceleration: ENABLED (VirGL native, override to 3.1)\" >&2
+        else
+            echo \"GPU acceleration: GL version too low (\$GL_VERSION), falling back to software\" >&2
+            unset GALLIUM_DRIVER MESA_NO_ERROR
+        fi
     else
-        echo 'GPU acceleration: UNAVAILABLE (no /dev/kgsl-3d0)' >&2
+        echo \"GPU acceleration: UNAVAILABLE (software rendering)\" >&2
     fi
 
     # Start openbox window manager so RuneLite is maximized to fill the display.

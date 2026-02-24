@@ -31,6 +31,9 @@ pulseaudio --kill 2>/dev/null || true
 # 5. X11 server process
 pkill -f 'termux-x11' 2>/dev/null || true
 
+# 5.5. VirGL server
+pkill -f 'virgl_test_server' 2>/dev/null || true
+
 # 6. Termux:X11 Android app
 am broadcast -a com.termux.x11.ACTION_STOP --user 0 2>/dev/null || true
 

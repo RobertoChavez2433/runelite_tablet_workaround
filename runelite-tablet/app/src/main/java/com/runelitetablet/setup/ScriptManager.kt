@@ -18,7 +18,7 @@ class ScriptManager(
             "install-proot.sh", "install-java.sh", "download-runelite.sh",
             "check-markers.sh", "check-x11-socket.sh", "launch-runelite.sh",
             "update-runelite.sh", "health-check.sh", "shutdown-session.sh",
-            "setup-gpu.sh"
+            "detect-gpu.sh", "setup-gpu.sh", "setup-gpu-mali.sh"
         )
         private val CONFIG_NAMES = listOf("openbox-rc.xml")
     }
