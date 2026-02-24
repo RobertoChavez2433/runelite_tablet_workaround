@@ -12,7 +12,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Polls Termux every [POLL_INTERVAL_MS] to check if RuneLite's Java process is alive.
- * Uses PID file ($HOME/.rlt-session.pid) with pgrep fallback.
+ * Uses sentinel file ($PREFIX/tmp/.rlt-session-alive) created by launch-runelite.sh
+ * and deleted when Java exits or shutdown-session.sh runs.
  *
  * Debounces: requires [STOPPED_THRESHOLD] consecutive "STOPPED" readings before
  * transitioning from Running to Stopped, to avoid flapping on transient health check failures.
@@ -69,10 +70,7 @@ class SessionHealthMonitor(
             val result = commandRunner.execute(
                 commandPath = "${TermuxCommandRunner.TERMUX_BIN_PATH}/bash",
                 arguments = arrayOf("-c", """
-                    PID=$(cat "${'$'}HOME/.rlt-session.pid" 2>/dev/null)
-                    if [ -n "${'$'}PID" ] && kill -0 "${'$'}PID" 2>/dev/null; then
-                        echo "RUNNING"
-                    elif pgrep -f 'net.runelite.client.RuneLite' > /dev/null 2>&1; then
+                    if [ -f "${'$'}PREFIX/tmp/.rlt-session-alive" ]; then
                         echo "RUNNING"
                     else
                         echo "STOPPED"

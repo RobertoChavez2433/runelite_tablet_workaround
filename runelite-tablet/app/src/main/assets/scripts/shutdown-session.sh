@@ -38,5 +38,6 @@ am broadcast -a com.termux.x11.ACTION_STOP --user 0 2>/dev/null || true
 rm -f "$HOME/.rlt-session.pid" 2>/dev/null || true
 rm -f "$PREFIX/tmp/.rlt-creds-"*.sh 2>/dev/null || true
 rm -f "$HOME/.rlt-launch-env.sh" 2>/dev/null || true
+rm -f "$PREFIX/tmp/.rlt-session-alive" 2>/dev/null || true
 
 echo "SHUTDOWN_COMPLETE"

@@ -11,7 +11,7 @@
 MARKER_DIR="$HOME/.runelite-tablet/markers"
 
 # Check each tracked step marker
-for STEP in step-proot step-java step-runelite; do
+for STEP in step-proot step-java step-runelite step-gpu; do
     if [ -f "$MARKER_DIR/$STEP.done" ]; then
         echo "PRESENT $STEP"
     else

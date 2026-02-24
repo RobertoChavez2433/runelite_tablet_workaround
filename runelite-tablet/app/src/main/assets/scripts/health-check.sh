@@ -1,8 +1,9 @@
 #!/data/data/com.termux/files/usr/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 # health-check.sh — Verify proot/Java/RuneLite integrity before launch.
-# Always exits 0. Health status reported via structured output.
+# No set -e: this script must always run ALL checks and produce complete output.
+# Health status reported via structured output. Always exits 0.
 
 ROOTFS_DIR="$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu"
 RUNELITE_JAR="/root/runelite/RuneLite.jar"

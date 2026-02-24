@@ -41,9 +41,10 @@ cleanup_previous() {
     # Kill previous perf monitor if still running
     pkill -f 'perf-monitor.log' 2>/dev/null && killed=$((killed+1))
 
-    # Clean up stale credential and PID files
+    # Clean up stale credential, PID, and sentinel files
     rm -f "$PREFIX/tmp/.rlt-creds-"*.sh 2>/dev/null || true
     rm -f "$HOME/.rlt-launch-env.sh" 2>/dev/null || true
+    rm -f "$PREFIX/tmp/.rlt-session-alive" 2>/dev/null || true
 
     # Brief pause to let processes die
     if [ "$killed" -gt 0 ]; then
@@ -86,9 +87,10 @@ cleanup_on_exit() {
     # Send stop broadcast to Termux:X11 Android app
     am broadcast -a com.termux.x11.ACTION_STOP --user 0 2>/dev/null || true
 
-    # Clean up credential and PID files
+    # Clean up credential, PID, and sentinel files
     rm -f "$PREFIX/tmp/.rlt-creds-"*.sh 2>/dev/null || true
     rm -f "$HOME/.rlt-launch-env.sh" 2>/dev/null || true
+    rm -f "$PREFIX/tmp/.rlt-session-alive" 2>/dev/null || true
 
     echo "Shutdown complete" | tee -a "$LOGFILE"
 }
@@ -191,6 +193,11 @@ if [ -e /dev/kgsl-3d0 ]; then
 else
     echo "GPU device node not found — software rendering only" | tee -a "$LOGFILE"
 fi
+# Create sentinel file for health monitoring (SessionHealthMonitor checks this)
+# $PREFIX/tmp is bind-mounted into proot as /tmp, so both sides can see it.
+touch "$PREFIX/tmp/.rlt-session-alive"
+echo "Session sentinel created" | tee -a "$LOGFILE"
+
 echo "Launching RuneLite..." | tee -a "$LOGFILE"
 proot-distro login ubuntu --bind "$PREFIX/tmp/.X11-unix:/tmp/.X11-unix" --bind "$PREFIX/tmp:/tmp" $GPU_BIND -- bash -c "
     export DISPLAY=:0
@@ -317,6 +324,7 @@ OBCFG
     wait \$JAVA_PID
     JAVA_EXIT=\$?
     rm -f /root/.rlt-session.pid
+    rm -f /tmp/.rlt-session-alive
 
     # Clean up perf monitor
     kill \$PERF_PID 2>/dev/null || true
