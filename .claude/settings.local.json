@@ -29,7 +29,8 @@
       "Bash(gh api repos/aitoiaita/linux-jagex-launcher/contents/src/forwarder.html --jq '.content' 2>/dev/null | base64 -d 2>/dev/null)",
       "Bash(cd \"C:\\\\Users\\\\rseba\\\\Projects\\\\Runelite for Tablet\" && gh api repos/aitoiaita/linux-jagex-launcher/contents/src/daemon/consent_client.rs --jq '.content' 2>/dev/null | base64 -d 2>/dev/null)",
       "Bash(pwsh:*)",
-      "Bash(cd \"C:/Users/rseba/Projects/Runelite for Tablet\" && gh api repos/aitoiaita/linux-jagex-launcher/contents/src/daemon/consent_client.rs --jq '.content' 2>/dev/null | base64 -d 2>/dev/null)"
+      "Bash(cd \"C:/Users/rseba/Projects/Runelite for Tablet\" && gh api repos/aitoiaita/linux-jagex-launcher/contents/src/daemon/consent_client.rs --jq '.content' 2>/dev/null | base64 -d 2>/dev/null)",
+      "Bash(gh api:*)"
     ]
   }
 }

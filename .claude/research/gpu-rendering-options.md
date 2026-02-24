@@ -44,10 +44,10 @@
 - For OSRS's relatively simple geometry, this should be more than sufficient
 - Zink + Turnip (open-source Adreno Vulkan driver) reported as best for Qualcomm
 
-### Snapdragon 8 Gen 3 / Adreno 750 Compatibility
-- Vulkan 1.3 supported (proprietary + Turnip)
-- Vulkan 1.3 includes all features Zink needs for OpenGL 4.6
-- Some Adreno 7xx issues reported with mesa-zink but development is active
+### Device: MediaTek Dimensity 9300+ / Mali-G720 Immortalis MC12
+- NOTE: Tab S10 Ultra uses Mali GPU, NOT Adreno — Turnip/Zink path does not apply
+- Mali Vulkan 1.3 supported but missing features Zink requires (`fillModeNonSolid`, `shaderClipDistance`, `logicOp`)
+- Adreno Zink+Turnip info retained below for reference (applies to Snapdragon devices only)
 
 ---
 

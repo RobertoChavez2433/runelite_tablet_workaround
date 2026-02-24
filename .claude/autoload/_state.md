@@ -1,34 +1,45 @@
 # Session State
 
-**Last Updated**: 2026-02-24 | **Session**: 37
+**Last Updated**: 2026-02-24 | **Session**: 39
 
 ## Current Phase
-- **Phase**: MVP Development — 6-Wave Review-Fix-Verify Complete, Production Hardened
-- **Status**: Ran 6 waves of automated review (3 standard + 3 production-scrutiny) with 12 review agents total. Applied 21 fixes across 17 files. All quality gates pass. 4 logical commits created. Ready for on-device verification.
+- **Phase**: MVP Development — On-Device Testing & GPU Debugging
+- **Status**: First full on-device test session. Fixed 3 bugs (shell syntax, env file deletion, stateStore cache). GPU packages installed but VirGL not working — Ubuntu ARM64 Mesa missing virpipe driver. RuneLite runs on llvmpipe (software) at 2960x1848.
 
 ## HOT CONTEXT - Resume Here
 
 ### EXACTLY WHERE WE LEFT OFF
 
-**Session 37: Ran 6-wave review-fix-verify loop (3 standard waves, 3 production-scrutiny waves). 12 review agents dispatched (code, performance, security — each wave). 21 fixes applied across 17 files, 4 builds verified. 4 logical commits created.**
+**Session 39: On-device testing found 3 bugs, all fixed. GPU acceleration BLOCKED — Ubuntu's `libgl1-mesa-dri` on ARM64 doesn't include `virtio_gpu_dri.so` (virpipe Gallium driver). VirGL server runs, socket exists, but proot Mesa can't use it. RuneLite works but is choppy on software rendering.**
 
 Key accomplishments:
-1. **Wave 1 (Standard)** — 3 reviewers found 7 P0 / 24 P1 / 31 P2. Applied 13 fixes: shell injection (double-quote escaping), deployment caching (40+ IPC round-trips eliminated), SideEffect logging removed, PendingIntent flags fixed, credential scrubbing, URI sanitization, check-markers step-gpu, GeckoSession close safety
-2. **Wave 2 (Verification)** — 3 reviewers verified all 13 fixes correct, 0 new issues. Found 9 remaining P1s. Applied 4 more fixes: @Volatile + ConcurrentHashMap (ScriptManager), allowBackup=false, health-check.sh set -e removed, broadened scrubCredentials patterns
-3. **Wave 3 (Final)** — Single agent verified all 16 fixes. QUALITY GATE: SPOTLESS. 0 P0, 0 P1.
-4. **Waves 4-6 (Production Scrutiny)** — Deep code review (edge cases, races, state machines), stress/resilience review (process death, network, disk full), adversarial security review (token replay, intent hijacking, shell injection fuzzing). Applied 5 more fixes: shellEscape newline stripping, GeckoAuth FLAG_SECURE + process death handling, resetSetup orchestrator reset, CredentialManager corruption recovery
-5. **4 commits** — Security hardening (10 files), performance optimization (4 files), shell script fixes (5 files), project state
+1. **Shell syntax fix** — 16 unescaped `"` inside `bash -c "..."` block in launch-runelite.sh caused syntax error on `(` characters. All escaped to `\"`.
+2. **Env file deletion fix** — `cleanup_previous()` deleted `.rlt-launch-env.sh` before the script read it. Removed premature deletion.
+3. **stateStore cache fix** — `reconcileWithMarkers()` ABSENT branch downgraded step UI status but didn't clear `stateStore.isCompleted()` flag, so `executeGpuStep()` always skipped. Added `stateStore.clearCompleted(key)`.
+4. **GPU packages installed** — `virglrenderer-android` + `angle-android` now install correctly during GPU setup step.
+5. **VirGL starts but virpipe fails** — `virgl_test_server_android --angle-gl` runs (PID alive, socket at `$PREFIX/tmp/.virgl_test`), but `GALLIUM_DRIVER=virpipe glxinfo` returns empty inside proot. Mesa falls back to llvmpipe.
 
 ### What Needs to Happen Next
 
-1. **On-device test of full app** — Lifecycle, GPU, auth, session UI (from Session 36, still pending)
-2. **Consider production P1s** — Cert pinning, APK signature verification, permission "Don't ask again" UX (identified by production reviewers, deferred as future work)
+1. **BLOCKER: Install virpipe-capable Mesa inside proot** — Ubuntu's Mesa doesn't include `virtio_gpu_dri.so` on ARM64. Options: TUR Mesa package, custom Mesa build, or third-party PPA. This is the #1 priority.
+2. **Verify VirGL GPU acceleration end-to-end** — Once virpipe driver available, confirm glxinfo shows VirGL renderer and RuneLite GPU plugin works.
+3. **Consider production P1s** — Cert pinning, APK signature verification, permission "Don't ask again" UX.
 
 ## Blockers
 
-**None blocking**. All code quality gates pass. Needs on-device verification.
+**1. Ubuntu ARM64 Mesa missing virpipe driver** — `libgl1-mesa-dri` on ARM64 does NOT include `virtio_gpu_dri.so`. VirGL server runs but Mesa inside proot can't connect. Need a Mesa build with virpipe enabled. Research needed on TUR packages, custom builds, or PPAs.
 
 ## Recent Sessions
+
+### Session 39 (2026-02-24)
+**Work**: First on-device test session. Fixed 3 bugs: shell syntax (16 unescaped `"` in bash -c block), env file premature deletion, stateStore cache not cleared on ABSENT reconciliation. GPU packages install correctly but VirGL doesn't work — Ubuntu ARM64 Mesa missing virpipe driver.
+**Decisions**: All `"` inside `bash -c "..."` must be escaped `\"`. stateStore must be cleared when marker reconciliation downgrades a step. Env file deletion moved out of cleanup_previous().
+**Next**: Install virpipe-capable Mesa in proot (TUR/custom build), verify GPU acceleration, production P1s.
+
+### Session 38 (2026-02-24)
+**Work**: Implemented Mali GPU acceleration plan via `/implement`. 5 phases (GPU detection, Mali setup, launch script tiered fallback, Kotlin changes, shutdown cleanup). 7 files (2 new + 5 modified). Code review found 7 P1s, all fixed and verified. 2 builds passed.
+**Decisions**: VirGL server tied to session lifecycle, GL version override AFTER GL check (not before), GPU setup non-blocking, polling loops (2s max) for VirGL readiness, 512MB disk space pre-check, grep -Eo (POSIX) not grep -oP (PCRE).
+**Next**: On-device test (especially Mali VirGL spike), commit changes.
 
 ### Session 37 (2026-02-24)
 **Work**: 6-wave review-fix-verify loop with 12 review agents. 21 fixes across 17 files. Standard reviews (code/perf/security), verification, final check, then 3 production-scrutiny waves (edge cases, stress/resilience, adversarial security). 4 logical commits.
@@ -45,20 +56,11 @@ Key accomplishments:
 **Decisions**: Keep running on swipe, notification with Switch/Stop actions, automated GPU setup step, auto-fallback to software, auto-detect running session, 15s health poll, Foreground Service + shell scripts approach.
 **Next**: Implement lifecycle (Phase 1), then GPU (Phase 2), then polish (Phase 3).
 
-### Session 34 (2026-02-23)
-**Work**: Implemented GeckoView auth (3 phases via /implement, 6 quality gates passed). Fixed cross-app file access bug (env file deployed via Termux stdin). Full auth flow verified on device. Added process cleanup/shutdown to launch script. Added perf logging (GC, CPU/mem monitor, GL info, --debug).
-**Decisions**: Deploy env file via TermuxCommandRunner stdin (not app filesDir). Added JX_REFRESH_TOKEN to env file. pkill-based cleanup before each launch. EXIT trap for clean shutdown.
-**Next**: Pull perf logs, tie app lifecycle together, GPU acceleration.
-
-### Session 33 (2026-02-23)
-**Work**: Brainstormed GeckoView auth integration design. Explored full auth codebase via agent (5 files, ~1327 lines). Made 6 design decisions. Presented 6 design sections, all approved. Wrote design doc.
-**Decisions**: Dedicated GeckoAuthActivity, no Custom Tabs fallback, single launch both steps, Activity does token exchange internally, ActivityResult API, immediate cancel on back press.
-**Next**: Implement design (4 phases), verify on device, then Slice 4+5.
-
 ## Active Plans
 
-- **Lifecycle + GPU Acceleration** — **IMPLEMENTED + HARDENED**. All 3 phases complete, 6 quality gates + 6-wave review-fix-verify. Session 36-37. Needs on-device testing.
-- **GeckoView Auth Integration** — **COMPLETE + HARDENED**. Implemented Session 34. Hardened Session 37.
+- **Mali GPU Acceleration** — **BLOCKED**. VirGL server works, but proot Mesa missing virpipe driver (`virtio_gpu_dri.so`). Need virpipe-capable Mesa build inside proot.
+- **Lifecycle + GPU Acceleration** — **IMPLEMENTED + HARDENED**. All 3 phases complete, 6 quality gates + 6-wave review-fix-verify. Session 36-37. On-device tested Session 39 (lifecycle works, GPU blocked).
+- **GeckoView Auth Integration** — **COMPLETE + HARDENED**. Implemented Session 34. Hardened Session 37. Credentials deploy correctly (Session 39 fix).
 - **Phase 1 UX Revert + Extra Keys** — **COMPLETE**. Verified on device.
 - **Permissions Automation** — **COMPLETE**. All 3 phases work, auto-advance verified.
 - **Security Hardening** — **COMPLETE**. Session 22 initial + Session 37 production-level (21 fixes total).
@@ -66,6 +68,7 @@ Key accomplishments:
 - **Slice 2+3 Implementation** — **COMPLETE**. Committed + security hardened.
 
 ## Reference
+- **Mali GPU design**: `.claude/plans/2026-02-24-mali-gpu-acceleration-design.md`
 - **Lifecycle + GPU design**: `.claude/plans/2026-02-23-lifecycle-gpu-design.md`
 - **GeckoView auth design**: `.claude/plans/2026-02-23-geckoview-auth-integration-design.md`
 - **OAuth 2-step flow research**: `.claude/research/jagex-oauth2-two-step-flow.md`

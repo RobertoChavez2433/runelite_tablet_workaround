@@ -1,7 +1,7 @@
 # Memory: Runelite for Tablet
 
 ## Project Overview
-- Tablet-optimized way to run the REAL RuneLite on Samsung Tab S10 Ultra (Snapdragon 8 Gen 3, 12-16GB RAM)
+- Tablet-optimized way to run the REAL RuneLite on Samsung Tab S10 Ultra (MediaTek Dimensity 9300+, Mali-G720 Immortalis MC12, 12-16GB RAM)
 - NOT a RuneLite clone/port — runs actual RuneLite .jar with all plugins
 - User plays with physical mouse + keyboard via Samsung DeX
 
@@ -13,7 +13,7 @@
 
 ## Slice 1 Implementation (Hardened)
 - Source code at `runelite-tablet/` — full Android project
-- 15 Kotlin files + 1 utility (PendingIntentCompat) + 2 shell scripts, APK builds clean
+- At Slice 1: 15 Kotlin files + 2 shell scripts. Now ~30 Kotlin + 13 scripts (auth/, session/, cleanup/, logging/ added)
 - Key packages: termux/, installer/, setup/, ui/
 - Manual DI (no Hilt/Koin), single-screen (no Navigation)
 - SetupActions callback pattern (not direct Activity ref) to avoid leaks
@@ -67,14 +67,16 @@
 - Jagex Launcher passes creds via env vars: `JX_SESSION_ID`, `JX_CHARACTER_ID`, `JX_DISPLAY_NAME`, `JX_ACCESS_TOKEN`, `JX_REFRESH_TOKEN`
 - `JX_SESSION_ID` does NOT expire
 - RuneLite `--insecure-write-credentials` flag saves tokens to `~/.runelite/credentials.properties`
-- Jagex OAuth2 supports Android Trusted Web Activity natively
+- WebView is Cloudflare-blocked; port 80 kernel-blocked on Android — GeckoView solves both
 
 ## GPU: Key Facts
-- RuneLite GPU plugin needs OpenGL 4.3+ (compute shaders) or 4.0 (no compute)
-- Mesa Zink translates OpenGL → Vulkan; achieves OpenGL 4.6 on Android
-- Zink + Turnip (open-source Adreno Vulkan driver) = best performance path
-- Software rendering (50fps) works fine as MVP
-- **CONFIRMED**: llvmpipe (Mesa 25.2.8) gives OpenGL 4.5 Compatibility Profile — RuneLite GPU plugin loads fine
+- RuneLite GPU plugin needs OpenGL 3.1+ (reduced in v1.8.27; compute shaders need 4.3+ for extended draw distance)
+- Device has Mali-G720 (NOT Adreno) — Zink+Turnip path is Adreno-only, useless on Mali
+- **Mali GPU path**: VirGL + ANGLE (Tier 1) or VirGL + native GLES (Tier 2) or software (Tier 3)
+- **BLOCKER (Session 39)**: VirGL server runs fine in Termux, but Ubuntu ARM64 Mesa lacks `virtio_gpu_dri.so` (virpipe driver)
+- Zink directly on Mali is unreliable — missing Vulkan features (`fillModeNonSolid`, `shaderClipDistance`, `logicOp`)
+- llvmpipe gives OpenGL 4.5 — GPU plugin loads but performance is CPU-bound (choppy)
+- Software rendering (50fps cap) works as MVP fallback
 
 ## Android Service Lifecycle with Static State
 - `onDestroy()` in a Service must NOT clear static companion object state

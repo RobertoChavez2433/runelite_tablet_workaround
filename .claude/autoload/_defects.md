@@ -4,6 +4,16 @@ Max 7 active. Oldest rotates to `.claude/logs/defects-archive.md`.
 
 ## Active Patterns
 
+### [SHELL] 2026-02-24: All double quotes inside bash -c "..." blocks must be escaped
+**Pattern**: Unescaped `"` inside a `bash -c "..."` block terminates the outer string. The outer shell then parses remaining text as commands — `(` becomes a subshell start and causes syntax errors.
+**Prevention**: Every `"` inside a `bash -c "..."` block must be `\"`. Use `awk | grep -n '"' | grep -v '\\"'` to audit.
+**Ref**: @runelite-tablet/app/src/main/assets/scripts/launch-runelite.sh (lines 282-450)
+
+### [ANDROID] 2026-02-24: reconcileWithMarkers ABSENT must clear stateStore, not just step UI status
+**Pattern**: `reconcileWithMarkers()` downgrades step status to Pending but doesn't clear `stateStore.isCompleted()` flag. The `executeStep()` function checks stateStore first and skips — step never re-runs.
+**Prevention**: Always call `stateStore.clearCompleted(key)` alongside `updateStepStatus(index, Pending)` in ABSENT branch.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupOrchestrator.kt (reconcileWithMarkers)
+
 ### [SECURITY] 2026-02-24: shellEscape must cover ALL bash metacharacters including newlines
 **Pattern**: Single-quote escaping (`'\''`) misses `$()`, backtick, and other expansions when file is `source`d. Newlines in credential values break out of quoted strings entirely, enabling shell injection.
 **Prevention**: Use double-quote escaping for all 5 metacharacters (`\`, `"`, `$`, `` ` ``, `!`) PLUS strip `\n`, `\r`, `\0`. Or use `printf %q` (bash-native).
@@ -28,13 +38,3 @@ Max 7 active. Oldest rotates to `.claude/logs/defects-archive.md`.
 **Pattern**: Writing a file to `context.filesDir` (`/data/user/0/com.runelitetablet/files/`) and passing the path to Termux. Termux runs as a different UID and cannot read it — `[ -f "$path" ]` silently fails.
 **Prevention**: Deploy files to Termux via `TermuxCommandRunner.execute()` with stdin (same pattern as script deployment). File lands in Termux's home dir where it's accessible.
 **Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupViewModel.kt (performLaunch)
-
-### [SHELL] 2026-02-24: Termux processes survive Android app force-stop — must explicitly kill
-**Pattern**: `am force-stop com.runelitetablet` only kills our app. Termux is a separate process — Java/proot/openbox/PulseAudio/X11 keep running as zombies.
-**Prevention**: Run `cleanup_previous()` at launch script start that pkills all known process patterns. Add comprehensive EXIT trap for clean shutdown.
-**Ref**: @runelite-tablet/app/src/main/assets/scripts/launch-runelite.sh
-
-### [SECURITY] 2026-02-24: OkHttp .execute() blocks IO thread on coroutine cancellation — use executeCancellable
-**Pattern**: `httpClient.newCall(request).execute()` is a blocking call that does not respond to coroutine cancellation.
-**Prevention**: Use `suspendCancellableCoroutine` + `call.enqueue()` + `invokeOnCancellation { call.cancel() }`.
-**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/JagexOAuth2Manager.kt

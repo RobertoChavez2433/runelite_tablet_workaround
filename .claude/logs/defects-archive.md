@@ -4,6 +4,18 @@ Older/resolved defects rotated from per-feature files in `.claude/defects/`.
 
 ---
 
+## Rotated 2026-02-24 (Session 39)
+
+### [SHELL] 2026-02-24: Termux processes survive Android app force-stop — must explicitly kill
+**Pattern**: `am force-stop com.runelitetablet` only kills our app. Termux is a separate process — Java/proot/openbox/PulseAudio/X11 keep running as zombies.
+**Prevention**: Run `cleanup_previous()` at launch script start that pkills all known process patterns. Add comprehensive EXIT trap for clean shutdown.
+**Ref**: @runelite-tablet/app/src/main/assets/scripts/launch-runelite.sh
+
+### [SECURITY] 2026-02-24: OkHttp .execute() blocks IO thread on coroutine cancellation — use executeCancellable
+**Pattern**: `httpClient.newCall(request).execute()` is a blocking call that does not respond to coroutine cancellation.
+**Prevention**: Use `suspendCancellableCoroutine` + `call.enqueue()` + `invokeOnCancellation { call.cancel() }`.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/JagexOAuth2Manager.kt
+
 ## Rotated 2026-02-24 (Session 37)
 
 ### [ANDROID] 2026-02-23: Android clipboard corrupts single quotes when pasting into Termux

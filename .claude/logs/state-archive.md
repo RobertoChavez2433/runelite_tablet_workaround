@@ -6,6 +6,11 @@ Session history archive. See `.claude/autoload/_state.md` for current state (las
 
 ## February 2026
 
+### Session 34 (2026-02-23)
+**Work**: Implemented GeckoView auth (3 phases via /implement, 6 quality gates passed). Fixed cross-app file access bug (env file deployed via Termux stdin). Full auth flow verified on device. Added process cleanup/shutdown to launch script. Added perf logging (GC, CPU/mem monitor, GL info, --debug).
+**Decisions**: Deploy env file via TermuxCommandRunner stdin (not app filesDir). Added JX_REFRESH_TOKEN to env file. pkill-based cleanup before each launch. EXIT trap for clean shutdown.
+**Next**: Pull perf logs, tie app lifecycle together, GPU acceleration.
+
 ### Session 30 (2026-02-23)
 **Work**: Implemented OAuth 2-step rewrite via `/implement` orchestrator (4 phases, 6 quality gates). 3 independent review agents. Fixed all findings: 1 P0 (JSON injection), 10 P1s, 3 completeness gaps.
 **Decisions**: suspendCancellableCoroutine for OkHttp, CSRF token on forwarder HTML, specific exception types.
@@ -123,3 +128,8 @@ Session history archive. See `.claude/autoload/_state.md` for current state (las
 **Work**: Systematic debugging of port 80 blocker. Exhaustive investigation. Confirmed VpnService dead (loopback bypasses TUN). Tested proot port 80 (PermissionError). Built GeckoView PoC — passes Cloudflare, user logged in.
 **Decisions**: GeckoView replaces Chrome Custom Tabs for auth. Both steps in GeckoView for cookie continuity.
 **Next**: Integrate GeckoView into actual auth flow, verify fragment capture.
+
+### Session 33 (2026-02-23)
+**Work**: Brainstormed GeckoView auth integration design. Explored full auth codebase via agent (5 files, ~1327 lines). Made 6 design decisions. Presented 6 design sections, all approved. Wrote design doc.
+**Decisions**: Dedicated GeckoAuthActivity, no Custom Tabs fallback, single launch both steps, Activity does token exchange internally, ActivityResult API, immediate cancel on back press.
+**Next**: Implement design (4 phases), verify on device, then Slice 4+5.

@@ -3,14 +3,14 @@
     "app_name": "Runelite for Tablet",
     "app_version": "0.1.0",
     "description": "Android installer app that runs the real RuneLite client on Samsung Tab S10 Ultra via Termux + proot-distro",
-    "last_updated": "2026-02-24T05:00:00Z",
-    "session_notes": "Session 37: 6-wave review-fix-verify cycle (12 review agents, 21 fixes, 17 files). Standard + production-scrutiny reviews. Shell injection fix, deployment caching, credential scrubbing, process death handling, corruption recovery. 4 logical commits."
+    "last_updated": "2026-02-24T17:00:00Z",
+    "session_notes": "Session 39: On-device testing. Fixed 3 bugs (shell syntax, env file deletion, stateStore cache). GPU packages install but virpipe driver missing from Ubuntu ARM64 Mesa. RuneLite runs on llvmpipe (software). GPU acceleration BLOCKED."
   },
   "current_phase": {
-    "phase_name": "MVP Development — Production Hardened",
-    "phase_status": "hardened_awaiting_device_test",
+    "phase_name": "MVP Development — GPU Acceleration Blocked",
+    "phase_status": "blocked_virpipe_driver_missing",
     "phase_started": "2026-02-22",
-    "progress_percentage": 98
+    "progress_percentage": 90
   },
   "release_cycle": {
     "last_release": null,
@@ -18,7 +18,15 @@
     "next_release_target": null,
     "next_release_version": "0.1.0"
   },
-  "active_blockers": [],
+  "active_blockers": [
+    {
+      "id": "virpipe-driver-missing",
+      "description": "Ubuntu ARM64 libgl1-mesa-dri does not include virtio_gpu_dri.so (virpipe Gallium driver). VirGL server runs, socket exists at $PREFIX/tmp/.virgl_test, but Mesa inside proot falls back to llvmpipe because virpipe driver binary is absent.",
+      "severity": "high",
+      "discovered": "2026-02-24",
+      "potential_solutions": "TUR Mesa package inside proot, custom Mesa build with -Dgallium-drivers=virpipe, or third-party PPA with virpipe-enabled Mesa for ARM64."
+    }
+  ],
   "resolved_blockers": [
     {
       "id": "geckoview-auth-integration",
