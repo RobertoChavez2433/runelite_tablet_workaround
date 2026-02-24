@@ -114,17 +114,16 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
      * Build the Step 2 consent URL for Chrome Custom Tab.
      * Uses the consent client with hybrid response_type (id_token code).
      * No PKCE — uses nonce for replay protection.
-     * Redirect to localhost where forwarder HTML extracts fragment params.
+     * Redirect to http://localhost (port 80) where forwarder HTML extracts fragment params.
      *
-     * @param localPort Port of the LocalhostAuthServer
      * @param state CSRF protection nonce
      * @param nonce Nonce for id_token replay protection (48 alphanumeric chars)
      */
-    fun buildStep2ConsentUrl(localPort: Int, state: String, nonce: String): Uri {
+    fun buildStep2ConsentUrl(state: String, nonce: String): Uri {
         return Uri.parse(AUTH_ENDPOINT).buildUpon()
             .appendQueryParameter("client_id", CONSENT_CLIENT_ID)
             .appendQueryParameter("response_type", "id_token code")
-            .appendQueryParameter("redirect_uri", "http://localhost:$localPort")
+            .appendQueryParameter("redirect_uri", "http://localhost")
             .appendQueryParameter("scope", CONSENT_SCOPES)
             .appendQueryParameter("state", state)
             .appendQueryParameter("nonce", nonce)

@@ -4,15 +4,13 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <queries>
         <package android:name="com.termux" />
         <package android:name="com.termux.x11" />
-        <!-- Required for Chrome Custom Tab package visibility on Android 11+ -->
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="https" />
-        </intent>
     </queries>
 
     <application
@@ -32,7 +30,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Capture jagex: protocol redirects from OAuth Step 1 (launcher-redirect page) -->
+            <!-- Safety net: capture jagex: protocol redirects if Chrome somehow opens instead of GeckoView -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -41,9 +39,22 @@
             </intent-filter>
         </activity>
 
+        <!-- GeckoView-based OAuth authentication Activity -->
+        <activity
+            android:name=".auth.GeckoAuthActivity"
+            android:exported="false" />
+
         <service
             android:name=".termux.TermuxResultService"
             android:exported="false" />
+
+        <service
+            android:name=".session.RuneLiteSessionService"
+            android:foregroundServiceType="specialUse"
+            android:exported="false">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Managing RuneLite game session processes in Termux" />
+        </service>
 
         <receiver
             android:name=".installer.InstallResultReceiver"

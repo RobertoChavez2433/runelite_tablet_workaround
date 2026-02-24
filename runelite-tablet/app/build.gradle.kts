@@ -46,6 +46,12 @@ android {
     buildFeatures {
         compose = true
     }
+
+    lint {
+        // GeckoView's ExoPlayer transitive dependency references POST_NOTIFICATIONS
+        // but we don't use notifications — suppress to avoid false positive lint error
+        disable += "NotificationPermission"
+    }
 }
 
 dependencies {
@@ -66,8 +72,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
-    // Auth: Chrome Custom Tab for Jagex OAuth2 login
-    implementation("androidx.browser:browser:1.8.0")
+    // Auth: GeckoView (Firefox engine) for Cloudflare-compatible OAuth with localhost redirect capture
+    implementation("org.mozilla.geckoview:geckoview-arm64-v8a:133.0.20241209150345")
     // Auth: Encrypted storage for Jagex credentials
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 

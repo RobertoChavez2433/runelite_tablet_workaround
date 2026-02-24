@@ -51,3 +51,9 @@
 # -------------------------------------------------------------------------
 -keep public class * extends android.content.BroadcastReceiver
 -keep public class * extends android.app.Service
+
+# -------------------------------------------------------------------------
+# GeckoView: suppress missing java.beans classes (referenced by snakeyaml,
+# a transitive dependency of GeckoView — not available on Android)
+# -------------------------------------------------------------------------
+-dontwarn java.beans.**
