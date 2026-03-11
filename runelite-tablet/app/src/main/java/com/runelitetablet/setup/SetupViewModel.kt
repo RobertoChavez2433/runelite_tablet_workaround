@@ -17,6 +17,7 @@ import com.runelitetablet.auth.GameCharacter
 import com.runelitetablet.auth.GeckoAuthActivity
 import com.runelitetablet.auth.JagexOAuth2Manager
 import com.runelitetablet.auth.OAuthException
+import com.runelitetablet.auth.SessionValidation
 import com.runelitetablet.auth.PkceHelper
 import com.runelitetablet.auth.TokenResponse
 import com.runelitetablet.cleanup.CleanupManager
@@ -78,6 +79,8 @@ sealed class LaunchState {
     object CheckingHealth : LaunchState()
     /** Refreshing OAuth2 tokens */
     object RefreshingTokens : LaunchState()
+    /** Validating game session against Jagex API */
+    object ValidatingSession : LaunchState()
     /** Launching RuneLite via Termux */
     object Launching : LaunchState()
     /** Launch failed with error */
@@ -155,6 +158,9 @@ class SetupViewModel(
     // Stored session ID between character list fetch and character selection
     @Volatile private var pendingSessionId: String? = null
 
+    // Flag to auto-resume launch after re-auth (session expired -> GeckoView -> re-launch)
+    private val pendingLaunchAfterAuth = AtomicBoolean(false)
+
     // Stored nonce for Step 2 consent id_token verification
     @Volatile private var pendingNonce: String? = null
 
@@ -168,6 +174,7 @@ class SetupViewModel(
         // Wipe sensitive auth state
         pendingSessionId = null
         pendingNonce = null
+        pendingLaunchAfterAuth.set(false)
         AppLog.lifecycle("SetupViewModel.onCleared: auth state wiped")
     }
 
@@ -352,8 +359,9 @@ class SetupViewModel(
             when (val result = refreshIfNeeded()) {
                 is AuthResult.NeedsLogin -> {
                     AppLog.step("auth", "performLaunch: token expired, need re-login")
+                    pendingLaunchAfterAuth.set(true)
                     _launchState.value = LaunchState.Idle
-                    _currentScreen.value = AppScreen.Login
+                    startLogin()
                     return
                 }
                 is AuthResult.NetworkError -> {
@@ -361,6 +369,38 @@ class SetupViewModel(
                     AppLog.w("AUTH", "performLaunch: refresh failed: ${result.exception.message}")
                 }
                 else -> {} // Valid or Refreshed — proceed
+            }
+
+            // Session validation: check if JX_SESSION_ID is still valid server-side.
+            // Only applies to Jagex accounts that have a sessionId stored.
+            // Legacy RuneScape accounts skip this (no sessionId stored).
+            val creds = withContext(Dispatchers.IO) { credentialManager.getCredentials() }
+            val sessionId = creds?.sessionId
+            if (sessionId != null && sessionId.isNotEmpty()) {
+                _launchState.value = LaunchState.ValidatingSession
+                when (val validation = oAuth2Manager.validateSession(sessionId)) {
+                    is SessionValidation.Valid -> {
+                        AppLog.step("auth", "performLaunch: session valid, proceeding to launch")
+                    }
+                    is SessionValidation.Expired -> {
+                        AppLog.step("auth", "performLaunch: session expired, triggering re-auth")
+                        pendingLaunchAfterAuth.set(true)
+                        withContext(Dispatchers.IO) { credentialManager.clearCredentials() }
+                        val actions = orchestrator.actions
+                        if (actions == null) {
+                            pendingLaunchAfterAuth.set(false)
+                            _launchState.value = LaunchState.Failed("Activity not available — please try again")
+                            return
+                        }
+                        _launchState.value = LaunchState.Idle
+                        startLogin()
+                        return
+                    }
+                    is SessionValidation.NetworkError -> {
+                        // Log but continue — match existing refreshIfNeeded NetworkError behavior
+                        AppLog.w("AUTH", "performLaunch: session validation failed: ${validation.exception.message}")
+                    }
+                }
             }
         }
 
@@ -379,8 +419,6 @@ class SetupViewModel(
                     appendLine("export JX_SESSION_ID=\"${shellEscape(creds.sessionId)}\"")
                     appendLine("export JX_CHARACTER_ID=\"${shellEscape(creds.characterId)}\"")
                     appendLine("export JX_DISPLAY_NAME=\"${shellEscape(creds.displayName)}\"")
-                    creds.accessToken?.let { appendLine("export JX_ACCESS_TOKEN=\"${shellEscape(it)}\"") }
-                    creds.refreshToken?.let { appendLine("export JX_REFRESH_TOKEN=\"${shellEscape(it)}\"") }
                 }
                 val deployCommand = "cat > $termuxEnvPath && chmod 600 $termuxEnvPath"
                 val result = commandRunner.execute(
@@ -676,14 +714,25 @@ class SetupViewModel(
                                     )
                                     withContext(Dispatchers.IO) { credentialManager.storeTokens(tokenResponse) }
                                 }
-                                _currentScreen.value = AppScreen.Launch
+                                navigateToLaunchOrResume()
                             }
                             else -> {
-                                // Jagex account — id_token from Step 2 consent
+                                // Jagex account — store Step 1 tokens, then use Step 2 consent id_token
                                 AppLog.step("auth", "handleAuthResult: Jagex account — proceeding to game session")
                                 if (idToken == null) {
                                     _currentScreen.value = AppScreen.AuthError("No consent token received")
                                     return@launch
+                                }
+                                // Store Step 1 OAuth tokens (access_token for game auth, refresh_token for renewal)
+                                if (accessToken != null) {
+                                    val tokenResponse = TokenResponse(
+                                        accessToken = accessToken,
+                                        refreshToken = refreshToken,
+                                        idToken = idToken,
+                                        expiresIn = expiresIn,
+                                        accessTokenExpiry = accessTokenExpiry
+                                    )
+                                    withContext(Dispatchers.IO) { credentialManager.storeTokens(tokenResponse) }
                                 }
                                 runStep3GameSession(idToken)
                             }
@@ -692,9 +741,11 @@ class SetupViewModel(
                         throw e
                     } catch (e: OAuthException) {
                         AppLog.e("AUTH", "handleAuthResult: OAuth error: ${e.message}", e)
+                        pendingLaunchAfterAuth.set(false)
                         _currentScreen.value = AppScreen.AuthError(e.message ?: "Authentication failed")
                     } catch (e: Exception) {
                         AppLog.e("AUTH", "handleAuthResult: exception: ${e.message}", e)
+                        pendingLaunchAfterAuth.set(false)
                         _currentScreen.value = AppScreen.AuthError(e.message ?: "Login failed")
                     } finally {
                         pendingNonce = null
@@ -703,6 +754,7 @@ class SetupViewModel(
             }
             Activity.RESULT_CANCELED -> {
                 AppLog.step("auth", "handleAuthResult: login cancelled by user")
+                pendingLaunchAfterAuth.set(false)
                 _currentScreen.value = AppScreen.AuthError("Login cancelled — tap Sign In to try again")
                 pendingNonce = null
             }
@@ -710,6 +762,7 @@ class SetupViewModel(
                 // RESULT_FIRST_USER = error case
                 val error = result.data?.getStringExtra(GeckoAuthActivity.RESULT_ERROR) ?: "Login failed"
                 AppLog.e("AUTH", "handleAuthResult: error: $error")
+                pendingLaunchAfterAuth.set(false)
                 _currentScreen.value = AppScreen.AuthError(error)
                 pendingNonce = null
             }
@@ -743,7 +796,7 @@ class SetupViewModel(
             withContext(Dispatchers.IO) {
                 credentialManager.storeGameSession(sessionId, character.accountId, character.displayName)
             }
-            _currentScreen.value = AppScreen.Launch
+            navigateToLaunchOrResume()
         } else {
             AppLog.step("auth", "runStep3GameSession: ${characters.size} characters, showing selection screen")
             pendingSessionId = sessionId
@@ -768,7 +821,7 @@ class SetupViewModel(
                 }
                 pendingSessionId = null
                 AppLog.step("auth", "onCharacterSelected: session stored -> Launch")
-                _currentScreen.value = AppScreen.Launch
+                navigateToLaunchOrResume()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -784,6 +837,22 @@ class SetupViewModel(
     fun skipLogin() {
         AppLog.step("auth", "skipLogin: skipping login, going to Launch")
         _currentScreen.value = AppScreen.Launch
+    }
+
+    /**
+     * Navigate to Launch screen, or auto-resume performLaunch() if a pending
+     * re-auth was triggered by session validation.
+     *
+     * Called after successful auth completion (Step 3 game session stored, or
+     * RuneScape account tokens stored). Must be called from a coroutine context.
+     */
+    private suspend fun navigateToLaunchOrResume() {
+        if (pendingLaunchAfterAuth.compareAndSet(true, false)) {
+            AppLog.step("auth", "navigateToLaunchOrResume: auto-resuming launch after re-auth")
+            performLaunch()
+        } else {
+            _currentScreen.value = AppScreen.Launch
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -816,8 +885,9 @@ class SetupViewModel(
             AppLog.step("auth", "refreshIfNeeded: refresh succeeded")
             AuthResult.Refreshed
         } catch (e: OAuthException) {
-            if (e.httpCode == 401) {
-                AppLog.w("AUTH", "refreshIfNeeded: refresh token rejected (401) -> NeedsLogin")
+            if (e.httpCode == 401 || e.httpCode == 400) {
+                // 401 = token_inactive, 400 = invalid_grant — both mean refresh token is dead
+                AppLog.w("AUTH", "refreshIfNeeded: refresh token rejected (${e.httpCode}) -> NeedsLogin")
                 AuthResult.NeedsLogin
             } else {
                 AppLog.w("AUTH", "refreshIfNeeded: HTTP error ${e.httpCode} -> NetworkError")

@@ -4,16 +4,17 @@ Tablet-optimized client for Old School RuneScape based on RuneLite.
 
 ## Quick References
 
-- Defects: `.claude/autoload/_defects.md` (auto-loaded)
 - Architecture: `.claude/docs/architecture.md`
 - State: `.claude/autoload/_state.md` (auto-loaded)
+- Feature docs: `.claude/docs/features/`
+- Defects: `.claude/defects/_defects-{package}.md` (demand-loaded by agents)
 
 ## Session
 
-- `/resume-session` — Load HOT context only
+- `/resume-session` — Load HOT context only (MEMORY.md + _state.md)
 - `/end-session` — Save state with auto-archiving
 - State: `.claude/autoload/_state.md` (max 5 sessions)
-- Defects: `.claude/autoload/_defects.md` (max 7, auto-loaded)
+- Defects: `.claude/defects/_defects-{package}.md` (max 5 per file, demand-loaded)
 - Archives: `.claude/logs/state-archive.md`, `.claude/logs/defects-archive.md`
 
 ## Agents
@@ -23,14 +24,19 @@ Tablet-optimized client for Old School RuneScape based on RuneLite.
 | `code-review-agent` | Opus | Senior Kotlin/Android reviewer (10-category checklist) | Read, Grep, Glob |
 | `performance-agent` | Opus | Full-stack perf analysis (6-category pipeline) | Read, Grep, Glob, Bash |
 | `security-review-agent` | Opus | Credential handling, IPC security, shell injection, network security (10-category checklist) | Read, Grep, Glob |
+| `termux-shell-agent` | Sonnet/Opus | Termux IPC, shell scripts, proot, X11, GPU setup | Read, Edit, Write, Bash, Glob, Grep |
+| `auth-agent` | Sonnet/Opus | Jagex OAuth, GeckoView, credentials, session validation | Read, Edit, Write, Bash, Glob, Grep |
 
 ## Skills
 
 | Skill | Purpose |
 |-------|---------|
-| `/brainstorming` | Collaborative design before implementation |
+| `/brainstorming` | Collaborative design -> spec output to `specs/` |
+| `/adversarial-review` | Review specs/plans for gaps, security, constraint violations |
+| `/writing-plans` | Convert approved spec into phased implementation plan |
 | `/implement` | Orchestrate implementation (dispatch, review, verify) |
 | `/systematic-debugging` | Root cause analysis framework |
+| `/audit-config` | Read-only .claude/ health check |
 | `/resume-session` | Load HOT context on session start |
 | `/end-session` | Session handoff with auto-archiving |
 
@@ -38,13 +44,30 @@ Tablet-optimized client for Old School RuneScape based on RuneLite.
 
 | Situation | Use |
 |-----------|-----|
-| New feature or behavior change | `/brainstorming` first, then `/implement` |
+| New feature or behavior change | `/brainstorming` -> `/adversarial-review` (optional) -> `/writing-plans` -> `/implement` |
+| Spec/plan quality check | `/adversarial-review` |
+| .claude/ health check | `/audit-config` |
 | Bug or unexpected behavior | `/systematic-debugging` |
 | Code quality concern | `code-review-agent` |
 | Performance concern | `performance-agent` |
 | Security or credential concern | `security-review-agent` |
+| Termux/shell work | `termux-shell-agent` |
+| Auth/OAuth work | `auth-agent` |
 | Starting a session | `/resume-session` |
 | Ending a session | `/end-session` |
+
+## Domain Rules
+
+Path-triggered rule files auto-loaded when editing matching files. See `rules/` for details.
+
+| Rule File | Path Trigger | Summary |
+|-----------|-------------|---------|
+| `rules/coroutine-safety.md` | `**/*.kt` | Dispatcher mapping, CancellationException, timeouts, structured concurrency |
+| `rules/termux-integration.md` | `**/termux/**/*.kt` | RUN_COMMAND protocol, FLAG_MUTABLE, Bundle extraction, paths |
+| `rules/shell-scripts.md` | `assets/scripts/**/*.sh` | set -euo pipefail, proot compatibility, quote escaping, CRLF |
+| `rules/compose-ui.md` | `**/ui/**/*.kt` | State hoisting, collectAsState, no side effects |
+| `rules/installer.md` | `**/installer/**/*.kt` | PackageInstaller fsync, signing, STATUS_PENDING_USER_ACTION |
+| `rules/auth.md` | `**/auth/**/*.kt` | Jagex 2-step OAuth, GeckoView, session validation, credentials |
 
 ## Source File Map
 
@@ -87,6 +110,8 @@ Source root: `runelite-tablet/app/src/main/java/com/runelitetablet/`
 
 ## Conventions
 
+Summary — see `rules/` files for full details.
+
 ### Kotlin/Android
 - **DI**: Manual — constructor injection, wired in Application/Activity
 - **Navigation**: Single-screen, state-driven content switching
@@ -94,34 +119,25 @@ Source root: `runelite-tablet/app/src/main/java/com/runelitetablet/`
 - **Lifecycle**: SetupActions callback with bind/unbind in onResume/onPause
 - **IDs**: AtomicInteger for Termux execution IDs (not nanoTime)
 
-### Coroutine Safety
-
-| Operation | Dispatcher | Notes |
-|-----------|-----------|-------|
-| Network (OkHttp) | IO | Blocking I/O |
-| File I/O | IO | Blocking I/O |
-| PackageInstaller | IO | Session writes block |
-| UI state updates | Main | StateFlow -> Compose |
-| Termux intent send | Main | Requires Activity context |
-| Termux result receive | Main | BroadcastReceiver |
-
-**Rules**:
-- Never swallow CancellationException — always re-throw or use specific exception types
+### Coroutine Safety (see `rules/coroutine-safety.md`)
+- Never swallow CancellationException
 - Always timeout CompletableDeferred.await() with withTimeout()
 - Use structured concurrency — no GlobalScope
+- Catch TimeoutCancellationException BEFORE CancellationException
 
-### Compose
+### Compose (see `rules/compose-ui.md`)
 - State hoisting — lift state to ViewModel, pass down
 - `collectAsState()` for StateFlow
 - No side effects in composition
 
-### Shell Scripts
+### Shell Scripts (see `rules/shell-scripts.md`)
 - Always `set -euo pipefail`
 - Idempotent and retry-safe
-- No hardcoded paths, proper quoting
 - proot compatible (no FUSE/systemd/mount)
 
 ## Common Gotchas
+
+Summary — see `architecture-decisions/` for full constraint details.
 
 | Area | Gotcha |
 |------|--------|
@@ -139,15 +155,24 @@ Source root: `runelite-tablet/app/src/main/java/com/runelitetablet/`
 
 | Directory | Purpose |
 |-----------|---------|
-| autoload/ | Hot state loaded every session (_state.md, _defects.md) |
-| agents/ | Agent definitions (code-review, performance) |
-| skills/ | Skill definitions (brainstorming, implement, debugging, session mgmt) |
+| autoload/ | Hot state loaded every session (_state.md) |
+| agents/ | Agent definitions (5 agents: code-review, performance, security, termux-shell, auth) |
+| agent-memory/ | Per-agent persistent memory (MEMORY.md per agent) |
+| skills/ | Skill definitions (brainstorming, implement, debugging, session mgmt, writing-plans, adversarial-review, audit-config) |
+| rules/ | Path-triggered convention rule files (6 files) |
+| architecture-decisions/ | Per-package hard rules and soft guidelines (7 files) |
+| defects/ | Per-feature defect pattern files (7 files, max 5 per file) |
 | docs/ | Architecture and reference documentation |
+| docs/features/ | Per-package overview + architecture docs (13 files) |
 | state/ | JSON state files (PROJECT-STATE.json, FEATURE-MATRIX.json, feature-*.json) |
 | logs/ | Archives (state-archive, defects-archive) — on-demand only, DO NOT auto-load |
-| plans/ | Implementation plans and design specs |
+| plans/ | Implementation plans |
 | plans/completed/ | Completed plans (reference only) |
-| research/ | Research findings (6 files + README) |
+| specs/ | Brainstorming spec output |
+| adversarial_reviews/ | Adversarial review reports |
+| dependency_graphs/ | Writing-plans blast radius analysis |
+| outputs/ | Audit-config reports |
+| research/ | Research findings (9 files + README) |
 | memory/ | Key learnings and patterns (MEMORY.md) |
 
 ## Unique Solved Problems

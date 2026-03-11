@@ -13,12 +13,12 @@ Fast context load. No questions — just read state and display summary.
 
 ## Actions
 
-### Step 1: Read HOT Context (3 files only)
+### Step 1: Read HOT Context (2 files only)
 1. `.claude/memory/MEMORY.md` — Key learnings and patterns
 2. `.claude/autoload/_state.md` — Current state
-3. `.claude/autoload/_defects.md` — Active defects (auto-loaded)
 
 **DO NOT READ** (lazy load only when needed):
+- `.claude/defects/_defects-*.md` — Demand-loaded by agents when working on specific packages
 - `.claude/logs/state-archive.md`
 - `.claude/logs/defects-archive.md`
 - Any rules, docs, constraints, or state JSON files
@@ -56,16 +56,24 @@ Wait for the user to say what they want. Their message determines what happens n
 
 | Domain | Use |
 |--------|-----|
-| New feature / behavior change | `/brainstorming` then `/implement` |
+| New feature / behavior change | `/brainstorming` -> `/adversarial-review` (optional) -> `/writing-plans` -> `/implement` |
 | Bug / unexpected behavior | `/systematic-debugging` |
 | Code quality concern | `code-review-agent` (Opus) |
 | Performance concern | `performance-agent` (Opus) |
+| Security or credential concern | `security-review-agent` (Opus) |
+| Spec/plan quality check | `/adversarial-review` |
+| .claude/ health check | `/audit-config` |
+| Termux/shell work | `termux-shell-agent` |
+| Auth/OAuth work | `auth-agent` |
 
 ## Context Loading Reference (for when work begins, not this skill)
 
 When work begins on a feature, load context on demand:
 - **State**: `state/feature-{name}.json`, `state/PROJECT-STATE.json`
-- **Defects**: `.claude/autoload/_defects.md` (already auto-loaded)
+- **Defects**: `defects/_defects-{package}.md` for the relevant package
+- **Constraints**: `architecture-decisions/{package}-constraints.md`
+- **Rules**: `rules/{rule}.md` (auto-loaded by path triggers)
+- **Feature docs**: `docs/features/feature-{package}-overview.md`
 - **Plans**: `plans/` for active plans
 - **Architecture**: `docs/architecture.md`
 

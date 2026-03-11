@@ -14,7 +14,7 @@ import android.content.Context
 class SetupStateStore(private val context: Context) {
     companion object {
         /** Must match SCRIPT_VERSION written by shell scripts. Bump on APK updates with changed scripts. */
-        const val CURRENT_SCRIPT_VERSION = "2"
+        const val CURRENT_SCRIPT_VERSION = "7"
     }
 
     private val prefs = context.getSharedPreferences("setup_state", Context.MODE_PRIVATE)

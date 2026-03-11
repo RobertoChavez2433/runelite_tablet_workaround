@@ -301,13 +301,19 @@ static void log_gl_caps(void) {
     fprintf(caps, "  \"limits\": {\n");
     int num_queries = sizeof(int_queries) / sizeof(int_queries[0]);
     for (int i = 0; i < num_queries; i++) {
-        GLint val = 0;
-        glGetIntegerv(int_queries[i].e, &val);
+        GLint val[2] = {0, 0};
+        glGetIntegerv(int_queries[i].e, val);
         /* Clear any errors from unsupported queries */
         while (glGetError() != GL_NO_ERROR) {}
-        LOG_INFO("  %s: %d", int_queries[i].name, val);
-        fprintf(caps, "    \"%s\": %d%s\n", int_queries[i].name, val,
-                i < num_queries - 1 ? "," : "");
+        if (int_queries[i].e == GL_MAX_VIEWPORT_DIMS) {
+            LOG_INFO("  %s: %dx%d", int_queries[i].name, val[0], val[1]);
+            fprintf(caps, "    \"%s\": [%d, %d]%s\n", int_queries[i].name, val[0], val[1],
+                    i < num_queries - 1 ? "," : "");
+        } else {
+            LOG_INFO("  %s: %d", int_queries[i].name, val[0]);
+            fprintf(caps, "    \"%s\": %d%s\n", int_queries[i].name, val[0],
+                    i < num_queries - 1 ? "," : "");
+        }
     }
     fprintf(caps, "  },\n");
 

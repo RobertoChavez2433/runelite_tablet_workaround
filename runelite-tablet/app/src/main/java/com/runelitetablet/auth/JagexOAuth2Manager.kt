@@ -10,6 +10,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Call
 import okhttp3.Callback
@@ -335,6 +336,53 @@ class JagexOAuth2Manager(private val httpClient: OkHttpClient) {
     }
 
     // -------------------------------------------------------------------------
+    // Session validation
+    // -------------------------------------------------------------------------
+
+    /**
+     * Validate a game session by testing the sessionId against the accounts API.
+     * GET /game-session/v1/accounts with Bearer sessionId.
+     *
+     * Returns SessionValidation (Valid/Expired/NetworkError) — never throws
+     * (except CancellationException for coroutine safety).
+     */
+    suspend fun validateSession(sessionId: String): SessionValidation = withContext(Dispatchers.IO) {
+        AppLog.step("auth", "validateSession: checking session against accounts API")
+
+        val request = Request.Builder()
+            .url(ACCOUNTS_ENDPOINT)
+            .header("Authorization", "Bearer $sessionId")
+            .get()
+            .build()
+
+        try {
+            httpClient.newCall(request).executeCancellable().use { response ->
+                when {
+                    response.isSuccessful -> {
+                        AppLog.step("auth", "validateSession: session valid (${response.code})")
+                        SessionValidation.Valid
+                    }
+                    response.code == 401 || response.code == 403 -> {
+                        AppLog.step("auth", "validateSession: session expired (${response.code})")
+                        SessionValidation.Expired
+                    }
+                    else -> {
+                        AppLog.w("AUTH", "validateSession: unexpected HTTP ${response.code}")
+                        SessionValidation.NetworkError(
+                            IOException("Unexpected HTTP ${response.code} from session validation")
+                        )
+                    }
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: IOException) {
+            AppLog.w("AUTH", "validateSession: network error: ${e.message}")
+            SessionValidation.NetworkError(e)
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
@@ -426,6 +474,20 @@ class OAuthException(
 ) : Exception(message) {
     /** Never expose errorBody in toString() to prevent accidental credential leakage in logs. */
     override fun toString(): String = "OAuthException(httpCode=$httpCode, message=$message)"
+}
+
+/**
+ * Result of pre-launch session validation.
+ * Tri-state ensures the caller can distinguish "expired" (clear creds, re-auth)
+ * from "network unreachable" (log, continue with existing creds).
+ */
+sealed class SessionValidation {
+    /** Session is valid (200 from accounts API). */
+    object Valid : SessionValidation()
+    /** Session expired server-side (401/403). Must re-auth via GeckoView. */
+    object Expired : SessionValidation()
+    /** Network error — cannot determine session status. Don't clear creds. */
+    data class NetworkError(val exception: Exception) : SessionValidation()
 }
 
 /**

@@ -56,8 +56,8 @@
     },
     {
       "id": "runelite-launch",
-      "name": "RuneLite Direct Launch",
-      "description": "Direct java -cp launch bypassing JvmLauncher, openbox WM auto-maximize, process cleanup via EXIT trap",
+      "name": "RuneLite Launcher Launch",
+      "description": "Always-run-launcher (auto-updates client jars), --scale 2 for UI scaling, RUNELITE_VMARGS for -Xmx4g/G1GC, openbox WM auto-maximize, process cleanup via EXIT trap",
       "status": "stable",
       "test_coverage": "none",
       "key_files": ["assets/scripts/launch-runelite.sh"],
@@ -137,12 +137,13 @@
     {
       "id": "game-session-api",
       "name": "Game Session API Integration",
-      "description": "POST id_token to /sessions, GET /accounts with sessionId Bearer. Correct two-step call order.",
+      "description": "POST id_token to /sessions, GET /accounts with sessionId Bearer. Correct two-step call order. Pre-launch session validation with auto-reauth on expiry.",
       "status": "needs_testing",
       "test_coverage": "none",
-      "key_files": ["auth/JagexOAuth2Manager.kt"],
+      "key_files": ["auth/JagexOAuth2Manager.kt", "setup/SetupViewModel.kt"],
       "session_implemented": 30,
-      "notes": "Correct API call order verified from aitoiaita source. Needs full E2E verification with real game launch."
+      "session_updated": 45,
+      "notes": "Session 45: Added SessionValidation sealed class + validateSession(). Pre-launch validation auto-triggers re-auth on expired session. Awaiting on-device E2E test."
     },
     {
       "id": "lifecycle-service",
@@ -166,13 +167,14 @@
     },
     {
       "id": "gpu-acceleration",
-      "name": "GPU Acceleration (Mesa/Turnip)",
-      "description": "Automated Mesa Zink + Turnip driver install in proot, /dev/kgsl-3d0 bind-mount, runtime auto-detection with software fallback",
-      "status": "needs_testing",
+      "name": "GPU Acceleration (Mali VirGL / Adreno Turnip)",
+      "description": "lfdevs Mesa install, VirGL+ANGLE server, virpipe Gallium driver, Zink+Turnip for Adreno, dynamic Mesa version from GitHub API, runtime auto-detection with software fallback",
+      "status": "broken",
       "test_coverage": "none",
-      "key_files": ["assets/scripts/setup-gpu.sh", "assets/scripts/launch-runelite.sh", "setup/SetupOrchestrator.kt"],
+      "key_files": ["assets/scripts/setup-gpu.sh", "assets/scripts/setup-gpu-mali.sh", "assets/scripts/launch-runelite.sh", "setup/SetupOrchestrator.kt"],
       "session_implemented": 36,
-      "notes": "Implemented Session 36. Needs on-device verification."
+      "session_updated": 47,
+      "notes": "Session 47: lfdevs Mesa 26.1.0-devel installed. VirGL server runs. But virpipe driver can't find server socket from inside proot. BLOCKER: socket path not bind-mounted."
     },
     {
       "id": "session-ui",

@@ -28,19 +28,21 @@ pkill -f 'proot --' 2>/dev/null || true
 # 4. PulseAudio
 pulseaudio --kill 2>/dev/null || true
 
-# 5. X11 server process
+# 5. X11 server process (binary is 'com.termux.x11.Loader', not 'termux-x11')
 pkill -f 'termux-x11' 2>/dev/null || true
+pkill -f 'com.termux.x11.Loader' 2>/dev/null || true
 
 # 5.5. VirGL server
 pkill -f 'virgl_test_server' 2>/dev/null || true
+rm -f "$PREFIX/tmp/.virgl_test" 2>/dev/null || true
 
 # 6. Termux:X11 Android app
 am broadcast -a com.termux.x11.ACTION_STOP --user 0 2>/dev/null || true
 
 # Cleanup files
+# NOTE: Do NOT delete $HOME/.rlt-launch-env.sh — a new launch may have deployed one.
 rm -f "$HOME/.rlt-session.pid" 2>/dev/null || true
 rm -f "$PREFIX/tmp/.rlt-creds-"*.sh 2>/dev/null || true
-rm -f "$HOME/.rlt-launch-env.sh" 2>/dev/null || true
 rm -f "$PREFIX/tmp/.rlt-session-alive" 2>/dev/null || true
 
 echo "SHUTDOWN_COMPLETE"

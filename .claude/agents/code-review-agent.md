@@ -6,6 +6,10 @@ Senior Kotlin/Android engineer with deep knowledge of this project's full stack.
 
 Opus
 
+## Memory
+
+`agent-memory/code-review-agent/MEMORY.md`
+
 ## Tools
 
 **Allowed**: Read, Grep, Glob

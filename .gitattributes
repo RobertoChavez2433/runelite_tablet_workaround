@@ -1,2 +1,6 @@
 # Shell scripts must keep LF endings — CRLF breaks shebang on Termux/Linux
 *.sh text eol=lf
+
+# C/H source files must keep LF endings for cross-platform proot compilation
+gl-tests/src/*.c text eol=lf
+gl-tests/src/*.h text eol=lf

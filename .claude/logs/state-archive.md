@@ -4,7 +4,72 @@ Session history archive. See `.claude/autoload/_state.md` for current state (las
 
 ---
 
+## March 2026
+
+### Session 46 (2026-03-09)
+**Work**: On-device test found 3 bugs: (1) Step 1 tokens discarded for Jagex accounts in GeckoAuthActivity Step 2 result, (2) env file race — old script EXIT trap deletes file before new script reads it, (3) HTTP 400 `invalid_grant` not treated as NeedsLogin. All 3 fixed and verified — env file now 343 bytes with JX_ACCESS_TOKEN. Game server still rejects login.
+**Decisions**: Move credential sourcing before cleanup in launch-runelite.sh. Treat HTTP 400 same as 401 for refresh rejection. Save Step 1 tokens in GeckoAuthActivity instance fields for Step 2 passthrough.
+**Next**: Research what token OSRS game server actually needs (BLOCKER). GPU test after login. Commit fixes.
+
+### Session 45 (2026-03-09)
+**Work**: Implemented auth session refresh fix via `/implement` (3 phases, 6 quality gates, 0 handoffs). Added `SessionValidation` sealed class, `validateSession()`, `pendingLaunchAfterAuth` auto-resume, `LaunchState.ValidatingSession` UI state. Zero review findings.
+**Decisions**: `navigateToLaunchOrResume()` helper to DRY auth completion logic across 3 paths. Added missing `CancellationException` import.
+**Next**: On-device test of auth flow, GPU plugin test, commit changes.
+
+### Session 43 (2026-03-09)
+**Work**: Implemented .claude directory upgrade via `/implement` (12 phases, all passed). Created ~50 new files. 2 review agents found 4 broken-reference issues (security package gap, stale research count, missing agent memory paths). All fixed.
+**Decisions**: Used `/implement` for markdown-only changes. "Security" treated as cross-cutting package with own constraints/docs. All 5 agents now declare memory paths.
+**Next**: Auth session refresh fix (P0), GPU test after login, optional `/audit-config`.
+
+## March 2026
+
+### Session 42 (2026-03-09)
+**Work**: Audited FieldGuide vs Tablite .claude directories (6 parallel agents). Brainstormed 12-section upgrade design (8 questions). Approved: 2 new agents, rules extraction, per-feature defects, constraints, agent memory, feature docs, writing-plans/adversarial-review/audit-config skills. Design doc saved.
+**Decisions**: Incremental migration approach. Extract existing content (no new invented content). Per-feature defects replace single _defects.md. Adversarial review as standalone skill. End/resume session skills to match FieldGuide patterns.
+**Next**: Implement .claude upgrade (12 steps), then auth fix, then GPU test.
+
+## March 2026
+
+### Session 41 (2026-03-08)
+**Work**: On-device test. GPU setup passes (virtio_gpu_dri.so present, lfdevs Mesa works). RuneLite launches but OSRS login fails. Diagnosed: refresh flow incomplete (only Step 1/3). JX_SESSION_ID expired after 12 days. Verified via 4 API tests. Fix plan written.
+**Decisions**: Game session cannot be recreated without browser (Step 2 consent). Pre-launch session validation + auto-reauth is the fix. JX_SESSION_ID DOES expire (corrects prior assumption).
+**Next**: Implement auth reauth fix, test GPU plugin after login works, production P1s.
+
+## March 2026
+
+### Session 40 (2026-02-24)
+**Work**: Brainstormed GPU blocker fix (3 research agents). Designed lfdevs Mesa approach. Implemented via /implement (1 phase, 6 gates). Audited MEMORY.md (11 issues, 5 fixed). Fixed SoC reference (Snapdragon→MediaTek). 3 commits.
+**Decisions**: Use lfdevs Mesa (same project as Adreno path, includes virgl). No distro change. Pin Mesa 26.1.0. VirGL is only viable Mali GPU path in proot.
+**Next**: On-device test GPU setup + VirGL, then RuneLite GPU plugin, then production P1s.
+
+---
+
 ## February 2026
+
+### Session 39 (2026-02-24)
+**Work**: First on-device test session. Fixed 3 bugs: shell syntax (16 unescaped `"` in bash -c block), env file premature deletion, stateStore cache not cleared on ABSENT reconciliation. GPU packages install correctly but VirGL doesn't work — Ubuntu ARM64 Mesa missing virpipe driver.
+**Decisions**: All `"` inside `bash -c "..."` must be escaped `\"`. stateStore must be cleared when marker reconciliation downgrades a step. Env file deletion moved out of cleanup_previous().
+**Next**: Install virpipe-capable Mesa in proot (TUR/custom build), verify GPU acceleration, production P1s.
+
+### Session 38 (2026-02-24)
+**Work**: Implemented Mali GPU acceleration plan via `/implement`. 5 phases (GPU detection, Mali setup, launch script tiered fallback, Kotlin changes, shutdown cleanup). 7 files (2 new + 5 modified). Code review found 7 P1s, all fixed and verified. 2 builds passed.
+**Decisions**: VirGL server tied to session lifecycle, GL version override AFTER GL check (not before), GPU setup non-blocking, polling loops (2s max) for VirGL readiness, 512MB disk space pre-check, grep -Eo (POSIX) not grep -oP (PCRE).
+**Next**: On-device test (especially Mali VirGL spike), commit changes.
+
+### Session 37 (2026-02-24)
+**Work**: 6-wave review-fix-verify loop with 12 review agents. 21 fixes across 17 files. Standard reviews (code/perf/security), verification, final check, then 3 production-scrutiny waves (edge cases, stress/resilience, adversarial security). 4 logical commits.
+**Decisions**: Double-quote shell escaping (not single-quote), IMMUTABLE_FLAGS for notification PendingIntents, sentinel file for health monitoring (not PID+pgrep), corrupted EncryptedSharedPreferences auto-recovery.
+**Next**: On-device test of full app. Consider production P1s (cert pinning, APK sig verify).
+
+### Session 36 (2026-02-24)
+**Work**: Implemented lifecycle + GPU plan via `/implement` (3 phases, 6 quality gates, 1 orchestrator cycle). 5 new files, 9 modified. GeckoView auth also committed. 4 logical commits.
+**Decisions**: Companion object MutableStateFlow for service-to-UI comm, startForeground in handleCheckSession for restart safety, GPU step non-blocking, POST_NOTIFICATIONS soft-prompted.
+**Next**: On-device test lifecycle, GPU, and session UI.
+
+### Session 35 (2026-02-23)
+**Work**: 3 parallel research agents (perf logs, lifecycle, GPU). Analyzed GC/CPU/memory/resolution from device logs. Identified GPU-on-llvmpipe as #1 bottleneck. User applied quick wins. Brainstormed combined lifecycle + GPU design (6 decisions, 7 sections). Design doc committed.
+**Decisions**: Keep running on swipe, notification with Switch/Stop actions, automated GPU setup step, auto-fallback to software, auto-detect running session, 15s health poll, Foreground Service + shell scripts approach.
+**Next**: Implement lifecycle (Phase 1), then GPU (Phase 2), then polish (Phase 3).
 
 ### Session 34 (2026-02-23)
 **Work**: Implemented GeckoView auth (3 phases via /implement, 6 quality gates passed). Fixed cross-app file access bug (env file deployed via Termux stdin). Full auth flow verified on device. Added process cleanup/shutdown to launch script. Added perf logging (GC, CPU/mem monitor, GL info, --debug).

@@ -93,6 +93,11 @@ DL_RESULT=$(proot-distro login ubuntu -- bash -c "
 if echo "$DL_RESULT" | grep -q "DOWNLOAD_OK"; then
     # Write new version to marker file
     echo "$LATEST_VERSION" > "$VERSION_FILE"
+    # Clean stale client jars so the updated launcher does a fresh bootstrap
+    proot-distro login ubuntu -- bash -c "
+        [ -d '/root/.runelite/repository2' ] && rm -rf '/root/.runelite/repository2' && \
+        echo 'Cleaned stale repository2/ for fresh launcher bootstrap'
+    " 2>/dev/null || true
     echo "UPDATE_STATUS updated $LATEST_VERSION"
 else
     echo "WARNING: Download or verification failed, keeping current version"

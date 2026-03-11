@@ -1,78 +1,84 @@
 # Session State
 
-**Last Updated**: 2026-02-24 | **Session**: 39
+**Last Updated**: 2026-03-10 | **Session**: 51
 
 ## Current Phase
-- **Phase**: MVP Development — On-Device Testing & GPU Debugging
-- **Status**: First full on-device test session. Fixed 3 bugs (shell syntax, env file deletion, stateStore cache). GPU packages installed but VirGL not working — Ubuntu ARM64 Mesa missing virpipe driver. RuneLite runs on llvmpipe (software) at 2960x1848.
+- **Phase**: MVP Development — VirGL FBO Rendering Broken (Root Cause Found)
+- **Status**: Systematic debugging revealed FBO rendering is completely non-functional on VirGL. Alpha=0 after `glClear(0,0,0,1)` proves `glClear`/`glReadPixels` don't operate on the FBO at all. This is NOT a depth issue — the entire FBO pipeline is broken. `--all` SIGSEGV persists despite `GL_MAX_VIEWPORT_DIMS` stack overflow fix — deeper crash source in `log_gl_caps()`. Two commits landed: test pipeline files (14 files) + LD_LIBRARY_PATH fix in launch-runelite.sh.
 
 ## HOT CONTEXT - Resume Here
 
 ### EXACTLY WHERE WE LEFT OFF
 
-**Session 39: On-device testing found 3 bugs, all fixed. GPU acceleration BLOCKED — Ubuntu's `libgl1-mesa-dri` on ARM64 doesn't include `virtio_gpu_dri.so` (virpipe Gallium driver). VirGL server runs, socket exists, but proot Mesa can't use it. RuneLite works but is choppy on software rendering.**
+**Session 51: Systematic debugging of BLACK rendering + SIGSEGV. Committed test pipeline (14 files) and LD_LIBRARY_PATH fix to launch-runelite.sh. Applied 3 code fixes (GL_MAX_VIEWPORT_DIMS overflow, DEPTH_COMPONENT32F→24, UBO diagnostic logging). Deployed to device, rebuilt, ran tests. Critical finding: FBO rendering completely broken on VirGL — `glClear(0,0,0,1)` produces A=0, proving the FBO color attachment is never written to. SIGSEGV in --all mode persists despite viewport dims fix.**
 
-Key accomplishments:
-1. **Shell syntax fix** — 16 unescaped `"` inside `bash -c "..."` block in launch-runelite.sh caused syntax error on `(` characters. All escaped to `\"`.
-2. **Env file deletion fix** — `cleanup_previous()` deleted `.rlt-launch-env.sh` before the script read it. Removed premature deletion.
-3. **stateStore cache fix** — `reconcileWithMarkers()` ABSENT branch downgraded step UI status but didn't clear `stateStore.isCompleted()` flag, so `executeGpuStep()` always skipped. Added `stateStore.clearCompleted(key)`.
-4. **GPU packages installed** — `virglrenderer-android` + `angle-android` now install correctly during GPU setup step.
-5. **VirGL starts but virpipe fails** — `virgl_test_server_android --angle-gl` runs (PID alive, socket at `$PREFIX/tmp/.virgl_test`), but `GALLIUM_DRIVER=virpipe glxinfo` returns empty inside proot. Mesa falls back to llvmpipe.
+Key findings this session:
+1. **COMMITTED**: Test pipeline (14 files, 5203 insertions) + `env -u LD_LIBRARY_PATH` fix in launch-runelite.sh (2 separate commits)
+2. **FBO IS THE ROOT CAUSE**: `Center pixel (128,64): R=0 G=0 B=0 A=0` — since `glClearColor(0,0,0,1)` sets alpha to 1.0, getting A=0 proves `glClear` never wrote to the FBO. The entire FBO color attachment is uninitialized zeros. This is NOT a depth issue.
+3. **DEPTH_COMPONENT24 didn't help**: Switching from 32F to 24 made no difference — the problem is FBO fundamentals, not depth format
+4. **SIGSEGV deeper than GL_MAX_VIEWPORT_DIMS**: Fixed the stack overflow (GLint→GLint[2]) but `--all` still crashes. Crash happens before any `[INFO]` output from the harness. Likely another query in `log_gl_caps()` or extension enumeration via `glGetStringi`
+5. **Shims still work mechanically**: Shim A verified (glClipControl injected, glGetError=0x0000, state confirmed). Shim B intercepts correctly (GL_GREATER→GL_LESS, glClearDepth 0→1). The shims aren't the problem.
+6. **adb push directory mode crashes** on Windows Git Bash with `std::bad_alloc` — must push individual files with `MSYS_NO_PATHCONV=1`
+7. **#!/usr/bin/env bash shebangs** don't work in Termux `run-as` — must invoke via full path `/data/data/com.termux/files/usr/bin/bash script.sh`
 
 ### What Needs to Happen Next
 
-1. **BLOCKER: Install virpipe-capable Mesa inside proot** — Ubuntu's Mesa doesn't include `virtio_gpu_dri.so` on ARM64. Options: TUR Mesa package, custom Mesa build, or third-party PPA. This is the #1 priority.
-2. **Verify VirGL GPU acceleration end-to-end** — Once virpipe driver available, confirm glxinfo shows VirGL renderer and RuneLite GPU plugin works.
-3. **Consider production P1s** — Cert pinning, APK signature verification, permission "Don't ask again" UX.
+1. **P0: Debug VirGL FBO non-functionality** — Render to DEFAULT framebuffer (not FBO) and verify geometry appears. If yes, VirGL's FBO implementation is broken. If no, rendering itself is broken. Also try `glGetError()` after every FBO operation to find which call actually fails.
+2. **P0: Isolate --all SIGSEGV** — Run `--module 1` individually to see if Module 1 alone crashes. If it does, bisect the `log_gl_caps()` queries (remove extension enumeration, remove specific glGetIntegerv calls). If module 1 is fine alone, test `--module 2`, `--module 3` etc.
+3. **P1: If FBO doesn't work on VirGL** — Redesign depth tests to render to the DEFAULT framebuffer + `glReadPixels` from it. FBO-based testing may be fundamentally incompatible with VirGL.
 
 ## Blockers
 
-**1. Ubuntu ARM64 Mesa missing virpipe driver** — `libgl1-mesa-dri` on ARM64 does NOT include `virtio_gpu_dri.so`. VirGL server runs but Mesa inside proot can't connect. Need a Mesa build with virpipe enabled. Research needed on TUR packages, custom builds, or PPAs.
+**1. VirGL FBO rendering completely broken** — `glClear` and `glDrawArrays` don't write to FBO color attachment (A=0 after glClear(0,0,0,1) = uninitialized zeros). All FBO-based tests produce BLACK. Root cause unknown — could be VirGL's FBO implementation, a Mesa virpipe bug, or an incompatible FBO configuration.
+
+**2. --all SIGSEGV in log_gl_caps()** — Crashes before any module output. `GL_MAX_VIEWPORT_DIMS` stack overflow was fixed but crash persists. Likely another problematic `glGetIntegerv` query or `glGetStringi` extension enumeration crash.
 
 ## Recent Sessions
 
-### Session 39 (2026-02-24)
-**Work**: First on-device test session. Fixed 3 bugs: shell syntax (16 unescaped `"` in bash -c block), env file premature deletion, stateStore cache not cleared on ABSENT reconciliation. GPU packages install correctly but VirGL doesn't work — Ubuntu ARM64 Mesa missing virpipe driver.
-**Decisions**: All `"` inside `bash -c "..."` must be escaped `\"`. stateStore must be cleared when marker reconciliation downgrades a step. Env file deletion moved out of cleanup_previous().
-**Next**: Install virpipe-capable Mesa in proot (TUR/custom build), verify GPU acceleration, production P1s.
+### Session 51 (2026-03-10)
+**Work**: Committed test pipeline (14 files) + LD_LIBRARY_PATH fix. Systematic debugging: fixed GL_MAX_VIEWPORT_DIMS overflow, DEPTH_COMPONENT32F→24, UBO diagnostic logging. Deployed+rebuilt+ran on device. Critical finding: FBO rendering completely broken on VirGL (A=0 after glClear proves FBO never written to). SIGSEGV persists despite viewport dims fix.
+**Decisions**: DEPTH_COMPONENT24 over 32F. MSYS_NO_PATHCONV=1 for all adb from Git Bash. Push individual files not directories. Invoke scripts via full bash path not shebangs.
+**Next**: Test rendering to default framebuffer (bypass FBO). Isolate SIGSEGV by running module 1 individually. Redesign tests if FBO is fundamentally broken on VirGL.
 
-### Session 38 (2026-02-24)
-**Work**: Implemented Mali GPU acceleration plan via `/implement`. 5 phases (GPU detection, Mali setup, launch script tiered fallback, Kotlin changes, shutdown cleanup). 7 files (2 new + 5 modified). Code review found 7 P1s, all fixed and verified. 2 builds passed.
-**Decisions**: VirGL server tied to session lifecycle, GL version override AFTER GL check (not before), GPU setup non-blocking, polling loops (2s max) for VirGL readiness, 512MB disk space pre-check, grep -Eo (POSIX) not grep -oP (PCRE).
-**Next**: On-device test (especially Mali VirGL spike), commit changes.
+### Session 50 (2026-03-10)
+**Work**: Implemented VirGL test pipeline via `/implement` (Phases 1-6, 13 files, 6 quality gates PASS). Fixed 4 P2 nitpicks. Deployed to device. Fixed 3 deployment bugs (LD_LIBRARY_PATH, X11 locks, TMPDIR). First successful on-device run: VirGL+ANGLE works, both shims activate correctly. But all depth tests render BLACK — fix is mechanically correct but geometry not visible.
+**Decisions**: `env -u LD_LIBRARY_PATH` for VirGL server (Termux OpenSSL conflicts). Always kill+clean X11 before starting (stale locks). Set TMPDIR/XDG_RUNTIME_DIR in self-bootstrap. GLFW_PLATFORM=x11 for GLFW 3.4.
+**Next**: Debug BLACK rendering (likely test harness projection/geometry bug). Fix Modules 1-3 SIGSEGV. Apply LD_LIBRARY_PATH fix to launch-runelite.sh. Commit files.
 
-### Session 37 (2026-02-24)
-**Work**: 6-wave review-fix-verify loop with 12 review agents. 21 fixes across 17 files. Standard reviews (code/perf/security), verification, final check, then 3 production-scrutiny waves (edge cases, stress/resilience, adversarial security). 4 logical commits.
-**Decisions**: Double-quote shell escaping (not single-quote), IMMUTABLE_FLAGS for notification PendingIntents, sentinel file for health monitoring (not PID+pgrep), corrupted EncryptedSharedPreferences auto-recovery.
-**Next**: On-device test of full app. Consider production P1s (cert pinning, APK sig verify).
+### Session 49 (2026-03-09)
+**Work**: Investigated GPU plugin black screen via 8 research agents. Root cause: reversed-Z depth buffer requires `glClipControl` (GL 4.5) which VirGL doesn't support. `GL_ARB_clip_control` confirmed absent from extension list. `MESA_NO_ERROR=1` masked the failure. Applied GLSL 330 override (shaders compile) and GL 4.5 override (didn't fix — LWJGL checks function pointers not just version string). Captured full VirGL capability dump. Designed 3-tier test pipeline via `/brainstorming` → `/adversarial-review` → `/writing-plans`. 6 MUST-FIX items found and addressed.
+**Decisions**: LD_PRELOAD shim approach (not patching RuneLite). Standalone developer tool (not app integration). Sub-process LD_PRELOAD testing (not dlopen). Cross-UID deploy via staging to /data/local/tmp/. Environment allowlist for results (not dump-all).
+**Next**: `/implement` test pipeline (7 phases). Deploy, run --quick, determine winning shim. Apply to launch-runelite.sh.
 
-### Session 36 (2026-02-24)
-**Work**: Implemented lifecycle + GPU plan via `/implement` (3 phases, 6 quality gates, 1 orchestrator cycle). 5 new files, 9 modified. GeckoView auth also committed. 4 logical commits.
-**Decisions**: Companion object MutableStateFlow for service-to-UI comm, startForeground in handleCheckSession for restart safety, GPU step non-blocking, POST_NOTIFICATIONS soft-prompted.
-**Next**: On-device test lifecycle, GPU, and session UI.
+### Session 48 (2026-03-09)
+**Work**: VirGL socket fix achieved via 4-agent research. 11 changes: `--shared-tmp`, socket wait with `[ -S ]`, `MESA_GLX_ALPHA_BITS=0` (24-bit visual fix), glxgears instead of glxinfo, stock Mesa replaces lfdevs, `termux-x11-preference` replaces xrandr (colon syntax), `com.termux.x11.Loader` cleanup pattern. VirGL confirmed working (virgl renderer detected). GPU plugin fails: GLSL 3.30 not supported.
+**Decisions**: Stock Ubuntu Mesa for Mali (not lfdevs). Termux:X11 preferences for resolution (not xrandr). glxgears for virpipe detection (not glxinfo). MESA_GLX_ALPHA_BITS=0 for visual depth fix.
+**Next**: Add MESA_GLSL_VERSION_OVERRIDE=330 (one-line). Test GPU plugin. Software fallback resolution.
 
-### Session 35 (2026-02-23)
-**Work**: 3 parallel research agents (perf logs, lifecycle, GPU). Analyzed GC/CPU/memory/resolution from device logs. Identified GPU-on-llvmpipe as #1 bottleneck. User applied quick wins. Brainstormed combined lifecycle + GPU design (6 decisions, 7 sections). Design doc committed.
-**Decisions**: Keep running on swipe, notification with Switch/Stop actions, automated GPU setup step, auto-fallback to software, auto-detect running session, 15s health poll, Foreground Service + shell scripts approach.
-**Next**: Implement lifecycle (Phase 1), then GPU (Phase 2), then polish (Phase 3).
+### Session 47 (2026-03-09)
+**Work**: Eliminated hardcoded versions (launcher 2.7.7, Mesa 26.1.0). Fixed RuneLite always-run-launcher (auto-update). Fixed JVM flag propagation (--scale 2, RUNELITE_VMARGS=-Xmx4g). Fixed lfdevs Mesa download URL (was 404). Fixed GPU marker staleness. Deployed v2→v5 across 4 iterations. lfdevs Mesa 26.1.0-devel now confirmed installed. VirGL still broken — socket path mismatch.
+**Decisions**: Use RUNELITE_VMARGS (not JDK_JAVA_OPTIONS) for client JVM args. Use --scale 2 (launcher's native mechanism). Always delete GPU marker on setup-gpu run. Fallback Mesa version = mesa-26.1.0-devel-20260208 (actual existing tag).
+**Next**: Fix VirGL socket path (P0). Lower xrandr resolution as interim perf mitigation. Test auth in-game.
 
 ## Active Plans
 
-- **Mali GPU Acceleration** — **BLOCKED**. VirGL server works, but proot Mesa missing virpipe driver (`virtio_gpu_dri.so`). Need virpipe-capable Mesa build inside proot.
-- **Lifecycle + GPU Acceleration** — **IMPLEMENTED + HARDENED**. All 3 phases complete, 6 quality gates + 6-wave review-fix-verify. Session 36-37. On-device tested Session 39 (lifecycle works, GPU blocked).
-- **GeckoView Auth Integration** — **COMPLETE + HARDENED**. Implemented Session 34. Hardened Session 37. Credentials deploy correctly (Session 39 fix).
-- **Phase 1 UX Revert + Extra Keys** — **COMPLETE**. Verified on device.
-- **Permissions Automation** — **COMPLETE**. All 3 phases work, auto-advance verified.
-- **Security Hardening** — **COMPLETE**. Session 22 initial + Session 37 production-level (21 fixes total).
-- **Slice 4+5 Implementation** — **DESIGNED**. Plan committed. Auth blocker RESOLVED.
-- **Slice 2+3 Implementation** — **COMPLETE**. Committed + security hardened.
+- **VirGL Test Pipeline** — **DEPLOYED, FBO BROKEN**. Session 51. 3 fixes applied (viewport overflow, depth format, UBO logging). On-device: compiles, shims activate, but FBO rendering completely non-functional (A=0 proves glClear doesn't write to FBO). Need to test default framebuffer rendering.
+- **GLSL Version Override** — **APPLIED**. Session 49. `MESA_GLSL_VERSION_OVERRIDE=330` added. Shaders compile.
+- **Mali GPU Acceleration** — **FBO BROKEN ON VIRGL**. VirGL connected, shaders compile, shims activate, but FBO doesn't work at all. May need to render to default framebuffer.
+- **Auth Session Refresh Fix** — **COMPLETE**. Session 45-46.
+- **Lifecycle + GPU Acceleration** — **COMPLETE**. All 3 phases.
+- **GeckoView Auth Integration** — **COMPLETE**.
 
 ## Reference
-- **Mali GPU design**: `.claude/plans/2026-02-24-mali-gpu-acceleration-design.md`
-- **Lifecycle + GPU design**: `.claude/plans/2026-02-23-lifecycle-gpu-design.md`
-- **GeckoView auth design**: `.claude/plans/2026-02-23-geckoview-auth-integration-design.md`
-- **OAuth 2-step flow research**: `.claude/research/jagex-oauth2-two-step-flow.md`
-- **Slice 4+5 plan**: `.claude/plans/completed/2026-02-23-slice4-5-implementation-plan.md`
+- **VirGL test pipeline plan**: `.claude/plans/2026-03-09-virgl-test-pipeline.md`
+- **VirGL test pipeline spec**: `.claude/specs/2026-03-09-virgl-test-pipeline-spec.md`
+- **VirGL test pipeline review**: `.claude/adversarial_reviews/2026-03-09-virgl-test-pipeline/review.md`
+- **VirGL capability dump**: `.claude/research/virgl-capabilities-dump.md`
+- **Implement checkpoint**: `.claude/state/implement-checkpoint.json`
+- **Auth session fix plan**: `.claude/plans/2026-03-08-auth-session-refresh-fix.md`
 - **Source code**: `runelite-tablet/app/src/main/java/com/runelitetablet/`
-- **Research**: `.claude/research/` (7 files + README)
+- **GL test source**: `runelite-tablet/gl-tests/` (14 files)
+- **Research**: `.claude/research/` (9 files + README)
 - **Perf logs on device**: `~/runelite/gc.log`, `~/runelite/perf-monitor.log`, `~/runelite-launch.log`
+- **Test results on device**: `~/gl-tests/results/run-20260310-211044/`
+- **jcodemunch MCP**: `.mcp.json` configured (C:\Users\rseba\Projects\jcodemunch-mcp)

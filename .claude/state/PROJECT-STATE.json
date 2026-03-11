@@ -3,14 +3,14 @@
     "app_name": "Runelite for Tablet",
     "app_version": "0.1.0",
     "description": "Android installer app that runs the real RuneLite client on Samsung Tab S10 Ultra via Termux + proot-distro",
-    "last_updated": "2026-02-24T17:00:00Z",
-    "session_notes": "Session 39: On-device testing. Fixed 3 bugs (shell syntax, env file deletion, stateStore cache). GPU packages install but virpipe driver missing from Ubuntu ARM64 Mesa. RuneLite runs on llvmpipe (software). GPU acceleration BLOCKED."
+    "last_updated": "2026-03-10T21:15:00Z",
+    "session_notes": "Session 51: Committed test pipeline (14 files) + LD_LIBRARY_PATH fix. Systematic debugging revealed FBO rendering completely broken on VirGL — A=0 after glClear(0,0,0,1) proves FBO never written to. Fixed GL_MAX_VIEWPORT_DIMS overflow, DEPTH_COMPONENT32F→24, UBO diagnostic logging. SIGSEGV persists despite viewport dims fix. Need to test default framebuffer rendering."
   },
   "current_phase": {
-    "phase_name": "MVP Development — GPU Acceleration Blocked",
-    "phase_status": "blocked_virpipe_driver_missing",
+    "phase_name": "MVP Development — VirGL FBO Rendering Broken",
+    "phase_status": "fbo_non_functional_need_default_framebuffer_test",
     "phase_started": "2026-02-22",
-    "progress_percentage": 90
+    "progress_percentage": 88
   },
   "release_cycle": {
     "last_release": null,
@@ -20,103 +20,74 @@
   },
   "active_blockers": [
     {
-      "id": "virpipe-driver-missing",
-      "description": "Ubuntu ARM64 libgl1-mesa-dri does not include virtio_gpu_dri.so (virpipe Gallium driver). VirGL server runs, socket exists at $PREFIX/tmp/.virgl_test, but Mesa inside proot falls back to llvmpipe because virpipe driver binary is absent.",
-      "severity": "high",
-      "discovered": "2026-02-24",
-      "potential_solutions": "TUR Mesa package inside proot, custom Mesa build with -Dgallium-drivers=virpipe, or third-party PPA with virpipe-enabled Mesa for ARM64."
+      "id": "virgl-fbo-rendering-broken",
+      "description": "VirGL FBO rendering completely non-functional. glClear(0,0,0,1) produces A=0 (should be A=255), proving FBO color attachment is never written to. All FBO-based tests produce BLACK with uninitialized zeros. Not a depth issue — entire FBO pipeline broken. Need to test default framebuffer rendering.",
+      "severity": "P0",
+      "discovered": "2026-03-10",
+      "session": 50
+    },
+    {
+      "id": "all-mode-sigsegv-log-gl-caps",
+      "description": "Running --all mode crashes with SIGSEGV before any module output. GL_MAX_VIEWPORT_DIMS stack overflow was fixed but crash persists. Likely another problematic glGetIntegerv query or glGetStringi extension enumeration in log_gl_caps(). Individual modules (--module 4a etc) work fine.",
+      "severity": "P0",
+      "discovered": "2026-03-10",
+      "session": 51
     }
   ],
   "resolved_blockers": [
     {
+      "id": "reversed-z-depth-no-clipcontrol",
+      "description": "RuneLite GPU plugin uses reversed-Z depth requiring glClipControl. VirGL doesn't support GL_ARB_clip_control.",
+      "resolved": "2026-03-10",
+      "resolution": "Session 50: LD_PRELOAD Shim A successfully injects glClipControl (glGetError=0x0000, state verified). Mechanical fix works. BLACK rendering is a separate issue."
+    },
+    {
+      "id": "glsl-version-override-missing",
+      "description": "RuneLite GPU plugin requires GLSL 3.30 but VirGL reports 1.50.",
+      "resolved": "2026-03-09",
+      "resolution": "Session 49: Added MESA_GLSL_VERSION_OVERRIDE=330. Shaders compile successfully. GPU plugin loads."
+    },
+    {
+      "id": "virgl-socket-unreachable-from-proot",
+      "description": "VirGL+ANGLE server starts in Termux but virpipe inside proot couldn't connect.",
+      "resolved": "2026-03-09",
+      "resolution": "Session 48: --shared-tmp, socket wait with [ -S ], MESA_GLX_ALPHA_BITS=0, stock Mesa, glxgears detection."
+    },
+    {
+      "id": "software-rendering-performance",
+      "description": "llvmpipe at 2960x1848 gives ~12fps.",
+      "resolved": "2026-03-09",
+      "resolution": "Session 48: VirGL now works. termux-x11-preference for half-res fallback deployed."
+    },
+    {
+      "id": "auth-session-refresh-incomplete",
+      "description": "Token refresh only renews Step 1 launcher tokens. Game session expires.",
+      "resolved": "2026-03-09",
+      "resolution": "Session 45: Pre-launch validateSession() checks game session via accounts API."
+    },
+    {
+      "id": "virpipe-driver-missing",
+      "description": "Ubuntu ARM64 libgl1-mesa-dri does not include virtio_gpu_dri.so.",
+      "resolved": "2026-03-08",
+      "resolution": "Session 48 update: stock Ubuntu Mesa DOES have virpipe."
+    },
+    {
       "id": "geckoview-auth-integration",
-      "description": "GeckoView auth integration designed and approved (Session 33). Needed implementation and on-device verification.",
+      "description": "GeckoView auth integration designed and approved.",
       "resolved": "2026-02-23",
-      "resolution": "Implemented in Session 34. All 3 phases complete, 6 quality gates passed. Fragment capture confirmed working in onLoadRequest. Full end-to-end auth flow verified on device."
+      "resolution": "Implemented in Session 34. All 3 phases complete."
     },
     {
       "id": "cross-app-file-access",
-      "description": "Credential env file written to app's private filesDir was not readable by Termux (different UID).",
+      "description": "Credential env file written to app's private filesDir not readable by Termux.",
       "resolved": "2026-02-23",
-      "resolution": "Deploy env file via TermuxCommandRunner.execute() with stdin, writing to Termux home dir."
+      "resolution": "Deploy env file via TermuxCommandRunner.execute() with stdin."
     },
     {
       "id": "port-80-android",
-      "description": "Android blocks bind() to port 80 for ALL apps. Jagex consent redirect goes to http://localhost (port 80).",
+      "description": "Android blocks bind() to port 80.",
       "resolved": "2026-02-23",
-      "resolution": "GeckoView intercepts navigation at engine level before network request. No port 80 needed."
-    },
-    {
-      "id": "oauth-2step-not-implemented",
-      "description": "OAuth 2-step flow design approved but code not yet written.",
-      "resolved": "2026-02-23",
-      "resolution": "Full implementation completed in Session 30. Replaced with GeckoView auth in Session 34."
-    },
-    {
-      "id": "oauth-wrong-client-id",
-      "description": "OAuth Step 1 uses wrong client_id.",
-      "resolved": "2026-02-23",
-      "resolution": "Fixed in 2-step flow rewrite."
-    },
-    {
-      "id": "permissions-npe",
-      "description": "StepState NPE crash on launch",
-      "resolved": "2026-02-23",
-      "resolution": "Changed SetupStep.allSteps from eager val to by lazy"
-    },
-    {
-      "id": "permissions-security-exception",
-      "description": "SecurityException crash when verifyPermissions() runs before RUN_COMMAND permission granted",
-      "resolved": "2026-02-23",
-      "resolution": "Added try/catch SecurityException in verifyPermissions() returning false"
-    },
-    {
-      "id": "permissions-ui-not-showing",
-      "description": "isPermissionStepActive always false",
-      "resolved": "2026-02-23",
-      "resolution": "Changed to MutableStateFlow<Boolean> and used combine()"
-    },
-    {
-      "id": "cloudflare-webview",
-      "description": "Cloudflare blocks Android WebView auth page",
-      "resolved": "2026-02-23",
-      "resolution": "Replaced with GeckoView (Firefox engine)"
-    },
-    {
-      "id": "oauth-redirect",
-      "description": "Chrome Custom Tabs onNavigationEvent doesn't reliably provide redirect URL",
-      "resolved": "2026-02-23",
-      "resolution": "Replaced with GeckoView NavigationDelegate"
-    },
-    {
-      "id": "headless-jdk",
-      "description": "openjdk-11-jdk-headless missing AWT/X11 libs",
-      "resolved": "2026-02-22",
-      "resolution": "Changed to openjdk-11-jdk"
-    },
-    {
-      "id": "proot-distro-exit-code",
-      "description": "proot-distro install returns non-zero due to /proc/self/fd warnings",
-      "resolved": "2026-02-22",
-      "resolution": "Manual rootfs extraction fallback"
-    },
-    {
-      "id": "apt-get-hang",
-      "description": "apt-get install hangs inside proot",
-      "resolved": "2026-02-22",
-      "resolution": "DEBIAN_FRONTEND=noninteractive + resolv.conf"
-    },
-    {
-      "id": "service-lifecycle",
-      "description": "TermuxResultService onDestroy clearing static pendingResults",
-      "resolved": "2026-02-22",
-      "resolution": "Removed deferred cancellation from onDestroy, added stopSelfIfIdle"
-    },
-    {
-      "id": "termux-bundle",
-      "description": "Termux wraps results in Bundle extra, not flat extras",
-      "resolved": "2026-02-22",
-      "resolution": "Extract via getBundleExtra('result')"
+      "resolution": "GeckoView intercepts navigation before network request."
     }
   ],
   "brainstorm_backlog": [],
@@ -129,97 +100,47 @@
     {
       "phase_name": "Research",
       "completed": "2026-02-21",
-      "notes": "Auth flow, architecture, GPU, existing projects, Android approaches. 6 research files saved."
+      "notes": "Auth flow, architecture, GPU, existing projects, Android approaches"
     },
     {
       "phase_name": "Brainstorming / PRD Design",
       "completed": "2026-02-21",
-      "notes": "Full design doc approved. Architecture, UX, components, phasing, error handling, testing."
+      "notes": "Full design doc approved"
     },
     {
       "phase_name": "Implementation Planning",
       "completed": "2026-02-22",
-      "notes": "MVP implementation plan approved. Vertical slices approach (5 slices, 23 tasks)."
+      "notes": "MVP implementation plan approved (5 slices, 23 tasks)"
     },
     {
-      "phase_name": "Slice 1 Implementation + Hardening",
-      "completed": "2026-02-22",
-      "notes": "15 Kotlin files + 2 shell scripts. 3-round review-fix-verify. All P0/P1 fixed. Pushed."
-    },
-    {
-      "phase_name": "Logging System",
-      "completed": "2026-02-22",
-      "notes": "AppLog dual-output + CleanupManager. Instrumented all files. Committed and pushed."
-    },
-    {
-      "phase_name": "On-Device Bug Fixes (Sessions 11-15)",
-      "completed": "2026-02-22",
-      "notes": "Fixed Termux Bundle extraction, service lifecycle, shell compatibility, proot-distro install, DNS config, DEBIAN_FRONTEND, X11 socket bind-mount, full JDK, direct RuneLite client launch. RuneLite running on tablet."
-    },
-    {
-      "phase_name": "Slice 2+3 Design (Session 16)",
-      "completed": "2026-02-22",
-      "notes": "Setup persistence, modular scripts, seamless UX, native OAuth2 auth."
-    },
-    {
-      "phase_name": "Slice 2+3 Implementation (Sessions 19-20)",
+      "phase_name": "Slice 1-3 Implementation + Hardening",
       "completed": "2026-02-23",
-      "notes": "22 files changed (+2571/-115). OAuth2 auth, modular scripts, settings UI."
+      "notes": "All core features implemented, reviewed, hardened"
     },
     {
-      "phase_name": "Security Hardening (Session 22)",
+      "phase_name": "GeckoView Auth + OAuth 2-Step",
       "completed": "2026-02-23",
-      "notes": "3-agent security review. 15 findings fixed. 16 files, 5 commits pushed."
+      "notes": "Full auth flow working on device"
     },
     {
-      "phase_name": "OAuth Login Fix (Session 23)",
-      "completed": "2026-02-23",
-      "notes": "Replaced CustomTabs callback with localhost server for redirect capture."
-    },
-    {
-      "phase_name": "Permissions Automation + Phase 1 UX (Sessions 24-26)",
-      "completed": "2026-02-23",
-      "notes": "3-phase permission flow, CRLF fix, clipboard UX, all setup steps verified on device."
-    },
-    {
-      "phase_name": "OAuth 2-Step Flow Research + Design (Sessions 27-29)",
-      "completed": "2026-02-23",
-      "notes": "Cloudflare WebView incompatibility discovered. Custom Tabs + localhost approach designed. Wrong client_id identified. Full 2-step flow researched from 3 launchers. 4 on-device tests. Design approved."
-    },
-    {
-      "phase_name": "OAuth 2-Step Implementation + Hardening (Session 30)",
-      "completed": "2026-02-23",
-      "notes": "Full 2-step, 2-client-ID OAuth rewrite. 4 phases via /implement orchestrator. 3-agent review. 14 fixes."
-    },
-    {
-      "phase_name": "Port 80 Debugging + GeckoView PoC (Sessions 31-32)",
-      "completed": "2026-02-23",
-      "notes": "Exhaustive port 80 investigation. GeckoView PoC passes Cloudflare. Port 80 blocker solved."
-    },
-    {
-      "phase_name": "GeckoView Auth Design (Session 33)",
-      "completed": "2026-02-23",
-      "notes": "6 design decisions, 6 sections. Design doc written and approved."
-    },
-    {
-      "phase_name": "GeckoView Auth Implementation + On-Device Verification (Session 34)",
-      "completed": "2026-02-23",
-      "notes": "3 phases via /implement (6 quality gates). Cross-app file access bug fixed. Full auth flow verified on device. Process cleanup added. Perf logging enabled."
-    },
-    {
-      "phase_name": "Performance Analysis + Lifecycle/GPU Design (Session 35)",
-      "completed": "2026-02-23",
-      "notes": "3 parallel research agents. Perf logs analyzed (GC/CPU/mem/resolution). Quick wins applied. Combined lifecycle + GPU design brainstormed and approved. Design doc committed."
-    },
-    {
-      "phase_name": "Lifecycle + GPU Implementation (Session 36)",
+      "phase_name": "Lifecycle + GPU Design + Implementation",
       "completed": "2026-02-24",
-      "notes": "3 phases via /implement (6 quality gates). Foreground service, health monitor, shutdown script, GPU setup, runtime detection. GeckoView auth committed. 4 logical commits."
+      "notes": "Foreground service, health monitor, GPU setup, 6-wave hardening"
     },
     {
-      "phase_name": "Production Hardening (Session 37)",
-      "completed": "2026-02-24",
-      "notes": "6-wave review-fix-verify loop with 12 review agents. 21 fixes across 17 files: shell injection, deployment caching, credential scrubbing, PendingIntent flags, process death handling, corruption recovery. All quality gates pass."
+      "phase_name": "Mali GPU + VirGL Socket Fix",
+      "completed": "2026-03-09",
+      "notes": "Session 48: VirGL socket accessible, stock Mesa, visual depth fix, renderer confirmed working"
+    },
+    {
+      "phase_name": "GLSL Override + GPU Plugin Loading",
+      "completed": "2026-03-09",
+      "notes": "Session 49: MESA_GLSL_VERSION_OVERRIDE=330 applied. Shaders compile. GPU plugin loads and uploads textures."
+    },
+    {
+      "phase_name": "VirGL Test Pipeline Implementation",
+      "completed": "2026-03-10",
+      "notes": "Session 50: 13 files, 6 quality gates PASS, deployed to device, first run complete. Shims activate correctly."
     }
   ],
   "dependencies_at_risk": [],

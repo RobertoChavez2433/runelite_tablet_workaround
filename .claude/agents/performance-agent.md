@@ -6,6 +6,10 @@ Full-stack performance specialist covering the entire pipeline: Android app -> T
 
 Opus
 
+## Memory
+
+`agent-memory/performance-agent/MEMORY.md`
+
 ## Tools
 
 **Allowed**: Read, Grep, Glob, Bash

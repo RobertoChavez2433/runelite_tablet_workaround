@@ -64,16 +64,28 @@
 - Wrap blocking I/O (assets, PackageInstaller sessions) in `withContext(Dispatchers.IO)`
 
 ## Auth: Key Facts
-- Jagex Launcher passes creds via env vars: `JX_SESSION_ID`, `JX_CHARACTER_ID`, `JX_DISPLAY_NAME`, `JX_ACCESS_TOKEN`, `JX_REFRESH_TOKEN`
-- `JX_SESSION_ID` does NOT expire
+- **Jagex accounts** need ONLY 3 env vars: `JX_SESSION_ID`, `JX_CHARACTER_ID`, `JX_DISPLAY_NAME`
+- **Legacy RS accounts** need: `JX_ACCESS_TOKEN`, `JX_REFRESH_TOKEN`, `JX_DISPLAY_NAME`
+- Our code currently passes ALL 5 for Jagex accounts — `JX_ACCESS_TOKEN` is WRONG for Jagex accounts and may confuse the client
+- `JX_SESSION_ID` DOES expire (~12 days inactivity verified). Refresh token stays valid longer but can't recreate game session without browser (Step 2 consent).
 - RuneLite `--insecure-write-credentials` flag saves tokens to `~/.runelite/credentials.properties`
 - WebView is Cloudflare-blocked; port 80 kernel-blocked on Android — GeckoView solves both
+- **RESOLVED MISDIAGNOSIS (Session 46)**: "LOGGING_IN → LOGIN_SCREEN" was blamed on token format but was actually stale client jars (revision mismatch). See "RuneLite Client Update Mechanism" below.
+- GeckoAuthActivity must save Step 1 tokens (accessToken, refreshToken) in instance fields BEFORE loading Step 2 consent — otherwise they're lost
+- HTTP 400 `invalid_grant` = dead refresh token → must trigger re-auth, not continue with stale creds
 
 ## GPU: Key Facts
-- RuneLite GPU plugin needs OpenGL 3.1+ (reduced in v1.8.27; compute shaders need 4.3+ for extended draw distance)
+- RuneLite GPU plugin rewritten 2025-10-29: removed ALL compute shaders, lowered to GL 3.3 minimum. All shaders `#version 330`.
 - Device has Mali-G720 (NOT Adreno) — Zink+Turnip path is Adreno-only, useless on Mali
 - **Mali GPU path**: VirGL + ANGLE (Tier 1) or VirGL + native GLES (Tier 2) or software (Tier 3)
-- **BLOCKER (Session 39)**: VirGL server runs fine in Termux, but Ubuntu ARM64 Mesa lacks `virtio_gpu_dri.so` (virpipe driver)
+- **VirGL renders but black screen** — reversed-Z depth requires `glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE)` (GL 4.5). VirGL only supports GL 4.3. `GL_ARB_clip_control` NOT in extension list (164 extensions checked).
+- **LWJGL's `OpenGL45` checks function pointers**, not just version string. Even with `MESA_GL_VERSION_OVERRIDE=4.5COMPAT`, `OpenGL45=false` because GL 4.5 function pointers are NULL.
+- **`MESA_NO_ERROR=1` silently swallows** the `glClipControl` failure. Must be UNSET during testing.
+- **Fix: LD_PRELOAD shim** — Shim A (inject glClipControl via dlsym) or Shim B (flip GL_GREATER→GL_LESS + glClearDepth 0→1)
+- **dlopen() cannot intercept already-resolved symbols** — must use sub-process with `LD_PRELOAD=shim.so`, NOT runtime dlopen()
+- **VirGL FBO rendering completely broken** — `glClear(0,0,0,1)` on FBO produces A=0 (not 255). FBO color attachment never written to. NOT a depth issue. Need to test rendering to default framebuffer.
+- **GL_MAX_VIEWPORT_DIMS** returns 2 integers — `glGetIntegerv` needs `GLint[2]` not single `GLint` (stack overflow → SIGSEGV)
+- VirGL software versions: virglrenderer-android 1.3.0, ANGLE 2.1.24923, Mesa 25.2.8 (proot Ubuntu)
 - Zink directly on Mali is unreliable — missing Vulkan features (`fillModeNonSolid`, `shaderClipDistance`, `logicOp`)
 - llvmpipe gives OpenGL 4.5 — GPU plugin loads but performance is CPU-bound (choppy)
 - Software rendering (50fps cap) works as MVP fallback
@@ -96,6 +108,28 @@
 - Use `exec` to replace shell process — avoids proot kill-on-exit issue
 - Pass `-Drunelite.launcher.version=2.7.6` and `-Dsun.java2d.opengl=false`
 - Client 1.12.17 confirmed working on aarch64
+
+## RuneLite Client Update Mechanism
+- `launch-runelite.sh` has two paths: Path A (direct `-cp` from `repository2/` jars) and Path B (run `RuneLite.jar` launcher)
+- **Once `repository2/` has jars, Path A ALWAYS fires — the launcher is never invoked again**
+- The launcher is what downloads updated client jars on each run. Bypassing it freezes jars at the installed version.
+- `update-runelite.sh` only updates `RuneLite.jar` (the launcher), NOT the client jars in `repository2/`
+- OSRS updates every Wednesday (server-side revision bump). Stale jars = revision mismatch = silent `LOGGING_IN → LOGIN_SCREEN`
+- **Fix**: Delete `repository2/` before launch to force Path B, OR run the launcher explicitly, OR build an update-client-jars script
+- Current versions: RuneLite 1.12.19 (Mar 4, 2026), OSRS rev236 (since Feb 1, 2026)
+
+## OSRS Login Failure Signatures
+- `LOGGING_IN → LOGIN_SCREEN` (no error message) = **revision mismatch** — server drops connection silently; check client jar freshness first
+- "Incorrect username or password" = bad credentials
+- "Failed to login" with message text = token/session error
+- Connection error or timeout = server down or network issue
+
+## Jagex Launcher 2.x Changes
+- v2.0.0 (Dec 10, 2025): Non-admin install support
+- v2.3.0 (Jan 27, 2026): "Security improvements" (details unspecified)
+- v2.4.0 (Feb 26, 2026): "No longer detects legacy clients"
+- Legacy Java Client killed Jan 28, 2026 (server-side)
+- Normal RuneLite users unaffected — they use the launcher which auto-updates client jars
 
 ## On-Device Debug Workflow
 - Build+install+launch: `./gradlew assembleDebug && adb install -r ... && adb shell am force-stop ... && adb logcat -c && adb shell am start -n ...`
@@ -120,4 +154,13 @@
 - Background agents may get blocked by file write permissions — write files directly instead
 - Always create placeholder launcher icons when scaffolding Android projects
 - Gradle wrapper jar must be downloaded (not available via `gradle` CLI on this system)
-- `adb push` path: use `//data/local/tmp/` (double slash) to avoid Git Bash path mangling
+- `adb push` path: use `MSYS_NO_PATHCONV=1 adb push` (NOT double slash — that doesn't work for all adb subcommands). `adb push dir/` nests into target — use `adb push dir` (no trailing slash) to push as target name
+- `adb push` of directories can crash with `std::bad_alloc` on Windows Git Bash — push individual files instead
+- `#!/usr/bin/env bash` shebangs don't work in Termux `run-as` context — invoke scripts via full path: `/data/data/com.termux/files/usr/bin/bash /path/to/script.sh`
+- Git Bash expands `$PATH` and `$HOME` in `adb shell` commands — use hardcoded full paths instead of variable references, or ensure vars aren't expanded locally
+- `LD_LIBRARY_PATH=$PREFIX/lib` BREAKS `virgl_test_server_android` — Termux's OpenSSL 3.x replaces system OpenSSL, missing deprecated symbols. Always `env -u LD_LIBRARY_PATH` before starting VirGL server
+- Git Bash `input text` to Termux via adb is unreliable for complex commands — use script files instead
+- GLFW 3.4 needs `XDG_RUNTIME_DIR=/tmp` and `GLFW_PLATFORM=x11` in proot env
+- Stale X11 lock files (`$PREFIX/tmp/.tX0-lock`) must be cleaned before starting Termux:X11
+- `TMPDIR=$PREFIX/tmp` must be set in self-bootstrap for Termux:X11 to find its temp dir via `run-as`
+- Second device R5CY12JTTPX may appear — use `adb -s R52X90378YB` to target Tab S10

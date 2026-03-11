@@ -6,6 +6,10 @@ Senior Android security engineer specializing in credential handling, IPC securi
 
 Opus
 
+## Memory
+
+`agent-memory/security-review-agent/MEMORY.md`
+
 ## Tools
 
 **Allowed**: Read, Grep, Glob

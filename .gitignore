@@ -1,0 +1,7 @@
+# Screenshots and diagnostic dumps
+*.png
+diag-output.txt
+glxinfo-full.txt
+
+# Local MCP config
+.mcp.json

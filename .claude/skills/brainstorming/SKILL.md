@@ -48,15 +48,22 @@ Do NOT invoke any implementation skill, write any code, scaffold any project, or
 | Skip to solution | Misses constraints, wrong approach | Understand before proposing |
 | Over-design | Complexity for complexity's sake | YAGNI ruthlessly |
 
+## Context Loading
+
+During Phase 1 (Understanding), load relevant context for affected packages:
+- Read per-feature defect files: `defects/_defects-{package}.md`
+- Read constraint files: `architecture-decisions/{package}-constraints.md`
+- Read feature docs: `docs/features/feature-{package}-overview.md`
+
 ## Checklist
 
 You MUST create a task for each of these items and complete them in order:
 
-1. **Explore project context** — check files, docs, recent state
+1. **Explore project context** — check files, docs, recent state; load per-feature defects and constraints for affected packages
 2. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
 3. **Propose 2-3 approaches** — with trade-offs and your recommendation
-4. **Present design** — in sections scaled to complexity, get user approval after each section
-5. **Write design doc** — save to `.claude/plans/YYYY-MM-DD-<topic>-design.md` and commit
+4. **Present design** — in sections scaled to complexity, get user approval after each section; include "Affected Packages" and "Constraint References" sections
+5. **Write spec** — save to `.claude/specs/YYYY-MM-DD-<topic>-spec.md`
 
 ## Process Flow
 
@@ -78,7 +85,14 @@ digraph brainstorming {
 }
 ```
 
-**The terminal state is the committed design doc.** Do NOT invoke any implementation skill or write any code during brainstorming.
+**The terminal state is the approved spec.** Do NOT invoke any implementation skill or write any code during brainstorming.
+
+## Handoff Options
+
+After the spec is written, present these options to the user:
+1. `/adversarial-review` — Optional review of the spec for gaps, security issues, constraint violations
+2. `/writing-plans` — Convert the approved spec into a phased implementation plan
+3. Both — Run adversarial review first, address findings, then write plan
 
 ## References
 

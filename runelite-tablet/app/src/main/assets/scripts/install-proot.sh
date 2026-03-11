@@ -5,7 +5,7 @@ set -euo pipefail
 # Idempotent: skips if rootfs already exists.
 # Writes step-proot.done marker only after positive verification.
 
-SCRIPT_VERSION="2"
+SCRIPT_VERSION="7"
 MARKER_DIR="$HOME/.runelite-tablet/markers"
 ROOTFS_DIR="$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu"
 

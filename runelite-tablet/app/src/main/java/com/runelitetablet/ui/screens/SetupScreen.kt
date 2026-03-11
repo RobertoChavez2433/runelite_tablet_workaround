@@ -520,6 +520,7 @@ private fun LaunchScreen(
                         )
                         is LaunchState.CheckingHealth -> LaunchProgress("Verifying environment...")
                         is LaunchState.RefreshingTokens -> LaunchProgress("Refreshing session...")
+                        is LaunchState.ValidatingSession -> LaunchProgress("Checking session...")
                         is LaunchState.Launching -> LaunchProgress("Launching RuneLite...")
                         else -> {} // Idle and Failed handled elsewhere
                     }

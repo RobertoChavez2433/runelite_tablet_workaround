@@ -681,9 +681,9 @@ static void run_module_4(const char *sub) {
         return;
     }
 
-    /* Create FBO with GL_DEPTH_COMPONENT32F */
+    /* Create FBO with GL_DEPTH_COMPONENT24 (universally supported; 32F may fail on VirGL) */
     GLuint fbo, colorTex, depthTex;
-    if (!create_fbo(&fbo, &colorTex, &depthTex, FBO_WIDTH, FBO_HEIGHT, 1)) {
+    if (!create_fbo(&fbo, &colorTex, &depthTex, FBO_WIDTH, FBO_HEIGHT, 0)) {
         log_module_result(4, sub, "Reversed-Z Depth", "FAIL", get_time_ms() - t0, "FBO creation failed");
         return;
     }
@@ -716,6 +716,8 @@ static void run_module_4(const char *sub) {
     if (blockIdx != GL_INVALID_INDEX) {
         pglUniformBlockBinding(prog, blockIdx, 0);
         pglBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo);
+    } else {
+        LOG_ERROR("UBO block 'Matrices' not found in shader — identity matrices will NOT be applied");
     }
     CHECK_GL("UBO binding");
 
@@ -1193,9 +1195,9 @@ static void run_module_8(void) {
         return;
     }
 
-    /* Create FBO with 32F depth for reversed-Z */
+    /* Create FBO with GL_DEPTH_COMPONENT24 (universally supported; 32F may fail on VirGL) */
     GLuint fbo, colorTex, depthTex;
-    if (!create_fbo(&fbo, &colorTex, &depthTex, FBO_WIDTH, FBO_HEIGHT, 1)) {
+    if (!create_fbo(&fbo, &colorTex, &depthTex, FBO_WIDTH, FBO_HEIGHT, 0)) {
         log_module_result(8, NULL, "Scene Emulation", "FAIL", get_time_ms() - t0, "FBO creation failed");
         return;
     }
@@ -1255,6 +1257,8 @@ static void run_module_8(void) {
     if (blockIdx != GL_INVALID_INDEX) {
         pglUniformBlockBinding(prog, blockIdx, 0);
         pglBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo);
+    } else {
+        LOG_ERROR("UBO block 'SceneUniforms' not found in shader — scene uniforms will NOT be applied");
     }
     CHECK_GL("scene UBO binding");
 

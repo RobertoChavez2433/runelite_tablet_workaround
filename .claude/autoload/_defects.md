@@ -4,6 +4,11 @@ Max 7 active. Oldest rotates to `.claude/logs/defects-archive.md`.
 
 ## Active Patterns
 
+### [ANDROID] 2026-03-08: Auth refresh only does Step 1/3 — game session not recreated
+**Pattern**: `refreshTokens()` renews Step 1 launcher tokens but skips Step 2 (consent browser flow) and Step 3 (createGameSession). `JX_SESSION_ID` expires server-side (~12 days). Refresh "succeeds" but game login silently fails because session is stale and `JX_ACCESS_TOKEN` is the wrong token (Step 1 launcher, not game).
+**Prevention**: Before launch, validate session via GET `/accounts?sessionId=...`. On 401, clear credentials and auto-trigger full GeckoView re-auth flow.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/JagexOAuth2Manager.kt (refreshTokens), @.claude/plans/2026-03-08-auth-session-refresh-fix.md
+
 ### [SHELL] 2026-02-24: All double quotes inside bash -c "..." blocks must be escaped
 **Pattern**: Unescaped `"` inside a `bash -c "..."` block terminates the outer string. The outer shell then parses remaining text as commands — `(` becomes a subshell start and causes syntax errors.
 **Prevention**: Every `"` inside a `bash -c "..."` block must be `\"`. Use `awk | grep -n '"' | grep -v '\\"'` to audit.
@@ -33,8 +38,3 @@ Max 7 active. Oldest rotates to `.claude/logs/defects-archive.md`.
 **Pattern**: `resetSetup()` clears stateStore but leaves orchestrator's `_permissionPhase`, `_awaitingPermissionCompletion`, and `failedStepIndex` stale. `runSetupForHealth()` doesn't reset `setupStarted` so `startSetup()` no-ops on re-entry.
 **Prevention**: Add `orchestrator.resetState()` method and call it from resetSetup. Reset `setupStarted.set(false)` from runSetupForHealth.
 **Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupViewModel.kt
-
-### [ANDROID] 2026-02-24: Cross-app file access — app's private filesDir is not readable by Termux
-**Pattern**: Writing a file to `context.filesDir` (`/data/user/0/com.runelitetablet/files/`) and passing the path to Termux. Termux runs as a different UID and cannot read it — `[ -f "$path" ]` silently fails.
-**Prevention**: Deploy files to Termux via `TermuxCommandRunner.execute()` with stdin (same pattern as script deployment). File lands in Termux's home dir where it's accessible.
-**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupViewModel.kt (performLaunch)

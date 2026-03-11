@@ -120,6 +120,12 @@ class GeckoAuthActivity : ComponentActivity() {
     private lateinit var expectedStep2State: String
     private lateinit var expectedNonce: String
 
+    // Step 1 tokens — saved when Jagex account proceeds to Step 2 consent
+    private var step1AccessToken: String? = null
+    private var step1RefreshToken: String? = null
+    private var step1ExpiresIn: Long = 0L
+    private var step1AccessTokenExpiry: Long = 0L
+
     private lateinit var geckoView: GeckoView
     private lateinit var session: GeckoSession
     private lateinit var oauthManager: JagexOAuth2Manager
@@ -313,7 +319,11 @@ class GeckoAuthActivity : ComponentActivity() {
                         )
                     }
                     else -> {
-                        // Jagex account — proceed to Step 2 consent
+                        // Jagex account — save Step 1 tokens before proceeding to Step 2 consent
+                        step1AccessToken = tokenResponse.accessToken
+                        step1RefreshToken = tokenResponse.refreshToken
+                        step1ExpiresIn = tokenResponse.expiresIn
+                        step1AccessTokenExpiry = tokenResponse.accessTokenExpiry
                         AppLog.step("auth", "GeckoAuthActivity: Jagex account — loading Step 2 consent URL")
                         currentState = AuthState.LOADING_STEP2
                         withContext(Dispatchers.Main) {
@@ -375,11 +385,11 @@ class GeckoAuthActivity : ComponentActivity() {
         AppLog.step("auth", "GeckoAuthActivity: Step 2 consent id_token captured and verified")
         finishWithSuccess(
             loginProvider = "jagex",
-            accessToken = null,
-            refreshToken = null,
+            accessToken = step1AccessToken,
+            refreshToken = step1RefreshToken,
             idToken = idToken,
-            expiresIn = 0L,
-            accessTokenExpiry = 0L
+            expiresIn = step1ExpiresIn,
+            accessTokenExpiry = step1AccessTokenExpiry
         )
     }
 

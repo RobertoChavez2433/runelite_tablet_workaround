@@ -45,21 +45,33 @@ If >5 sessions exist in "Recent Sessions", run rotation:
 2. Append to `.claude/logs/state-archive.md` under appropriate month header
 3. Remove from _state.md
 
-### 3. Update Defects
-**File**: `.claude/autoload/_defects.md`
+### 3. Update Per-Feature Defects
+**Directory**: `.claude/defects/`
 
 For defects discovered during this session:
-1. Add new defect at the **top** of "Active Patterns" section
-2. Use standardized format:
+1. Determine the affected package (auth, shell, setup, security, termux, installer, ui)
+2. Write defect to `defects/_defects-{package}.md` at the **top** of "Active Patterns" section
+3. Use standardized format:
 ```markdown
 ### [CATEGORY] YYYY-MM-DD: Brief Title
 **Pattern**: What to avoid (1 line)
 **Prevention**: How to avoid (1-2 lines)
 **Ref**: @path/to/file (optional)
 ```
-3. If >7 defects, move oldest to `.claude/logs/defects-archive.md`
+4. If >5 defects in a single file, move oldest to `.claude/logs/defects-archive.md`
 
-### Defect Categories
+### Package-to-File Mapping
+| Package | Defect File |
+|---------|-------------|
+| Auth (OAuth, credentials, GeckoView) | `defects/_defects-auth.md` |
+| Shell (scripts, proot, bash) | `defects/_defects-shell.md` |
+| Setup (orchestrator, ViewModel, state) | `defects/_defects-setup.md` |
+| Security (injection, escaping, IPC) | `defects/_defects-security.md` |
+| Termux (RUN_COMMAND, results, IPC) | `defects/_defects-termux.md` |
+| Installer (PackageInstaller, APK) | `defects/_defects-installer.md` |
+| UI (Compose, theme, rendering) | `defects/_defects-ui.md` |
+
+### Defect Categories (for [CATEGORY] tag)
 | Category | Use For |
 |----------|---------|
 | [COROUTINE] | CancellationException, dispatcher, timeout, structured concurrency |
@@ -106,5 +118,5 @@ Present:
 - **NO git commands** — not `git status`, not `git diff`, not `git add`, not `git commit`
 - All analysis from conversation context only
 - Zero user input required
-- Defects go to single `.claude/autoload/_defects.md` (not per-feature files)
-- Max 7 active defects — oldest rotates to archive
+- Defects go to per-feature files in `defects/_defects-{package}.md`
+- Max 5 active defects per file — oldest rotates to archive

@@ -5,20 +5,16 @@ set -euo pipefail
 # Idempotent: skips if RuneLite.jar already exists and passes verification.
 # Writes step-runelite.done marker only after positive verification.
 
-SCRIPT_VERSION="2"
+SCRIPT_VERSION="7"
 MARKER_DIR="$HOME/.runelite-tablet/markers"
 RUNELITE_DIR="/root/runelite"
 RUNELITE_JAR="$RUNELITE_DIR/RuneLite.jar"
-# Hardcoded fallback version — update this when RuneLite releases a new launcher.
-# The script tries the GitHub latest redirect first; this is only used if the API fails.
-FALLBACK_URL="https://github.com/runelite/launcher/releases/download/2.7.6/RuneLite.jar"
 
 echo "=== Downloading RuneLite ==="
 
 RUNELITE_DL_LOG="$HOME/.rlt-runelite-dl.log"
 proot-distro login ubuntu -- bash -s << RUNELITE_SCRIPT 2>&1 | tee "$RUNELITE_DL_LOG" || true
     RUNELITE_URL="https://github.com/runelite/launcher/releases/latest/download/RuneLite.jar"
-    FALLBACK_URL="$FALLBACK_URL"
     mkdir -p "$RUNELITE_DIR"
 
     # Skip download if jar already exists and is > 1MB
@@ -34,10 +30,11 @@ proot-distro login ubuntu -- bash -s << RUNELITE_SCRIPT 2>&1 | tee "$RUNELITE_DL
         fi
     fi
 
-    # Try latest release URL first, fall back to hardcoded version
+    # Download latest release (no hardcoded fallback — avoids version staleness)
     if ! wget -O "$RUNELITE_JAR" "\$RUNELITE_URL" 2>&1; then
-        echo "WARNING: Latest release download failed, trying fallback URL..."
-        wget -O "$RUNELITE_JAR" "\$FALLBACK_URL" 2>&1
+        echo "ERROR: RuneLite download failed" >&2
+        rm -f "$RUNELITE_JAR"
+        exit 1
     fi
 
     # Verify file size > 1MB

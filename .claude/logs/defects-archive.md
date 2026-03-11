@@ -4,6 +4,59 @@ Older/resolved defects rotated from per-feature files in `.claude/defects/`.
 
 ---
 
+## Shell (rotated 2026-03-10, Session 51)
+
+### [SHELL] 2026-03-09: X11 cleanup misses com.termux.x11.Loader process
+**Pattern**: `pkill -f 'termux-x11'` doesn't match the actual X server binary which runs as `app_process ... com.termux.x11.Loader :0`. Stale X11 server blocks new sessions with "server already running".
+**Prevention**: Kill both patterns: `pkill -f 'termux-x11'` AND `pkill -f 'com.termux.x11.Loader'` in all cleanup locations.
+
+### [SHELL] 2026-03-09: xrandr --newmode/--scale doesn't work with Termux:X11
+**Pattern**: Termux:X11's X server doesn't implement `rrCrtcTransformSet`. `xrandr --newmode` modes are ignored.
+**Prevention**: Use `termux-x11-preference displayResolutionMode:custom displayResolutionCustom:WxH`. Syntax is `key:value` (colon), NOT `key=value`.
+
+## Shell (rotated 2026-03-10)
+
+### [SHELL] 2026-03-09: MESA_GL_VERSION_OVERRIDE doesn't unlock LWJGL's OpenGL45 — function pointers NULL
+**Pattern**: Setting `MESA_GL_VERSION_OVERRIDE=4.5COMPAT` changes `glGetString(GL_VERSION)` to "4.5" but does NOT make all GL 4.5 function pointers available. LWJGL's `OpenGL45` boolean checks ALL GL 4.5 function pointers via `check_GL45()` — if any are NULL, `OpenGL45=false` regardless of version string.
+**Prevention**: Don't rely on Mesa version overrides for feature availability. Use LD_PRELOAD shim to inject `glClipControl` call directly.
+**Ref**: @runelite-tablet/app/src/main/assets/scripts/launch-runelite.sh
+
+## Rotated 2026-03-09 (Session 49)
+
+### [SHELL] 2026-03-09: Old launch script EXIT trap deletes env file before new script reads it — KNOWN
+**Pattern**: `cleanup_on_exit()` EXIT trap in launch-runelite.sh and `shutdown-session.sh` both delete `$HOME/.rlt-launch-env.sh`. When new launch kills old RuneLite, old script's EXIT trap fires → deletes newly deployed env file → new script says "No credentials env file provided."
+**Prevention**: Source env file BEFORE `cleanup_previous()` at top of launch-runelite.sh (file is read and deleted before old script's EXIT trap can race). Remove env file deletion from `cleanup_on_exit()` and `shutdown-session.sh`.
+**Ref**: @runelite-tablet/app/src/main/assets/scripts/launch-runelite.sh, @runelite-tablet/app/src/main/assets/scripts/shutdown-session.sh
+
+---
+
+## Rotated 2026-03-09 (Session 47)
+
+### [ANDROID] 2026-03-08: Auth refresh only does Step 1/3 — game session not recreated — FIXED Session 45
+**Pattern**: `refreshTokens()` renews Step 1 launcher tokens but skips Step 2 (consent browser flow) and Step 3 (createGameSession). `JX_SESSION_ID` expires server-side (~12 days). Refresh "succeeds" but game login silently fails because session is stale.
+**Prevention**: Pre-launch `validateSession()` checks session via GET `/accounts` with Bearer sessionId. On 401/403 (Expired), auto-triggers GeckoView re-auth with `pendingLaunchAfterAuth` resume. On NetworkError, logs and continues.
+**Status**: FIXED Session 45.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/JagexOAuth2Manager.kt (validateSession), @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupViewModel.kt (performLaunch)
+
+### [ANDROID] 2026-02-24: GeckoAuthActivity must handle process death — check savedInstanceState
+**Pattern**: GeckoView sessions and `lateinit` vars cannot survive process death. Restored Activity crashes with `UninitializedPropertyAccessException`.
+**Prevention**: Check `savedInstanceState != null` in `onCreate` and finish with error. Also add `FLAG_SECURE` to prevent login page appearing in recents.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/GeckoAuthActivity.kt
+
+### [ANDROID] 2026-02-24: EncryptedSharedPreferences corruption bricks credential storage permanently
+**Pattern**: Power loss or disk corruption can break the encrypted prefs XML file. Next `create()` call throws `GeneralSecurityException` and returns null forever — user must uninstall app.
+**Prevention**: On exception, delete the corrupted file and retry once. Guard with a `prefsRecreateAttempted` flag to prevent infinite loops.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/auth/CredentialManager.kt
+
+---
+
+## March 2026
+
+### [ANDROID] 2026-02-24: Cross-app file access — app's private filesDir is not readable by Termux
+**Pattern**: Writing a file to `context.filesDir` (`/data/user/0/com.runelitetablet/files/`) and passing the path to Termux. Termux runs as a different UID and cannot read it — `[ -f "$path" ]` silently fails.
+**Prevention**: Deploy files to Termux via `TermuxCommandRunner.execute()` with stdin (same pattern as script deployment). File lands in Termux's home dir where it's accessible.
+**Ref**: @runelite-tablet/app/src/main/java/com/runelitetablet/setup/SetupViewModel.kt (performLaunch)
+
 ## Rotated 2026-02-24 (Session 39)
 
 ### [SHELL] 2026-02-24: Termux processes survive Android app force-stop — must explicitly kill
