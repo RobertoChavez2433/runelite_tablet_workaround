@@ -11,6 +11,24 @@ PERF_MONITOR_PID=""
 echo "=== RuneLite launch $(date) ===" | tee "$LOGFILE"
 
 # ===================================================================
+# Credential injection — MUST happen before cleanup_previous because
+# the old launch script's EXIT trap deletes .rlt-launch-env.sh
+# ===================================================================
+ENV_FILE="${1:-}"
+if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
+    echo "Sourcing credentials from env file..." | tee -a "$LOGFILE"
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    rm -f "$ENV_FILE"
+    # Never log credential values — only confirm presence
+    [ -n "${JX_SESSION_ID:-}" ] && echo "  JX_SESSION_ID=***" | tee -a "$LOGFILE"
+    [ -n "${JX_CHARACTER_ID:-}" ] && echo "  JX_CHARACTER_ID=***" | tee -a "$LOGFILE"
+    [ -n "${JX_DISPLAY_NAME:-}" ] && echo "  JX_DISPLAY_NAME=***" | tee -a "$LOGFILE"
+else
+    echo "No credentials env file provided — RuneLite will show its own login" | tee -a "$LOGFILE"
+fi
+
+# ===================================================================
 # Clean shutdown of any previous session
 # ===================================================================
 # Kill everything from a prior run so we start fresh every time.
@@ -36,13 +54,16 @@ cleanup_previous() {
     pulseaudio --kill 2>/dev/null && killed=$((killed+1))
 
     # Kill previous termux-x11 server process
+    # The actual X server binary is 'com.termux.x11.Loader', not 'termux-x11'
     pkill -f 'termux-x11' 2>/dev/null && killed=$((killed+1))
+    pkill -f 'com.termux.x11.Loader' 2>/dev/null && killed=$((killed+1))
 
     # Kill previous perf monitor if still running
     pkill -f 'perf-monitor.log' 2>/dev/null && killed=$((killed+1))
 
-    # Kill virgl server
+    # Kill virgl server and clean up socket
     pkill -f 'virgl_test_server' 2>/dev/null && killed=$((killed+1))
+    rm -f "$PREFIX/tmp/.virgl_test" 2>/dev/null || true
 
     # Clean up stale credential, PID, and sentinel files
     # NOTE: Do NOT delete $HOME/.rlt-launch-env.sh here — it hasn't been read yet.
@@ -85,43 +106,28 @@ cleanup_on_exit() {
     # Stop PulseAudio
     pulseaudio --kill 2>/dev/null || true
 
-    # Kill virgl server
+    # Kill virgl server and clean up socket
     [ -n "${VIRGL_PID:-}" ] && kill "$VIRGL_PID" 2>/dev/null
     pkill -f 'virgl_test_server' 2>/dev/null || true
+    rm -f "$PREFIX/tmp/.virgl_test" 2>/dev/null || true
 
-    # Kill X11 server
+    # Kill X11 server (binary is 'com.termux.x11.Loader', not 'termux-x11')
     [ -n "${X11_PID:-}" ] && kill "$X11_PID" 2>/dev/null
+    pkill -f 'com.termux.x11.Loader' 2>/dev/null || true
 
     # Send stop broadcast to Termux:X11 Android app
     am broadcast -a com.termux.x11.ACTION_STOP --user 0 2>/dev/null || true
 
     # Clean up credential, PID, and sentinel files
+    # NOTE: Do NOT delete $HOME/.rlt-launch-env.sh here — a new launch may have
+    # deployed one already. It's cleaned up after sourcing at the top of this script.
     rm -f "$PREFIX/tmp/.rlt-creds-"*.sh 2>/dev/null || true
-    rm -f "$HOME/.rlt-launch-env.sh" 2>/dev/null || true
     rm -f "$PREFIX/tmp/.rlt-session-alive" 2>/dev/null || true
 
     echo "Shutdown complete" | tee -a "$LOGFILE"
 }
 
 trap cleanup_on_exit EXIT
-
-# ===================================================================
-# Credential injection
-# ===================================================================
-ENV_FILE="${1:-}"
-if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
-    echo "Sourcing credentials from env file..." | tee -a "$LOGFILE"
-    # shellcheck disable=SC1090
-    source "$ENV_FILE"
-    rm -f "$ENV_FILE"
-    # Never log credential values — only confirm presence
-    [ -n "${JX_SESSION_ID:-}" ] && echo "  JX_SESSION_ID=***" | tee -a "$LOGFILE"
-    [ -n "${JX_CHARACTER_ID:-}" ] && echo "  JX_CHARACTER_ID=***" | tee -a "$LOGFILE"
-    [ -n "${JX_DISPLAY_NAME:-}" ] && echo "  JX_DISPLAY_NAME=***" | tee -a "$LOGFILE"
-    [ -n "${JX_ACCESS_TOKEN:-}" ] && echo "  JX_ACCESS_TOKEN=***" | tee -a "$LOGFILE"
-else
-    echo "No credentials env file provided — RuneLite will show its own login" | tee -a "$LOGFILE"
-fi
 
 # ===================================================================
 # Start services
@@ -167,10 +173,10 @@ am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity 2>&1 | tee -a "$
 
 # Set Termux:X11 preferences from the shell as backup.
 # The primary mechanism is the CHANGE_PREFERENCE broadcast sent from the Kotlin launch() method.
+# Syntax: termux-x11-preference key:value (colon separator, NOT equals)
 echo "Setting Termux:X11 preferences (shell backup)..." | tee -a "$LOGFILE"
-timeout 5 termux-x11-preference "fullscreen"="true" 2>&1 | tee -a "$LOGFILE" || true
-timeout 5 termux-x11-preference "showAdditionalKbd"="false" 2>&1 | tee -a "$LOGFILE" || true
-timeout 5 termux-x11-preference "displayResolutionMode"="native" 2>&1 | tee -a "$LOGFILE" || true
+timeout 5 termux-x11-preference fullscreen:true 2>&1 | tee -a "$LOGFILE" || true
+timeout 5 termux-x11-preference showAdditionalKbd:false 2>&1 | tee -a "$LOGFILE" || true
 
 # Build credential env var forwarding for proot.
 # Env vars set in the outer Termux shell are NOT inherited by proot-distro login (Spike C result).
@@ -184,8 +190,6 @@ if [ -n "${JX_SESSION_ID:-}" ]; then
         printf "export JX_SESSION_ID=%q\n" "${JX_SESSION_ID}"
         [ -n "${JX_CHARACTER_ID:-}" ] && printf "export JX_CHARACTER_ID=%q\n" "${JX_CHARACTER_ID}"
         [ -n "${JX_DISPLAY_NAME:-}" ] && printf "export JX_DISPLAY_NAME=%q\n" "${JX_DISPLAY_NAME}"
-        [ -n "${JX_ACCESS_TOKEN:-}" ] && printf "export JX_ACCESS_TOKEN=%q\n" "${JX_ACCESS_TOKEN}"
-        [ -n "${JX_REFRESH_TOKEN:-}" ] && printf "export JX_REFRESH_TOKEN=%q\n" "${JX_REFRESH_TOKEN}"
     } > "$TERMUX_ENV_FILE"
     chmod 600 "$TERMUX_ENV_FILE"
     echo "Credential env file written for proot forwarding" | tee -a "$LOGFILE"
@@ -215,44 +219,50 @@ elif [ "$GPU_VENDOR" = "mali" ]; then
     sleep 0.5
 
     if command -v virgl_test_server_android >/dev/null 2>&1; then
+        VIRGL_SOCKET="$PREFIX/tmp/.virgl_test"
+
         # Tier 1: VirGL + ANGLE (Vulkan backend)
         echo "Starting VirGL+ANGLE server..." | tee -a "$LOGFILE"
-        virgl_test_server_android --angle-gl &
+        env -u LD_LIBRARY_PATH virgl_test_server_android --angle-gl &
         VIRGL_PID=$!
 
-        # Wait for server to be ready (PID alive + socket exists)
+        # Wait for server to be ready (PID alive AND socket exists)
         VIRGL_READY=false
-        for i in $(seq 1 20); do
-            if kill -0 $VIRGL_PID 2>/dev/null; then
+        for i in $(seq 1 30); do
+            if kill -0 $VIRGL_PID 2>/dev/null && [ -S "$VIRGL_SOCKET" ]; then
                 VIRGL_READY=true
                 break
             fi
-            sleep 0.1
+            sleep 0.2
         done
 
         if [ "$VIRGL_READY" = true ]; then
-            echo "VirGL+ANGLE server started (PID $VIRGL_PID)" | tee -a "$LOGFILE"
+            echo "VirGL+ANGLE server started (PID $VIRGL_PID, socket ready)" | tee -a "$LOGFILE"
             PROOT_GPU_ENV="mali-angle"
         else
-            echo "VirGL+ANGLE failed, trying native GLES..." | tee -a "$LOGFILE"
+            echo "VirGL+ANGLE failed (socket: $(ls -la "$VIRGL_SOCKET" 2>&1)), trying native GLES..." | tee -a "$LOGFILE"
+            kill $VIRGL_PID 2>/dev/null || true
+            rm -f "$VIRGL_SOCKET" 2>/dev/null || true
+
             # Tier 2: VirGL + native GLES
-            virgl_test_server_android &
+            env -u LD_LIBRARY_PATH virgl_test_server_android &
             VIRGL_PID=$!
 
             VIRGL_READY=false
-            for i in $(seq 1 20); do
-                if kill -0 $VIRGL_PID 2>/dev/null; then
+            for i in $(seq 1 30); do
+                if kill -0 $VIRGL_PID 2>/dev/null && [ -S "$VIRGL_SOCKET" ]; then
                     VIRGL_READY=true
                     break
                 fi
-                sleep 0.1
+                sleep 0.2
             done
 
             if [ "$VIRGL_READY" = true ]; then
-                echo "VirGL native GLES server started (PID $VIRGL_PID)" | tee -a "$LOGFILE"
+                echo "VirGL native GLES server started (PID $VIRGL_PID, socket ready)" | tee -a "$LOGFILE"
                 PROOT_GPU_ENV="mali-native"
             else
-                echo "VirGL unavailable, using software rendering" | tee -a "$LOGFILE"
+                echo "VirGL unavailable (socket: $(ls -la "$VIRGL_SOCKET" 2>&1)), using software rendering" | tee -a "$LOGFILE"
+                kill $VIRGL_PID 2>/dev/null || true
                 VIRGL_PID=""
                 PROOT_GPU_ENV=""
             fi
@@ -279,8 +289,19 @@ if [ -n "$VIRGL_PID" ] && ! kill -0 "$VIRGL_PID" 2>/dev/null; then
     PROOT_GPU_ENV=""
 fi
 
+# Set display resolution via Termux:X11 preferences (xrandr doesn't work — no transform support).
+# GPU path: native resolution. Software path: half-res for 4x fewer pixels.
+if [ -n "$PROOT_GPU_ENV" ]; then
+    echo "Setting display: native resolution (GPU available)" | tee -a "$LOGFILE"
+    timeout 5 termux-x11-preference displayResolutionMode:native 2>&1 | tee -a "$LOGFILE" || true
+else
+    echo "Setting display: 1480x924 (software rendering, half-res)" | tee -a "$LOGFILE"
+    timeout 5 termux-x11-preference displayResolutionMode:custom displayResolutionCustom:1480x924 2>&1 | tee -a "$LOGFILE" || true
+fi
+
 echo "Launching RuneLite..." | tee -a "$LOGFILE"
-proot-distro login ubuntu --bind "$PREFIX/tmp/.X11-unix:/tmp/.X11-unix" --bind "$PREFIX/tmp:/tmp" $GPU_BIND -- bash -c "
+echo "VirGL socket: $(ls -la "$PREFIX/tmp/.virgl_test" 2>&1)" | tee -a "$LOGFILE"
+proot-distro login ubuntu --shared-tmp $GPU_BIND -- bash -c "
     export DISPLAY=:0
     export PULSE_SERVER=tcp:127.0.0.1:4713
 
@@ -290,11 +311,11 @@ proot-distro login ubuntu --bind "$PREFIX/tmp/.X11-unix:/tmp/.X11-unix" --bind "
         rm -f '${PROOT_ENV_FILE}'
     fi
 
-    # Set display resolution via xrandr for Tab S10 Ultra (2960x1848)
-    # xrandr is installed by install-java.sh (x11-xserver-utils package)
-    # These commands are best-effort — display works at default res if they fail
-    sleep 0.5  # Brief delay for X11 to initialize
-    xrandr --output default --mode 2960x1848 2>/dev/null || true
+    # Brief delay for X11 to initialize before GPU detection and xrandr
+    sleep 0.5
+
+    # Skip errors for all Mesa operations (applies to both GPU and software paths)
+    export MESA_NO_ERROR=1
 
     # ---------------------------------------------------------------
     # GPU acceleration detection
@@ -319,43 +340,38 @@ proot-distro login ubuntu --bind "$PREFIX/tmp/.X11-unix:/tmp/.X11-unix" --bind "
             unset MESA_LOADER_DRIVER_OVERRIDE GALLIUM_DRIVER TU_DEBUG MESA_NO_ERROR ZINK_DESCRIPTORS
         fi
 
-    elif [ \"\$PROOT_GPU_ENV\" = \"mali-angle\" ]; then
-        # Mali: VirGL + ANGLE — check actual GL version first, then override
+    elif [ \"\$PROOT_GPU_ENV\" = \"mali-angle\" ] || [ \"\$PROOT_GPU_ENV\" = \"mali-native\" ]; then
+        # Mali: VirGL — force 24-bit visual to avoid BadMatch on XGetImage (depth mismatch)
         export GALLIUM_DRIVER=virpipe
+        export VTEST_SOCKET_NAME=/tmp/.virgl_test
+        export MESA_GLX_ALPHA_BITS=0
         export MESA_NO_ERROR=1
 
-        GL_VERSION=\$(glxinfo 2>/dev/null | grep \"OpenGL version\" | head -1 || true)
-        echo \"GL check (before override): \$GL_VERSION\" >&2
-        GL_MAJOR=\$(echo \"\$GL_VERSION\" | grep -Eo '[0-9]+\.[0-9]+' | head -1 | cut -d. -f1)
-        if [ \"\${GL_MAJOR:-0}\" -ge 2 ]; then
-            # VirGL is working — apply version override for RuneLite GPU plugin compatibility
-            export MESA_GL_VERSION_OVERRIDE=4.1COMPAT
-            GPU_AVAILABLE=true
-            echo \"GPU acceleration: ENABLED (VirGL+ANGLE, override to 4.1)\" >&2
-        else
-            echo \"GPU acceleration: GL version too low (\$GL_VERSION), falling back to software\" >&2
-            unset GALLIUM_DRIVER MESA_NO_ERROR
-        fi
+        echo \"VirGL socket visible: \$(ls -la /tmp/.virgl_test 2>&1)\" >&2
 
-    elif [ \"\$PROOT_GPU_ENV\" = \"mali-native\" ]; then
-        # Mali: VirGL + native GLES — check actual GL version first, then override
-        export GALLIUM_DRIVER=virpipe
-        export MESA_NO_ERROR=1
+        # glxinfo crashes with BadMatch on XGetImage (32-bit vs 24-bit visual mismatch).
+        # Use glxgears instead — it uses XPutImage (write), not XGetImage (read).
+        GEARS_OUTPUT=\$(timeout 3 glxgears -info 2>&1 || true)
+        GL_RENDERER=\$(echo \"\$GEARS_OUTPUT\" | grep -i \"GL_RENDERER\" | head -1 || true)
+        echo \"VirGL glxgears check: \$GL_RENDERER\" >&2
 
-        GL_VERSION=\$(glxinfo 2>/dev/null | grep \"OpenGL version\" | head -1 || true)
-        echo \"GL check (before override): \$GL_VERSION\" >&2
-        GL_MAJOR=\$(echo \"\$GL_VERSION\" | grep -Eo '[0-9]+\.[0-9]+' | head -1 | cut -d. -f1)
-        if [ \"\${GL_MAJOR:-0}\" -ge 2 ]; then
-            export MESA_GL_VERSION_OVERRIDE=3.1COMPAT
+        if echo \"\$GL_RENDERER\" | grep -qi \"virgl\"; then
+            OVERRIDE=\"4.5COMPAT\"
+            [ \"\$PROOT_GPU_ENV\" = \"mali-native\" ] && OVERRIDE=\"3.1COMPAT\"
+            export MESA_GL_VERSION_OVERRIDE=\"\$OVERRIDE\"
+            export MESA_GLSL_VERSION_OVERRIDE=330
             GPU_AVAILABLE=true
-            echo \"GPU acceleration: ENABLED (VirGL native, override to 3.1)\" >&2
+            echo \"GPU acceleration: ENABLED (VirGL, GL=\$OVERRIDE GLSL=330)\" >&2
         else
-            echo \"GPU acceleration: GL version too low (\$GL_VERSION), falling back to software\" >&2
-            unset GALLIUM_DRIVER MESA_NO_ERROR
+            echo \"GPU acceleration: VirGL not detected (\$GL_RENDERER), falling back to software\" >&2
+            unset GALLIUM_DRIVER VTEST_SOCKET_NAME MESA_GLX_ALPHA_BITS MESA_NO_ERROR
         fi
     else
         echo \"GPU acceleration: UNAVAILABLE (software rendering)\" >&2
     fi
+
+    # Resolution is set via Termux:X11 preferences (outside proot, before launch).
+    # xrandr --newmode/--scale don't work — Termux:X11 doesn't implement RandR transforms.
 
     # Start openbox window manager so RuneLite is maximized to fill the display.
     mkdir -p /root/.config/openbox
@@ -404,36 +420,30 @@ OBCFG
     GC_LOG_FLAGS=\"-Xlog:gc*:file=/root/runelite/gc.log:time,uptime,level,tags:filecount=2,filesize=5M\"
 
     # Conditional JVM flags based on GPU availability
+    # Always --scale 2 for readable UI on high-DPI tablet display
+    SCALE_FLAG='--scale 2'
     if [ \"\$GPU_AVAILABLE\" = true ]; then
         GPU_FLAGS=''
         echo 'Using GPU-accelerated rendering' >&2
     else
-        GPU_FLAGS='-Dsun.java2d.opengl=false'
-        echo 'Using software rendering' >&2
+        GPU_FLAGS='-Dsun.java2d.opengl=false -Dsun.java2d.xrender=true -Dsun.java2d.pmoffscreen=true'
+        echo 'Using software rendering (half-res for performance)' >&2
     fi
 
-    # Build classpath from repository2 jars downloaded by the launcher
-    REPO_DIR=\"/root/.runelite/repository2\"
-    if [ -d \"\$REPO_DIR\" ] && ls \"\$REPO_DIR\"/*.jar > /dev/null 2>&1; then
-        CP=\$(echo \"\$REPO_DIR\"/*.jar | tr ' ' ':')
-        echo 'Running RuneLite client directly (classpath found)' >&2
-        java -Xmx2g -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=50 \
-            \$GC_LOG_FLAGS \
-            \$GPU_FLAGS \
-            -Dsun.java2d.uiScale=2.0 \
-            -Drunelite.launcher.version=2.7.6 \
-            -cp \"\$CP\" \
-            net.runelite.client.RuneLite --insecure-write-credentials --debug &
-        JAVA_PID=\$!
-    else
-        echo 'No client jars found — running launcher to download them first' >&2
-        java -Xmx2g -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=50 \
-            \$GC_LOG_FLAGS \
-            \$GPU_FLAGS \
-            -Dsun.java2d.uiScale=2.0 \
-            -jar RuneLite.jar --insecure-write-credentials --debug &
-        JAVA_PID=\$!
-    fi
+    # Always run through the launcher — it handles client jar auto-updates.
+    # Bypassing the launcher freezes client jars at their initial version,
+    # causing silent login failures when OSRS updates weekly.
+    #
+    # JVM flags must be passed via RUNELITE_VMARGS (env var read by Launcher.java)
+    # because the launcher spawns the client as a CHILD process — flags on the
+    # launcher java command only apply to the launcher, not the client.
+    # RUNELITE_VMARGS is appended AFTER bootstrap's -Xmx768m, so last-Xmx wins.
+    # --scale controls -Dsun.java2d.uiScale passed to client (2 for GPU, 1 for software).
+    export RUNELITE_VMARGS=\"-Xmx4g -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=50 \$GC_LOG_FLAGS \$GPU_FLAGS\"
+    echo \"RUNELITE_VMARGS=\$RUNELITE_VMARGS\" >&2
+    echo \"Running RuneLite via launcher (scale=\$SCALE_FLAG)\" >&2
+    java -jar RuneLite.jar \$SCALE_FLAG --insecure-write-credentials --debug &
+    JAVA_PID=\$!
 
     # Write PID file for health monitoring (read by SessionHealthMonitor)
     echo \"\$JAVA_PID\" > /root/.rlt-session.pid
