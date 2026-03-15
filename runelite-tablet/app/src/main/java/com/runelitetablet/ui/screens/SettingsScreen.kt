@@ -53,6 +53,7 @@ fun SettingsScreen(
     onSignOut: () -> Unit,
     onResetSetup: () -> Unit,
     onViewLogs: () -> Unit,
+    onOpenDirectSurfaceProbe: () -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -100,7 +101,8 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             SetupSection(
-                onResetSetupClicked = { showResetConfirmDialog = true }
+                onResetSetupClicked = { showResetConfirmDialog = true },
+                onOpenDirectSurfaceProbe = onOpenDirectSurfaceProbe
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -163,7 +165,8 @@ private fun AccountSection(
 
 @Composable
 private fun SetupSection(
-    onResetSetupClicked: () -> Unit
+    onResetSetupClicked: () -> Unit,
+    onOpenDirectSurfaceProbe: () -> Unit
 ) {
     SectionHeader(title = "Setup")
 
@@ -188,6 +191,24 @@ private fun SetupSection(
 
             Text(
                 text = "Clears all setup progress. You'll need to run setup again.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedButton(
+                onClick = onOpenDirectSurfaceProbe,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Open Direct Surface Probe")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Experimental branch tool: opens an app-owned SurfaceView that requests " +
+                    "high refresh without Termux:X11 so we can measure the presentation path directly.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -136,6 +136,10 @@ fun SetupScreen(viewModel: SetupViewModel) {
                 AppLog.ui("SetupScreen: View logs from settings clicked")
                 viewModel.navigateToLogViewer()
             },
+            onOpenDirectSurfaceProbe = {
+                AppLog.ui("SetupScreen: Open direct surface probe clicked")
+                viewModel.openDirectSurfaceProbe()
+            },
             onBack = {
                 AppLog.ui("SetupScreen: Settings back clicked")
                 viewModel.navigateBackToLaunch()

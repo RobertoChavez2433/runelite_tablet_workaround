@@ -12,8 +12,8 @@ import com.runelitetablet.MainActivity
 import com.runelitetablet.PendingIntentCompat
 import com.runelitetablet.RuneLiteTabletApp
 import com.runelitetablet.logging.AppLog
+import com.runelitetablet.presentation.PresentationBackends
 import com.runelitetablet.termux.TermuxCommandRunner
-import com.runelitetablet.termux.TermuxPackageHelper
 import com.runelitetablet.setup.ScriptManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -61,6 +61,7 @@ class RuneLiteSessionService : Service() {
     private lateinit var commandRunner: TermuxCommandRunner
     private lateinit var scriptManager: ScriptManager
     private lateinit var prefs: SharedPreferences
+    private val presentationBackend = PresentationBackends.stable
     private var lastNotificationText: String? = null
     override fun onCreate() {
         super.onCreate()
@@ -177,17 +178,12 @@ class RuneLiteSessionService : Service() {
     }
 
     private fun handleSwitchToGame() {
-        AppLog.lifecycle("RuneLiteSessionService: switching to Termux:X11")
-        val x11Intent = packageManager.getLaunchIntentForPackage(TermuxPackageHelper.TERMUX_X11_PACKAGE)
-        if (x11Intent != null) {
-            x11Intent.addFlags(
-                Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP
-            )
-            startActivity(x11Intent)
+        AppLog.lifecycle("RuneLiteSessionService: switching to ${presentationBackend.displayName}")
+        val switchIntent = presentationBackend.createSwitchIntent(this)
+        if (switchIntent != null) {
+            startActivity(switchIntent)
         } else {
-            AppLog.w("SESSION", "RuneLiteSessionService: cannot launch Termux:X11 — not installed")
+            AppLog.w("SESSION", "RuneLiteSessionService: cannot launch ${presentationBackend.displayName}")
         }
     }
 

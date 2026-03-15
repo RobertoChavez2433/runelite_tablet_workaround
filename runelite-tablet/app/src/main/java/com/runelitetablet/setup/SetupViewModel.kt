@@ -24,6 +24,8 @@ import com.runelitetablet.cleanup.CleanupManager
 import com.runelitetablet.installer.ApkDownloader
 import com.runelitetablet.installer.ApkInstaller
 import com.runelitetablet.logging.AppLog
+import com.runelitetablet.presentation.PresentationBackend
+import com.runelitetablet.presentation.PresentationBackends
 import com.runelitetablet.session.RuneLiteSessionService
 import com.runelitetablet.session.SessionState
 import com.runelitetablet.termux.TermuxCommandRunner
@@ -109,6 +111,7 @@ class SetupViewModel(
     private val credentialManager: CredentialManager,
     private val oAuth2Manager: JagexOAuth2Manager,
     private val displayPreferences: DisplayPreferences,
+    private val presentationBackend: PresentationBackend,
     private val stateStore: SetupStateStore
 ) : ViewModel() {
 
@@ -235,38 +238,24 @@ class SetupViewModel(
 
         // Check Termux:X11 is installed before anything else
         val termuxHelper = TermuxPackageHelper(context)
-        if (!termuxHelper.isTermuxX11Installed()) {
-            AppLog.e("STEP", "launch: Termux:X11 not installed — cannot launch")
+        if (!presentationBackend.isInstalled(termuxHelper)) {
+            AppLog.e("STEP", "launch: ${presentationBackend.displayName} not available — cannot launch")
             return false
         }
 
-        // Set Termux:X11 preferences before launch using display settings
-        val prefIntent = Intent("com.termux.x11.CHANGE_PREFERENCE").apply {
-            setPackage("com.termux.x11")
-            putExtra("fullscreen", displayPreferences.fullscreen.toString())
-            putExtra("showAdditionalKbd", displayPreferences.showKeyboardBar.toString())
-            putExtra("displayResolutionMode", displayPreferences.resolutionMode)
-            if (displayPreferences.resolutionMode == "exact") {
-                putExtra("displayResolutionExactX", displayPreferences.customWidth.toString())
-                putExtra("displayResolutionExactY", displayPreferences.customHeight.toString())
-            }
-        }
-        context.sendBroadcast(prefIntent)
-        AppLog.step("launch", "launch: sent CHANGE_PREFERENCE broadcast to Termux:X11 (mode=${displayPreferences.resolutionMode} fullscreen=${displayPreferences.fullscreen})")
+        presentationBackend.applyLaunchPreferences(context, displayPreferences)
 
-        // Bring Termux:X11 to foreground via SetupActions (routes through Activity)
-        val x11LaunchIntent = context.packageManager.getLaunchIntentForPackage(
-            TermuxPackageHelper.TERMUX_X11_PACKAGE
-        )
-        if (x11LaunchIntent != null) {
-            orchestrator.actions?.launchIntent(x11LaunchIntent)
-            AppLog.step("launch", "launch: sent launchIntent for Termux:X11")
+        // Bring the presentation surface owner to the foreground via SetupActions.
+        val presentationIntent = presentationBackend.createLaunchIntent(context)
+        if (presentationIntent != null) {
+            orchestrator.actions?.launchIntent(presentationIntent)
+            AppLog.step("launch", "launch: sent launchIntent for ${presentationBackend.displayName}")
             // Let Termux:X11 come to the foreground before the hidden Termux
             // bootstrap begins. The actual shell launch no longer opens a
             // visible Termux terminal session.
             delay(700)
         } else {
-            AppLog.w("STEP", "launch: could not get launch intent for Termux:X11")
+            AppLog.w("STEP", "launch: could not get launch intent for ${presentationBackend.displayName}")
         }
 
         // Fire launch script with optional env file path as argument
@@ -280,8 +269,8 @@ class SetupViewModel(
         AppLog.step("launch", "launch: result success=$finalSuccess")
         if (!finalSuccess) {
             AppLog.e("STEP", "launch: failed to start RuneLite launch command")
-        } else if (x11LaunchIntent != null) {
-            waitForDisplayReadyAndSwitch(x11LaunchIntent)
+        } else if (presentationIntent != null && presentationBackend.shouldWaitForReadySignal()) {
+            waitForDisplayReadyAndSwitch(presentationIntent)
         }
         AppLog.perf("launch: completed success=$finalSuccess")
         return finalSuccess
@@ -1016,6 +1005,16 @@ class SetupViewModel(
         orchestrator.requestOwnBatteryOptimization()
     }
 
+    fun openDirectSurfaceProbe() {
+        val intent = PresentationBackends.directSurfaceProbe.createLaunchIntent(context)
+        if (intent != null) {
+            AppLog.ui("openDirectSurfaceProbe: launching experimental probe activity")
+            orchestrator.actions?.launchIntent(intent)
+        } else {
+            AppLog.w("SURFACE", "openDirectSurfaceProbe: no launch intent available")
+        }
+    }
+
     fun recheckPermissions() {
         // Re-evaluate completed steps on return from settings/install screens.
         // Guard with isRetrying to prevent concurrent retryCurrentStep() calls if the user
@@ -1152,13 +1151,15 @@ class SetupViewModel(
             val credentialManager = CredentialManager(context)
             val oAuth2Manager = JagexOAuth2Manager(httpClient)
             val displayPreferences = DisplayPreferences(context)
+            val presentationBackend = PresentationBackends.stable
             val orchestrator = SetupOrchestrator(
                 context, termuxHelper, apkDownloader, apkInstaller,
                 commandRunner, scriptManager, cleanupManager, stateStore
             )
             return SetupViewModel(
                 context, orchestrator, commandRunner, scriptManager,
-                credentialManager, oAuth2Manager, displayPreferences, stateStore
+                credentialManager, oAuth2Manager, displayPreferences,
+                presentationBackend, stateStore
             ) as T
         }
     }

@@ -45,6 +45,11 @@
             android:name=".auth.GeckoAuthActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".presentation.DirectSurfaceProbeActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
+
         <service
             android:name=".termux.TermuxResultService"
             android:exported="false" />
