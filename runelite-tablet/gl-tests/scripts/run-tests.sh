@@ -142,7 +142,7 @@ if [ ! -S "$PREFIX/tmp/.X11-unix/X0" ]; then
 fi
 echo "[setup] Termux:X11 running"
 
-# ===== Start VirGL Server (tiered: ANGLE first, native GLES fallback) =====
+# ===== Start VirGL Server (native GLES only on Mali) =====
 echo "[setup] Starting VirGL server..."
 
 export VIRGL_DEBUG="tgsi,shader,shader_compile,stream,resource,query"
@@ -153,12 +153,12 @@ rm -f "$VIRGL_SOCKET" 2>/dev/null || true
 # Termux binaries have correct rpath baked in. Setting LD_LIBRARY_PATH
 # causes system libs (libsqlite.so) to find Termux's OpenSSL 3.x instead
 # of the system's, breaking symbol resolution (OpenSSL_add_all_algorithms removed).
-echo "[setup] Trying VirGL+ANGLE..."
-env -u LD_LIBRARY_PATH virgl_test_server_android --angle-gl >"$RESULTS_DIR/virgl-server.log" 2>&1 &
+echo "[setup] Trying VirGL native GLES..."
+env -u LD_LIBRARY_PATH virgl_test_server_android >"$RESULTS_DIR/virgl-server.log" 2>&1 &
 VIRGL_PID=$!
 
 VIRGL_READY=false
-RETRIES=5
+RETRIES=10
 while [ $RETRIES -gt 0 ]; do
     sleep 1
     if [ -S "$VIRGL_SOCKET" ]; then
@@ -166,32 +166,17 @@ while [ $RETRIES -gt 0 ]; do
         break
     fi
     if ! kill -0 "$VIRGL_PID" 2>/dev/null; then
-        echo "[setup] ANGLE backend failed (server died). Falling back to native GLES..."
+        echo "ERROR: Native VirGL server died. Check $RESULTS_DIR/virgl-server.log" >&2
         break
     fi
     RETRIES=$((RETRIES - 1))
 done
 
-# Tier 2: VirGL + native GLES (fallback)
 if [ "$VIRGL_READY" = false ]; then
     kill "$VIRGL_PID" 2>/dev/null || true
     rm -f "$VIRGL_SOCKET" 2>/dev/null || true
-    sleep 1
-
-    echo "[setup] Trying VirGL native GLES..."
-    env -u LD_LIBRARY_PATH virgl_test_server_android >>"$RESULTS_DIR/virgl-server.log" 2>&1 &
-    VIRGL_PID=$!
-
-    RETRIES=10
-    while [ ! -S "$VIRGL_SOCKET" ] && [ $RETRIES -gt 0 ]; do
-        sleep 1
-        if ! kill -0 "$VIRGL_PID" 2>/dev/null; then
-            echo "ERROR: VirGL server died (both ANGLE and native). Check $RESULTS_DIR/virgl-server.log" >&2
-            cat "$RESULTS_DIR/virgl-server.log" >&2
-            exit 1
-        fi
-        RETRIES=$((RETRIES - 1))
-    done
+    cat "$RESULTS_DIR/virgl-server.log" >&2 || true
+    exit 1
 fi
 
 if [ ! -S "$VIRGL_SOCKET" ]; then
@@ -244,8 +229,14 @@ PROOT_CMD="$PROOT_CMD -u MESA_NO_ERROR"
 PROOT_CMD="$PROOT_CMD GALLIUM_DRIVER=virpipe"
 PROOT_CMD="$PROOT_CMD VTEST_SOCKET_NAME=/tmp/.virgl_test"
 PROOT_CMD="$PROOT_CMD MESA_GLX_ALPHA_BITS=0"
-PROOT_CMD="$PROOT_CMD MESA_GL_VERSION_OVERRIDE=4.5COMPAT"
-PROOT_CMD="$PROOT_CMD MESA_GLSL_VERSION_OVERRIDE=330"
+# GL_DEPTH_CLAMP fix: Mesa 4.5COMPAT auto-enables GL_DEPTH_CLAMP; GLES host
+# returns GL_INVALID_ENUM which causes virglrenderer to discard all subsequent
+# draws. Disable both ARB and EXT variants. (Termux issue #15832)
+PROOT_CMD="$PROOT_CMD MESA_EXTENSION_OVERRIDE=-GL_ARB_depth_clamp,-GL_EXT_depth_clamp"
+# Use 4.3COMPAT to avoid 4.5-specific state that virglrenderer doesn't handle.
+# Match GLSL to the GL version: 4.3 = GLSL 430.
+PROOT_CMD="$PROOT_CMD MESA_GL_VERSION_OVERRIDE=4.3COMPAT"
+PROOT_CMD="$PROOT_CMD MESA_GLSL_VERSION_OVERRIDE=430"
 PROOT_CMD="$PROOT_CMD DISPLAY=:0"
 PROOT_CMD="$PROOT_CMD XDG_RUNTIME_DIR=/tmp"
 PROOT_CMD="$PROOT_CMD GLFW_PLATFORM=x11"
@@ -370,10 +361,15 @@ print('|--------|------|--------|-----------|--------|')
 for m in data.get('modules', []):
     sub = m.get('sub', '')
     detail = m.get('detail', '')
-    print(f'| {m[\"module\"]}{sub} | {m[\"name\"]} | {m[\"status\"]} | {m[\"time_ms\"]:.1f} | {detail} |')
+    module = m.get('module', '')
+    name = m.get('name', '')
+    status = m.get('status', '')
+    time_ms = m.get('time_ms', 0.0)
+    print(f'| {module}{sub} | {name} | {status} | {time_ms:.1f} | {detail} |')
 if data.get('crashed'):
     print()
-    print(f'**CRASHED**: {data[\"crashed\"]}')
+    crashed = data.get('crashed')
+    print(f'**CRASHED**: {crashed}')
 \" > \"$RESULTS_DIR/SUMMARY.md\" 2>&1
     " || echo "[results] WARNING: SUMMARY.md generation failed"
 fi

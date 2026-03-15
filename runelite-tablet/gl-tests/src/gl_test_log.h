@@ -279,29 +279,29 @@ static void log_gl_caps(void) {
         {GL_MAX_FRAGMENT_UNIFORM_COMPONENTS, "max_fragment_uniform_components"},
         {GL_MAX_UNIFORM_BLOCK_SIZE, "max_uniform_block_size"},
         {GL_MAX_UNIFORM_BUFFER_BINDINGS, "max_uniform_buffer_bindings"},
-        {GL_MAX_VARYING_FLOATS, "max_varying_floats"},
+        /* Removed: GL_MAX_VARYING_FLOATS — Desktop GL 2.0 only (0x8B4B), GLES crash on virpipe */
         {GL_MAX_DRAW_BUFFERS, "max_draw_buffers"},
         {GL_MAX_COLOR_ATTACHMENTS, "max_color_attachments"},
         {GL_MAX_RENDERBUFFER_SIZE, "max_renderbuffer_size"},
         {GL_MAX_VIEWPORT_DIMS, "max_viewport_dims"},
-        {GL_MAX_CLIP_DISTANCES, "max_clip_distances"},
+        /* Removed: GL_MAX_CLIP_DISTANCES — GL_EXT_clip_cull_distance on GLES, not safe on virpipe [AR: SC-5] */
         {GL_MAX_SAMPLES, "max_samples"},
         {GL_MAX_VERTEX_OUTPUT_COMPONENTS, "max_vertex_output_components"},
         {GL_MAX_FRAGMENT_INPUT_COMPONENTS, "max_fragment_input_components"},
         {GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, "max_combined_texture_image_units"},
         {GL_MAX_ELEMENTS_VERTICES, "max_elements_vertices"},
         {GL_MAX_ELEMENTS_INDICES, "max_elements_indices"},
-        {GL_DEPTH_BITS, "depth_bits"},
-        {GL_STENCIL_BITS, "stencil_bits"},
-        {GL_SAMPLE_BUFFERS, "sample_buffers"},
-        {GL_SAMPLES, "samples"},
-        {GL_SUBPIXEL_BITS, "subpixel_bits"},
+        /* Removed: GL_DEPTH_BITS, GL_STENCIL_BITS — removed from core in GL 3.1+ */
+        /* Removed: GL_SAMPLE_BUFFERS, GL_SAMPLES — deprecated, may cascade stale errors */
+        /* Removed: GL_SUBPIXEL_BITS — not available in all GLES/virpipe contexts */
     };
 
     fprintf(caps, "  \"limits\": {\n");
     int num_queries = sizeof(int_queries) / sizeof(int_queries[0]);
     for (int i = 0; i < num_queries; i++) {
         GLint val[2] = {0, 0};
+        fflush(stdout);  /* Ensure output visible before any potential crash */
+        if (g_log_file) fflush(g_log_file);  /* [AR: MF-4] NULL guard — fflush(NULL) flushes ALL streams */
         glGetIntegerv(int_queries[i].e, val);
         /* Clear any errors from unsupported queries */
         while (glGetError() != GL_NO_ERROR) {}
@@ -318,6 +318,8 @@ static void log_gl_caps(void) {
     fprintf(caps, "  },\n");
 
     /* Extensions */
+    fflush(stdout);  /* Ensure output visible before extension enumeration */
+    if (g_log_file) fflush(g_log_file);
     GLint num_ext = 0;
     glGetIntegerv(GL_NUM_EXTENSIONS, &num_ext);
     while (glGetError() != GL_NO_ERROR) {}
@@ -326,9 +328,29 @@ static void log_gl_caps(void) {
     fprintf(caps, "  \"num_extensions\": %d,\n", num_ext);
     fprintf(caps, "  \"extensions\": [\n");
 
-    /* Use glGetStringi if available, fall back to glGetString */
+    /* glXGetProcAddressARB never returns NULL (Mesa design) — gate on GL version >= 3.0.
+     * Also validate index 0 before iterating to detect non-NULL crash stubs. */
     typedef const GLubyte *(*PFNGLGETSTRINGIPROC)(GLenum, GLuint);
-    PFNGLGETSTRINGIPROC pglGetStringi = (PFNGLGETSTRINGIPROC)glXGetProcAddressARB((const GLubyte *)"glGetStringi");
+    PFNGLGETSTRINGIPROC pglGetStringi = NULL;
+    {
+        GLint major = 0, minor = 0;
+        glGetIntegerv(GL_MAJOR_VERSION, &major);
+        glGetIntegerv(GL_MINOR_VERSION, &minor);
+        while (glGetError() != GL_NO_ERROR) {}
+        if (major >= 3) {
+            pglGetStringi = (PFNGLGETSTRINGIPROC)glXGetProcAddressARB((const GLubyte *)"glGetStringi");
+            /* Validate: call index 0 and check result before trusting for full loop */
+            if (pglGetStringi && num_ext > 0) {
+                const char *probe = (const char *)pglGetStringi(GL_EXTENSIONS, 0);
+                if (!probe) {
+                    LOG_ERROR("glGetStringi returned NULL for index 0 — disabling (crash stub)");
+                    pglGetStringi = NULL;
+                }
+            }
+        } else {
+            LOG_INFO("GL version < 3.0 — skipping glGetStringi (GL_EXTENSIONS string only)");
+        }
+    }
 
     if (pglGetStringi && num_ext > 0) {
         for (int i = 0; i < num_ext; i++) {

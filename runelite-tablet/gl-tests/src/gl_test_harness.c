@@ -112,6 +112,11 @@ typedef void (*PFNGLTEXIMAGE3DPROC)(GLenum target, GLint level, GLint internalfo
 typedef void (*PFNGLTEXSUBIMAGE3DPROC)(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const void *pixels);
 typedef void (*PFNGLGENERATEMIPMAPPROC)(GLenum target);
 typedef void (*PFNGLDRAWBUFFERSPROC)(GLsizei n, const GLenum *bufs);
+typedef void (*PFNGLGENRENDERBUFFERSPROC)(GLsizei, GLuint*);
+typedef void (*PFNGLBINDRENDERBUFFERPROC)(GLenum, GLuint);
+typedef void (*PFNGLRENDERBUFFERSTORAGEPROC)(GLenum, GLenum, GLsizei, GLsizei);
+typedef void (*PFNGLFRAMEBUFFERRENDERBUFFERPROC)(GLenum, GLenum, GLenum, GLuint);
+typedef void (*PFNGLDELETERENDERBUFFERSPROC)(GLsizei, const GLuint*);
 
 /* ===== Resolved Function Pointers ===== */
 
@@ -155,6 +160,11 @@ static PFNGLTEXIMAGE3DPROC pglTexImage3D = NULL;
 static PFNGLTEXSUBIMAGE3DPROC pglTexSubImage3D = NULL;
 static PFNGLGENERATEMIPMAPPROC pglGenerateMipmap = NULL;
 static PFNGLDRAWBUFFERSPROC pglDrawBuffers = NULL;
+static PFNGLGENRENDERBUFFERSPROC pglGenRenderbuffers = NULL;
+static PFNGLBINDRENDERBUFFERPROC pglBindRenderbuffer = NULL;
+static PFNGLRENDERBUFFERSTORAGEPROC pglRenderbufferStorage = NULL;
+static PFNGLFRAMEBUFFERRENDERBUFFERPROC pglFramebufferRenderbuffer = NULL;
+static PFNGLDELETERENDERBUFFERSPROC pglDeleteRenderbuffers = NULL;
 
 /* ===== Constants ===== */
 
@@ -212,6 +222,11 @@ static void resolve_all_functions(void) {
     pglTexSubImage3D = (PFNGLTEXSUBIMAGE3DPROC)resolve_gl("glTexSubImage3D");
     pglGenerateMipmap = (PFNGLGENERATEMIPMAPPROC)resolve_gl("glGenerateMipmap");
     pglDrawBuffers = (PFNGLDRAWBUFFERSPROC)resolve_gl("glDrawBuffers");
+    pglGenRenderbuffers = (PFNGLGENRENDERBUFFERSPROC)resolve_gl("glGenRenderbuffers");
+    pglBindRenderbuffer = (PFNGLBINDRENDERBUFFERPROC)resolve_gl("glBindRenderbuffer");
+    pglRenderbufferStorage = (PFNGLRENDERBUFFERSTORAGEPROC)resolve_gl("glRenderbufferStorage");
+    pglFramebufferRenderbuffer = (PFNGLFRAMEBUFFERRENDERBUFFERPROC)resolve_gl("glFramebufferRenderbuffer");
+    pglDeleteRenderbuffers = (PFNGLDELETERENDERBUFFERSPROC)resolve_gl("glDeleteRenderbuffers");
 }
 
 /* ===== Helper: Compile Shader ===== */
@@ -284,51 +299,138 @@ static GLuint link_program(GLuint vert, GLuint frag, const char *name) {
 
 /* ===== Helper: Create FBO with color + depth ===== */
 
-static int create_fbo(GLuint *fbo, GLuint *colorTex, GLuint *depthTex, int w, int h, int depth32f) {
+/* New signature — depth_is_rbo output tells destroy_fbo how to clean up [AR: MF-2] */
+static int create_fbo(GLuint *fbo, GLuint *colorTex, GLuint *depthRes,
+                      int *depth_is_rbo, int w, int h) {
     if (!pglGenFramebuffers || !pglBindFramebuffer || !pglFramebufferTexture2D || !pglCheckFramebufferStatus) {
         LOG_ERROR("FBO functions not available");
         return 0;
     }
 
+    /* Create color texture */
     glGenTextures(1, colorTex);
     glBindTexture(GL_TEXTURE_2D, *colorTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    /* Use unsized GL_RGBA instead of GL_RGBA8: virglrenderer's GLES backend has
+     * known BGRA emulation issues with sized internal formats (issue #221). */
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     CHECK_GL("color texture");
 
-    glGenTextures(1, depthTex);
-    glBindTexture(GL_TEXTURE_2D, *depthTex);
-    if (depth32f) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    } else {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, w, h, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, NULL);
-    }
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    CHECK_GL("depth texture");
-
+    /* Create and bind FBO first, then attach */
     pglGenFramebuffers(1, fbo);
     pglBindFramebuffer(GL_FRAMEBUFFER, *fbo);
+    CHECK_GL("pglBindFramebuffer");
     pglFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *colorTex, 0);
-    pglFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, *depthTex, 0);
-    CHECK_GL("FBO attach");
+    CHECK_GL("color attachment");
+
+    /* Depth renderbuffer — depth textures can fail silently on GLES hosts;
+     * renderbuffers are more reliably implemented in virglrenderer. [AR: MF-1] */
+    if (!pglGenRenderbuffers || !pglBindRenderbuffer || !pglRenderbufferStorage ||
+        !pglFramebufferRenderbuffer) {
+        LOG_ERROR("Renderbuffer functions not available — cannot create depth attachment");
+        /* Fall through — color-only FBO may still work */
+        *depthRes = 0;
+        *depth_is_rbo = 0;
+    } else {
+        GLuint depthRbo;
+        pglGenRenderbuffers(1, &depthRbo);
+        pglBindRenderbuffer(GL_RENDERBUFFER, depthRbo);
+        pglRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, w, h);
+        CHECK_GL("depth renderbuffer storage");
+        pglFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthRbo);
+        CHECK_GL("depth attachment");
+        *depthRes = depthRbo;
+        *depth_is_rbo = 1;
+    }
 
     GLenum status = pglCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
-        LOG_ERROR("FBO incomplete: 0x%04x", status);
+        LOG_ERROR("FBO incomplete: status=0x%04x", status);
         return 0;
     }
+    LOG_INFO("FBO %dx%d complete (status=0x%04x)", w, h, status);
 
     return 1;
 }
 
 /* ===== Helper: Destroy FBO ===== */
 
-static void destroy_fbo(GLuint fbo, GLuint colorTex, GLuint depthTex) {
+static void destroy_fbo(GLuint fbo, GLuint colorTex, GLuint depthRes, int depth_is_rbo) {
     if (pglDeleteFramebuffers) pglDeleteFramebuffers(1, &fbo);
     glDeleteTextures(1, &colorTex);
-    glDeleteTextures(1, &depthTex);
+    if (depthRes) {
+        if (depth_is_rbo && pglDeleteRenderbuffers)
+            pglDeleteRenderbuffers(1, &depthRes);
+        else
+            glDeleteTextures(1, &depthRes);
+    }
+}
+
+/* ===== FBO Capability Probe ===== */
+
+static int g_fbo_works = -1; /* -1=untested, 0=broken, 1=works */
+
+/* probe_fbo_capability() — Create a minimal 32x32 FBO, clear to blue, read center pixel.
+ * If blue >= 200 and alpha >= 200, FBO is working. If all-zero, FBO is broken.
+ * Sets g_fbo_works. Logs result. Must be called after GL context is current. */
+static void probe_fbo_capability(void) {
+    if (!pglGenFramebuffers || !pglBindFramebuffer || !pglFramebufferTexture2D ||
+        !pglCheckFramebufferStatus) {
+        LOG_INFO("FBO probe: SKIP (FBO extension functions not available)");
+        g_fbo_works = 0;
+        return;
+    }
+
+    GLuint fbo, colorTex;
+    glGenTextures(1, &colorTex);
+    glBindTexture(GL_TEXTURE_2D, colorTex);
+    /* Use unsized GL_RGBA (consistent with create_fbo fix) */
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 32, 32, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    pglGenFramebuffers(1, &fbo);
+    pglBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    pglFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTex, 0);
+
+    GLenum status = pglCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        LOG_ERROR("FBO probe: INCOMPLETE (status=0x%04x) — FBO broken", status);
+        g_fbo_works = 0;
+        pglDeleteFramebuffers(1, &fbo);
+        glDeleteTextures(1, &colorTex);
+        return;
+    }
+
+    glViewport(0, 0, 32, 32);
+    glClearColor(0.0f, 0.0f, 1.0f, 1.0f); /* Blue */
+    glClear(GL_COLOR_BUFFER_BIT);
+    CHECK_GL("FBO probe glClear");
+
+    GLubyte pixel[4] = {0, 0, 0, 0};
+    glReadPixels(16, 16, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
+    CHECK_GL("FBO probe glReadPixels");
+
+    LOG_INFO("FBO probe: center pixel R=%d G=%d B=%d A=%d", pixel[0], pixel[1], pixel[2], pixel[3]);
+
+    if (pixel[2] >= 200 && pixel[3] >= 200) {
+        LOG_INFO("FBO probe: WORKS (blue clear successful)");
+        g_fbo_works = 1;
+    } else if (pixel[0] == 0 && pixel[1] == 0 && pixel[2] == 0 && pixel[3] == 0) {
+        LOG_ERROR("FBO probe: BROKEN (all-zero — color attachment not written)");
+        g_fbo_works = 0;
+    } else {
+        LOG_ERROR("FBO probe: BROKEN (unexpected pixel — expected B>=200,A>=200 got R=%d G=%d B=%d A=%d)",
+                  pixel[0], pixel[1], pixel[2], pixel[3]);
+        g_fbo_works = 0;
+    }
+
+    pglDeleteFramebuffers(1, &fbo);
+    glDeleteTextures(1, &colorTex);
+
+    /* Restore default framebuffer */
+    pglBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 /* ===== Helper: Save framebuffer to PNG ===== */
@@ -681,17 +783,27 @@ static void run_module_4(const char *sub) {
         return;
     }
 
-    /* Create FBO with GL_DEPTH_COMPONENT24 (universally supported; 32F may fail on VirGL) */
-    GLuint fbo, colorTex, depthTex;
-    if (!create_fbo(&fbo, &colorTex, &depthTex, FBO_WIDTH, FBO_HEIGHT, 0)) {
-        log_module_result(4, sub, "Reversed-Z Depth", "FAIL", get_time_ms() - t0, "FBO creation failed");
-        return;
+    /* Create FBO with fallback to default framebuffer */
+    GLuint fbo = 0, colorTex = 0, depthRes = 0;
+    int depth_is_rbo = 0;
+    int use_fbo = (g_fbo_works == 1);
+    if (use_fbo) {
+        if (!create_fbo(&fbo, &colorTex, &depthRes, &depth_is_rbo, FBO_WIDTH, FBO_HEIGHT)) {
+            LOG_ERROR("Module 4: FBO creation failed despite probe success — falling back");
+            use_fbo = 0;
+        }
+    }
+    if (use_fbo) {
+        pglBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    } else {
+        pglBindFramebuffer(GL_FRAMEBUFFER, 0);
+        LOG_INFO("Module 4: using DEFAULT FRAMEBUFFER (FBO unavailable)");
     }
 
     /* Create shader program */
     GLuint prog = create_program_from_sources(SHADER_VERT_BASIC, SHADER_FRAG_BASIC, "depth_test");
     if (!prog) {
-        destroy_fbo(fbo, colorTex, depthTex);
+        if (use_fbo) destroy_fbo(fbo, colorTex, depthRes, depth_is_rbo);
         log_module_result(4, sub, "Reversed-Z Depth", "FAIL", get_time_ms() - t0, "shader compilation failed");
         return;
     }
@@ -783,12 +895,13 @@ static void run_module_4(const char *sub) {
     LOG_INFO("Center pixel at (%d,%d): R=%d G=%d B=%d A=%d",
              center_x, center_y, center_pixel[0], center_pixel[1], center_pixel[2], center_pixel[3]);
 
-    /* In correct reversed-Z: red (z=0.3) should be "nearer" and win over blue (z=0.7) */
-    /* With GL_GREATER, larger depth values pass. z=0.3 is written first, z=0.7 passes GL_GREATER => blue wins */
-    /* UNLESS a shim transforms the depth function */
+    /* In the validated path, the near red triangle must win at the overlap sample.
+     * Anything else indicates broken reversed-Z semantics or missing geometry. */
     const char *pixel_desc;
+    const char *status = "FAIL";
     if (center_pixel[0] > 128 && center_pixel[2] < 128) {
         pixel_desc = "RED dominant (near wins)";
+        status = "PASS";
     } else if (center_pixel[2] > 128 && center_pixel[0] < 128) {
         pixel_desc = "BLUE dominant (far wins)";
     } else if (center_pixel[0] < 20 && center_pixel[1] < 20 && center_pixel[2] < 20) {
@@ -808,13 +921,15 @@ static void run_module_4(const char *sub) {
     destroy_geometry(vao, vbo);
     pglDeleteBuffers(1, &ubo);
     pglDeleteProgram(prog);
-    destroy_fbo(fbo, colorTex, depthTex);
+    if (use_fbo) {
+        destroy_fbo(fbo, colorTex, depthRes, depth_is_rbo);
+    }
 
     double elapsed = get_time_ms() - t0;
     char result_detail[256];
-    snprintf(result_detail, sizeof(result_detail), "%s; depth min=%.4f max=%.4f mean=%.4f",
-             pixel_desc, depth_min, depth_max, depth_mean);
-    log_module_result(4, sub, "Reversed-Z Depth", "PASS", elapsed, result_detail);
+    snprintf(result_detail, sizeof(result_detail), "%s; depth min=%.4f max=%.4f mean=%.4f; fbo=%s",
+             pixel_desc, depth_min, depth_max, depth_mean, use_fbo ? "YES" : "DEFAULT");
+    log_module_result(4, sub, "Reversed-Z Depth", status, elapsed, result_detail);
 }
 
 /* ################################################################## */
@@ -831,11 +946,21 @@ static void run_module_5(void) {
         return;
     }
 
-    /* Create FBO */
-    GLuint fbo, colorTex, depthTex;
-    if (!create_fbo(&fbo, &colorTex, &depthTex, FBO_WIDTH, FBO_HEIGHT, 0)) {
-        log_module_result(5, NULL, "sampler2DArray", "FAIL", get_time_ms() - t0, "FBO creation failed");
-        return;
+    /* Create FBO with fallback */
+    GLuint fbo = 0, colorTex = 0, depthRes = 0;
+    int depth_is_rbo = 0;
+    int use_fbo = (g_fbo_works == 1);
+    if (use_fbo) {
+        if (!create_fbo(&fbo, &colorTex, &depthRes, &depth_is_rbo, FBO_WIDTH, FBO_HEIGHT)) {
+            LOG_ERROR("Module 5: FBO creation failed despite probe success — falling back");
+            use_fbo = 0;
+        }
+    }
+    if (use_fbo) {
+        pglBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    } else {
+        pglBindFramebuffer(GL_FRAMEBUFFER, 0);
+        LOG_INFO("Module 5: using DEFAULT FRAMEBUFFER (FBO unavailable)");
     }
 
     /* Create a texture array vertex shader that passes texcoord + layer */
@@ -853,7 +978,7 @@ static void run_module_5(void) {
 
     GLuint prog = create_program_from_sources(texarray_vert, SHADER_FRAG_TEXARRAY, "texarray");
     if (!prog) {
-        destroy_fbo(fbo, colorTex, depthTex);
+        if (use_fbo) destroy_fbo(fbo, colorTex, depthRes, depth_is_rbo);
         log_module_result(5, NULL, "sampler2DArray", "FAIL", get_time_ms() - t0, "shader compilation failed");
         return;
     }
@@ -960,7 +1085,9 @@ static void run_module_5(void) {
     destroy_geometry(vao, vbo);
     glDeleteTextures(1, &texArray);
     pglDeleteProgram(prog);
-    destroy_fbo(fbo, colorTex, depthTex);
+    if (use_fbo) {
+        destroy_fbo(fbo, colorTex, depthRes, depth_is_rbo);
+    }
 
     double elapsed = get_time_ms() - t0;
     char detail[128];
@@ -981,16 +1108,26 @@ static void run_module_6(void) {
         return;
     }
 
-    /* Create two FBOs */
-    GLuint fboA, colorA, depthA, fboB, colorB, depthB;
-    if (!create_fbo(&fboA, &colorA, &depthA, FBO_WIDTH, FBO_HEIGHT, 0)) {
-        log_module_result(6, NULL, "noperspective", "FAIL", get_time_ms() - t0, "FBO A creation failed");
-        return;
+    /* Create two FBOs with fallback to sequential default framebuffer rendering */
+    GLuint fboA = 0, colorA = 0, depthResA = 0, fboB = 0, colorB = 0, depthResB = 0;
+    int depth_is_rbo_A = 0, depth_is_rbo_B = 0;
+    int use_fbo = (g_fbo_works == 1);
+    if (use_fbo) {
+        if (!create_fbo(&fboA, &colorA, &depthResA, &depth_is_rbo_A, FBO_WIDTH, FBO_HEIGHT)) {
+            LOG_ERROR("Module 6: FBO A creation failed — falling back");
+            use_fbo = 0;
+        }
     }
-    if (!create_fbo(&fboB, &colorB, &depthB, FBO_WIDTH, FBO_HEIGHT, 0)) {
-        destroy_fbo(fboA, colorA, depthA);
-        log_module_result(6, NULL, "noperspective", "FAIL", get_time_ms() - t0, "FBO B creation failed");
-        return;
+    if (use_fbo) {
+        if (!create_fbo(&fboB, &colorB, &depthResB, &depth_is_rbo_B, FBO_WIDTH, FBO_HEIGHT)) {
+            destroy_fbo(fboA, colorA, depthResA, depth_is_rbo_A);
+            LOG_ERROR("Module 6: FBO B creation failed — falling back");
+            use_fbo = 0;
+        }
+    }
+    if (!use_fbo) {
+        pglBindFramebuffer(GL_FRAMEBUFFER, 0);
+        LOG_INFO("Module 6: using DEFAULT FRAMEBUFFER (sequential render + CRC compare)");
     }
 
     /* Create noperspective program */
@@ -1001,8 +1138,10 @@ static void run_module_6(void) {
     if (!progNP || !progSmooth) {
         if (progNP) pglDeleteProgram(progNP);
         if (progSmooth) pglDeleteProgram(progSmooth);
-        destroy_fbo(fboA, colorA, depthA);
-        destroy_fbo(fboB, colorB, depthB);
+        if (use_fbo) {
+            destroy_fbo(fboA, colorA, depthResA, depth_is_rbo_A);
+            destroy_fbo(fboB, colorB, depthResB, depth_is_rbo_B);
+        }
         log_module_result(6, NULL, "noperspective", "FAIL", get_time_ms() - t0, "shader compilation failed");
         return;
     }
@@ -1030,8 +1169,8 @@ static void run_module_6(void) {
     glViewport(0, 0, FBO_WIDTH, FBO_HEIGHT);
     glDisable(GL_DEPTH_TEST);
 
-    /* Render with noperspective to FBO A */
-    pglBindFramebuffer(GL_FRAMEBUFFER, fboA);
+    /* Render with noperspective */
+    if (use_fbo) pglBindFramebuffer(GL_FRAMEBUFFER, fboA);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     pglUseProgram(progNP);
@@ -1039,7 +1178,7 @@ static void run_module_6(void) {
     glFinish();
     CHECK_GL("nopersp draw");
 
-    /* Read FBO A pixels */
+    /* Read pixels (from FBO A or default framebuffer) */
     unsigned char *pixelsA = (unsigned char *)malloc(FBO_WIDTH * FBO_HEIGHT * 4);
     glReadPixels(0, 0, FBO_WIDTH, FBO_HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, pixelsA);
     uint32_t crcA = crc32_compute(pixelsA, FBO_WIDTH * FBO_HEIGHT * 4);
@@ -1048,8 +1187,8 @@ static void run_module_6(void) {
     snprintf(pngA, sizeof(pngA), "%s/module6-noperspective.png", g_results_dir);
     save_fbo_png(pngA, FBO_WIDTH, FBO_HEIGHT);
 
-    /* Render with smooth to FBO B */
-    pglBindFramebuffer(GL_FRAMEBUFFER, fboB);
+    /* Render with smooth */
+    if (use_fbo) pglBindFramebuffer(GL_FRAMEBUFFER, fboB);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     pglUseProgram(progSmooth);
@@ -1057,7 +1196,7 @@ static void run_module_6(void) {
     glFinish();
     CHECK_GL("smooth draw");
 
-    /* Read FBO B pixels */
+    /* Read pixels (from FBO B or default framebuffer) */
     unsigned char *pixelsB = (unsigned char *)malloc(FBO_WIDTH * FBO_HEIGHT * 4);
     glReadPixels(0, 0, FBO_WIDTH, FBO_HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, pixelsB);
     uint32_t crcB = crc32_compute(pixelsB, FBO_WIDTH * FBO_HEIGHT * 4);
@@ -1087,12 +1226,14 @@ static void run_module_6(void) {
     destroy_geometry(vao, vbo);
     pglDeleteProgram(progNP);
     pglDeleteProgram(progSmooth);
-    destroy_fbo(fboA, colorA, depthA);
-    destroy_fbo(fboB, colorB, depthB);
+    if (use_fbo) {
+        destroy_fbo(fboA, colorA, depthResA, depth_is_rbo_A);
+        destroy_fbo(fboB, colorB, depthResB, depth_is_rbo_B);
+    }
 
     double elapsed = get_time_ms() - t0;
     char detail[128];
-    snprintf(detail, sizeof(detail), "crcNP=0x%08x crcSmooth=0x%08x differ=%s", crcA, crcB, differ ? "YES" : "NO");
+    snprintf(detail, sizeof(detail), "crcNP=0x%08x crcSmooth=0x%08x differ=%s fbo=%s", crcA, crcB, differ ? "YES" : "NO", use_fbo ? "YES" : "DEFAULT");
     /* Both modes should produce non-black output AND they should differ */
     const char *status = differ ? "PASS" : "WARN";
     log_module_result(6, NULL, "noperspective vs smooth", status, elapsed, detail);
@@ -1105,6 +1246,57 @@ static void run_module_6(void) {
 static void run_module_7(void) {
     double t0 = get_time_ms();
     LOG_INFO("=== Module 7: FBO Blit ===");
+    char detail[256] = "";  /* [AR: MF-7] Function-scoped to avoid stack corruption */
+
+    if (g_fbo_works != 1) {
+        /* FBO diagnostic mode: try each failure point in isolation and report */
+        LOG_INFO("Module 7: FBO BROKEN — running diagnostic probe sequence");
+
+        /* Diagnostic 1: Can we create an FBO at all? */
+        if (!pglGenFramebuffers) {
+            log_module_result(7, "diag", "FBO Blit Diagnostic",
+                "SKIP", get_time_ms() - t0, "FBO extension not available");
+            return;
+        }
+
+        /* Diagnostic 2: Does color-only FBO (no depth) complete? */
+        GLuint fbo1, colorTex1;
+        glGenTextures(1, &colorTex1);
+        glBindTexture(GL_TEXTURE_2D, colorTex1);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 32, 32, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        pglGenFramebuffers(1, &fbo1);
+        pglBindFramebuffer(GL_FRAMEBUFFER, fbo1);
+        pglFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTex1, 0);
+        GLenum s1 = pglCheckFramebufferStatus(GL_FRAMEBUFFER);
+        snprintf(detail, sizeof(detail), "color-only FBO status=0x%04x", s1);
+        LOG_INFO("Module 7 diag: %s", detail);
+
+        /* Diagnostic 3: Can we clear and read back from the color-only FBO? */
+        if (s1 == GL_FRAMEBUFFER_COMPLETE) {
+            glViewport(0, 0, 32, 32);
+            glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            glFinish();
+            GLubyte p[4] = {0};
+            glReadPixels(16, 16, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, p);
+            snprintf(detail, sizeof(detail),
+                "color-only FBO clear+read: R=%d G=%d B=%d A=%d (expect R=255,A=255)",
+                p[0], p[1], p[2], p[3]);
+            LOG_INFO("Module 7 diag: %s", detail);
+        }
+
+        pglDeleteFramebuffers(1, &fbo1);
+        glDeleteTextures(1, &colorTex1);
+        pglBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        log_module_result(7, "diag", "FBO Blit Diagnostic",
+            "FAIL", get_time_ms() - t0, detail);
+        return;
+    }
+
+    /* --- Normal FBO Blit path (g_fbo_works == 1) --- */
 
     if (!pglGenFramebuffers || !pglBlitFramebuffer) {
         log_module_result(7, NULL, "FBO Blit", "SKIP", get_time_ms() - t0, "glBlitFramebuffer not available");
@@ -1112,13 +1304,14 @@ static void run_module_7(void) {
     }
 
     /* Create two FBOs */
-    GLuint fboA, colorA, depthA, fboB, colorB, depthB;
-    if (!create_fbo(&fboA, &colorA, &depthA, FBO_WIDTH, FBO_HEIGHT, 0)) {
+    GLuint fboA, colorA, depthResA, fboB, colorB, depthResB;
+    int depth_is_rbo_A = 0, depth_is_rbo_B = 0;
+    if (!create_fbo(&fboA, &colorA, &depthResA, &depth_is_rbo_A, FBO_WIDTH, FBO_HEIGHT)) {
         log_module_result(7, NULL, "FBO Blit", "FAIL", get_time_ms() - t0, "FBO A creation failed");
         return;
     }
-    if (!create_fbo(&fboB, &colorB, &depthB, FBO_WIDTH, FBO_HEIGHT, 0)) {
-        destroy_fbo(fboA, colorA, depthA);
+    if (!create_fbo(&fboB, &colorB, &depthResB, &depth_is_rbo_B, FBO_WIDTH, FBO_HEIGHT)) {
+        destroy_fbo(fboA, colorA, depthResA, depth_is_rbo_A);
         log_module_result(7, NULL, "FBO Blit", "FAIL", get_time_ms() - t0, "FBO B creation failed");
         return;
     }
@@ -1126,8 +1319,8 @@ static void run_module_7(void) {
     /* Render a gradient to FBO A */
     GLuint prog = create_program_from_sources(SHADER_VERT_NOPERSP, SHADER_FRAG_NOPERSP, "blit_src");
     if (!prog) {
-        destroy_fbo(fboA, colorA, depthA);
-        destroy_fbo(fboB, colorB, depthB);
+        destroy_fbo(fboA, colorA, depthResA, depth_is_rbo_A);
+        destroy_fbo(fboB, colorB, depthResB, depth_is_rbo_B);
         log_module_result(7, NULL, "FBO Blit", "FAIL", get_time_ms() - t0, "shader failed");
         return;
     }
@@ -1172,11 +1365,10 @@ static void run_module_7(void) {
     pglBindFramebuffer(GL_FRAMEBUFFER, 0);
     destroy_geometry(vao, vbo);
     pglDeleteProgram(prog);
-    destroy_fbo(fboA, colorA, depthA);
-    destroy_fbo(fboB, colorB, depthB);
+    destroy_fbo(fboA, colorA, depthResA, depth_is_rbo_A);
+    destroy_fbo(fboB, colorB, depthResB, depth_is_rbo_B);
 
     double elapsed = get_time_ms() - t0;
-    char detail[128];
     snprintf(detail, sizeof(detail), "crcA=0x%08x crcB=0x%08x match=%s", crcA, crcB, match ? "YES" : "NO");
     log_module_result(7, NULL, "FBO Blit", match ? "PASS" : "FAIL", elapsed, detail);
 }
@@ -1195,17 +1387,27 @@ static void run_module_8(void) {
         return;
     }
 
-    /* Create FBO with GL_DEPTH_COMPONENT24 (universally supported; 32F may fail on VirGL) */
-    GLuint fbo, colorTex, depthTex;
-    if (!create_fbo(&fbo, &colorTex, &depthTex, FBO_WIDTH, FBO_HEIGHT, 0)) {
-        log_module_result(8, NULL, "Scene Emulation", "FAIL", get_time_ms() - t0, "FBO creation failed");
-        return;
+    /* Create FBO with fallback */
+    GLuint fbo = 0, colorTex = 0, depthRes = 0;
+    int depth_is_rbo = 0;
+    int use_fbo = (g_fbo_works == 1);
+    if (use_fbo) {
+        if (!create_fbo(&fbo, &colorTex, &depthRes, &depth_is_rbo, FBO_WIDTH, FBO_HEIGHT)) {
+            LOG_ERROR("Module 8: FBO creation failed despite probe success — falling back");
+            use_fbo = 0;
+        }
+    }
+    if (use_fbo) {
+        pglBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    } else {
+        pglBindFramebuffer(GL_FRAMEBUFFER, 0);
+        LOG_INFO("Module 8: using DEFAULT FRAMEBUFFER (FBO unavailable)");
     }
 
     /* Create scene program */
     GLuint prog = create_program_from_sources(SHADER_VERT_SCENE, SHADER_FRAG_SCENE, "scene");
     if (!prog) {
-        destroy_fbo(fbo, colorTex, depthTex);
+        if (use_fbo) destroy_fbo(fbo, colorTex, depthRes, depth_is_rbo);
         log_module_result(8, NULL, "Scene Emulation", "FAIL", get_time_ms() - t0, "shader compilation failed");
         return;
     }
@@ -1371,12 +1573,14 @@ static void run_module_8(void) {
     pglDeleteBuffers(1, &ubo);
     glDeleteTextures(1, &texArray);
     pglDeleteProgram(prog);
-    destroy_fbo(fbo, colorTex, depthTex);
+    if (use_fbo) {
+        destroy_fbo(fbo, colorTex, depthRes, depth_is_rbo);
+    }
 
     double elapsed = get_time_ms() - t0;
     char detail[256];
-    snprintf(detail, sizeof(detail), "content=%s depth(min=%.4f max=%.4f mean=%.4f) pixel(%d,%d,%d)",
-             has_content ? "YES" : "NO", d_min, d_max, d_mean, center[0], center[1], center[2]);
+    snprintf(detail, sizeof(detail), "content=%s depth(min=%.4f max=%.4f mean=%.4f) pixel(%d,%d,%d) fbo=%s",
+             has_content ? "YES" : "NO", d_min, d_max, d_mean, center[0], center[1], center[2], use_fbo ? "YES" : "DEFAULT");
     log_module_result(8, NULL, "Scene Emulation", has_content ? "PASS" : "WARN", elapsed, detail);
 }
 
@@ -1393,16 +1597,26 @@ static void run_module_9(void) {
         return;
     }
 
-    /* Create FBO at full size */
-    GLuint fbo, colorTex, depthTex;
-    if (!create_fbo(&fbo, &colorTex, &depthTex, FBO_WIDTH, FBO_HEIGHT, 0)) {
-        log_module_result(9, NULL, "Performance", "FAIL", get_time_ms() - t0, "FBO creation failed");
-        return;
+    /* Create FBO at full size with fallback */
+    GLuint fbo = 0, colorTex = 0, depthRes = 0;
+    int depth_is_rbo = 0;
+    int use_fbo = (g_fbo_works == 1);
+    if (use_fbo) {
+        if (!create_fbo(&fbo, &colorTex, &depthRes, &depth_is_rbo, FBO_WIDTH, FBO_HEIGHT)) {
+            LOG_ERROR("Module 9: FBO creation failed despite probe success — falling back");
+            use_fbo = 0;
+        }
+    }
+    if (use_fbo) {
+        pglBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    } else {
+        pglBindFramebuffer(GL_FRAMEBUFFER, 0);
+        LOG_INFO("Module 9: using DEFAULT FRAMEBUFFER (FBO unavailable)");
     }
 
     GLuint prog = create_program_from_sources(SHADER_VERT_NOPERSP, SHADER_FRAG_NOPERSP, "perf");
     if (!prog) {
-        destroy_fbo(fbo, colorTex, depthTex);
+        if (use_fbo) destroy_fbo(fbo, colorTex, depthRes, depth_is_rbo);
         log_module_result(9, NULL, "Performance", "FAIL", get_time_ms() - t0, "shader failed");
         return;
     }
@@ -1442,12 +1656,13 @@ static void run_module_9(void) {
     }
     free(read_buf);
 
-    /* Half-size run */
-    GLuint fboH, colorH, depthH;
+    /* Half-size run — skip if FBO is broken (need separate FBO for different resolution) */
+    GLuint fboH = 0, colorH = 0, depthResH = 0;
+    int depth_is_rbo_H = 0;
     double *half_times = NULL;
     int has_half = 0;
 
-    if (create_fbo(&fboH, &colorH, &depthH, PERF_HALF_WIDTH, PERF_HALF_HEIGHT, 0)) {
+    if (use_fbo && create_fbo(&fboH, &colorH, &depthResH, &depth_is_rbo_H, PERF_HALF_WIDTH, PERF_HALF_HEIGHT)) {
         pglBindFramebuffer(GL_FRAMEBUFFER, fboH);
         glViewport(0, 0, PERF_HALF_WIDTH, PERF_HALF_HEIGHT);
 
@@ -1467,7 +1682,7 @@ static void run_module_9(void) {
             half_times[i] = get_time_ms() - ft0;
         }
         has_half = 1;
-        destroy_fbo(fboH, colorH, depthH);
+        destroy_fbo(fboH, colorH, depthResH, depth_is_rbo_H);
     }
 
     /* Compute stats */
@@ -1534,12 +1749,14 @@ static void run_module_9(void) {
     pglBindFramebuffer(GL_FRAMEBUFFER, 0);
     destroy_geometry(vao, vbo);
     pglDeleteProgram(prog);
-    destroy_fbo(fbo, colorTex, depthTex);
+    if (use_fbo) {
+        destroy_fbo(fbo, colorTex, depthRes, depth_is_rbo);
+    }
 
     double elapsed = get_time_ms() - t0;
     char detail[256];
-    snprintf(detail, sizeof(detail), "mean=%.2fms p95=%.2fms p99=%.2fms readpix=%.2fms fps=%.0f",
-             ft_mean, ft_p95, ft_p99, rp_mean, 1000.0 / ft_mean);
+    snprintf(detail, sizeof(detail), "mean=%.2fms p95=%.2fms p99=%.2fms readpix=%.2fms fps=%.0f fbo=%s",
+             ft_mean, ft_p95, ft_p99, rp_mean, 1000.0 / ft_mean, use_fbo ? "YES" : "DEFAULT");
     log_module_result(9, NULL, "Performance Baseline", "PASS", elapsed, detail);
 }
 
@@ -1586,7 +1803,13 @@ int main(int argc, char **argv) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
-    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); /* Offscreen */
+    /* GLFW issue #2620: GLFW_VISIBLE=FALSE causes glReadPixels to return garbage on X11/Linux.
+     * The window must be visible for correct framebuffer readback even when using FBOs,
+     * because the default framebuffer backing is not allocated on invisible windows. */
+    glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
+    glfwWindowHint(GLFW_DEPTH_BITS, 24);
+    glfwWindowHint(GLFW_FOCUSED, GLFW_FALSE);   /* [AR: SC-2] Don't steal focus from other windows */
+    glfwWindowHint(GLFW_DECORATED, GLFW_FALSE); /* [AR: SC-2] Minimize visual disruption */
 
     GLFWwindow *window = glfwCreateWindow(FBO_WIDTH, FBO_HEIGHT, "VirGL Test Harness", NULL, NULL);
     if (!window) {
@@ -1603,16 +1826,20 @@ int main(int argc, char **argv) {
     /* Resolve function pointers */
     resolve_all_functions();
 
+    /* Probe FBO capability early */
+    probe_fbo_capability();
+    LOG_INFO("FBO capability: %s", g_fbo_works == 1 ? "WORKS" : "BROKEN");
+
     /* Run modules */
     if (run_all) {
         run_module_1();
         run_module_2();
         run_module_3();
+        run_module_7();  /* FBO diagnostic first — before modules that depend on FBO */
         /* Module 4 in --all mode runs 4a (no shim baseline) */
         run_module_4("a");
         run_module_5();
         run_module_6();
-        run_module_7();
         run_module_8();
         run_module_9();
     } else if (run_module == 4 && module_sub) {
