@@ -65,5 +65,22 @@
         <receiver
             android:name=".installer.InstallResultReceiver"
             android:exported="false" />
+
+        <receiver
+            android:name=".presentation.hybrid.TermuxX11StartReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.termux.x11.CmdEntryPoint.ACTION_START" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".presentation.hybrid.HybridX11TestReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.runelitetablet.action.START_HYBRID_X11_TEST" />
+                <action android:name="com.runelitetablet.action.STOP_HYBRID_X11_TEST" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
