@@ -101,6 +101,10 @@ fun SetupScreen(viewModel: SetupViewModel) {
                 AppLog.ui("SetupScreen: Stop Game button clicked")
                 viewModel.stopSession()
             },
+            onOpenDirectSurfaceProbe = {
+                AppLog.ui("SetupScreen: Direct Surface Probe button clicked")
+                viewModel.openDirectSurfaceProbe()
+            },
             onSettings = {
                 AppLog.ui("SetupScreen: Settings button clicked")
                 viewModel.navigateToSettings()
@@ -328,6 +332,7 @@ private fun LaunchScreen(
     onLaunch: () -> Unit,
     onSwitchToGame: () -> Unit,
     onStopSession: () -> Unit,
+    onOpenDirectSurfaceProbe: () -> Unit,
     onSettings: () -> Unit,
     onViewLogs: () -> Unit
 ) {
@@ -556,16 +561,27 @@ private fun LaunchScreen(
                 }
                 // Default: show Launch button
                 else -> {
-                    Button(
-                        onClick = onLaunch,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                    ) {
-                        Text(
-                            text = "Launch RuneLite",
-                            style = MaterialTheme.typography.labelLarge
-                        )
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = onLaunch,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                        ) {
+                            Text(
+                                text = "Launch RuneLite",
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        OutlinedButton(
+                            onClick = onOpenDirectSurfaceProbe,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Open Direct Surface Probe")
+                        }
                     }
                 }
             }
