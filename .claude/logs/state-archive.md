@@ -6,6 +6,16 @@ Session history archive. See `.claude/autoload/_state.md` for current state (las
 
 ## March 2026
 
+### Session 48 (2026-03-09)
+**Work**: VirGL socket fix achieved via 4-agent research. 11 changes: `--shared-tmp`, socket wait with `[ -S ]`, `MESA_GLX_ALPHA_BITS=0` (24-bit visual fix), glxgears instead of glxinfo, stock Mesa replaces lfdevs, `termux-x11-preference` replaces xrandr (colon syntax), `com.termux.x11.Loader` cleanup pattern. VirGL confirmed working (virgl renderer detected). GPU plugin fails: GLSL 3.30 not supported.
+**Decisions**: Stock Ubuntu Mesa for Mali (not lfdevs). Termux:X11 preferences for resolution (not xrandr). glxgears for virpipe detection (not glxinfo). MESA_GLX_ALPHA_BITS=0 for visual depth fix.
+**Next**: Add MESA_GLSL_VERSION_OVERRIDE=330 (one-line). Test GPU plugin. Software fallback resolution.
+
+### Session 47 (2026-03-09)
+**Work**: Eliminated hardcoded versions (launcher 2.7.7, Mesa 26.1.0). Fixed RuneLite always-run-launcher (auto-update). Fixed JVM flag propagation (--scale 2, RUNELITE_VMARGS=-Xmx4g). Fixed lfdevs Mesa download URL (was 404). Fixed GPU marker staleness. Deployed v2→v5 across 4 iterations. lfdevs Mesa 26.1.0-devel now confirmed installed. VirGL still broken — socket path mismatch.
+**Decisions**: Use RUNELITE_VMARGS (not JDK_JAVA_OPTIONS) for client JVM args. Use --scale 2 (launcher's native mechanism). Always delete GPU marker on setup-gpu run. Fallback Mesa version = mesa-26.1.0-devel-20260208 (actual existing tag).
+**Next**: Fix VirGL socket path (P0). Lower xrandr resolution as interim perf mitigation. Test auth in-game.
+
 ### Session 46 (2026-03-09)
 **Work**: On-device test found 3 bugs: (1) Step 1 tokens discarded for Jagex accounts in GeckoAuthActivity Step 2 result, (2) env file race — old script EXIT trap deletes file before new script reads it, (3) HTTP 400 `invalid_grant` not treated as NeedsLogin. All 3 fixed and verified — env file now 343 bytes with JX_ACCESS_TOKEN. Game server still rejects login.
 **Decisions**: Move credential sourcing before cleanup in launch-runelite.sh. Treat HTTP 400 same as 401 for refresh rejection. Save Step 1 tokens in GeckoAuthActivity instance fields for Step 2 passthrough.

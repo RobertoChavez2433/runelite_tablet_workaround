@@ -4,6 +4,18 @@ Older/resolved defects rotated from per-feature files in `.claude/defects/`.
 
 ---
 
+## Shell (rotated 2026-03-12, Session 53)
+
+### [SHELL] 2026-03-09: lfdevs Mesa breaks virpipe on Mali (32-bit visual BadMatch)
+**Pattern**: lfdevs Mesa (mesa-for-android-container) is built for Adreno/Turnip. When installed on Mali, virpipe selects 32-bit RGBA visual but Termux:X11 root window is 24-bit RGB. `XGetSubImage()` fails with BadMatch. glxinfo crashes before printing GL strings.
+**Prevention**: Use stock Ubuntu Mesa for Mali/VirGL (all community setups do this). Set `MESA_GLX_ALPHA_BITS=0` to force 24-bit visual. Use glxgears (XPutImage) not glxinfo (XGetImage) for virpipe detection.
+**Ref**: @runelite-tablet/app/src/main/assets/scripts/setup-gpu-mali.sh
+
+### [SHELL] 2026-03-10: LD_LIBRARY_PATH=$PREFIX/lib crashes virgl_test_server_android
+**Pattern**: Self-bootstrap `export LD_LIBRARY_PATH=$PREFIX/lib` in shell scripts causes `virgl_test_server_android` to find Termux's OpenSSL 3.x (which removed `OpenSSL_add_all_algorithms`) instead of system's OpenSSL. System's `libsqlite.so` needs that symbol → ANGLE dlopen fails → SIGSEGV.
+**Prevention**: Start VirGL server with `env -u LD_LIBRARY_PATH virgl_test_server_android`. Termux binaries have correct rpath baked in.
+**Ref**: @runelite-tablet/gl-tests/scripts/run-tests.sh
+
 ## Shell (rotated 2026-03-10, Session 51)
 
 ### [SHELL] 2026-03-09: X11 cleanup misses com.termux.x11.Loader process

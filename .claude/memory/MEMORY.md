@@ -83,8 +83,12 @@
 - **`MESA_NO_ERROR=1` silently swallows** the `glClipControl` failure. Must be UNSET during testing.
 - **Fix: LD_PRELOAD shim** — Shim A (inject glClipControl via dlsym) or Shim B (flip GL_GREATER→GL_LESS + glClearDepth 0→1)
 - **dlopen() cannot intercept already-resolved symbols** — must use sub-process with `LD_PRELOAD=shim.so`, NOT runtime dlopen()
-- **VirGL FBO rendering completely broken** — `glClear(0,0,0,1)` on FBO produces A=0 (not 255). FBO color attachment never written to. NOT a depth issue. Need to test rendering to default framebuffer.
-- **GL_MAX_VIEWPORT_DIMS** returns 2 integers — `glGetIntegerv` needs `GLint[2]` not single `GLint` (stack overflow → SIGSEGV)
+- **VirGL FBO broken: GL_DEPTH_CLAMP root cause** — Mesa 4.5COMPAT auto-enables GL_DEPTH_CLAMP; GLES 3.2 host returns GL_INVALID_ENUM; stale error causes virglrenderer to silently discard ALL subsequent draws/clears. Fix: `MESA_EXTENSION_OVERRIDE=-GL_ARB_depth_clamp,-GL_EXT_depth_clamp` (Termux #15832)
+- **SIGSEGV: GL_MAX_VARYING_FLOATS crashes virpipe** — Desktop GL 2.0 token (0x8B4B) not in GLES 3.x. virpipe crashes (not just GL_INVALID_ENUM). Also: `glXGetProcAddressARB` NEVER returns NULL on Mesa — stubs crash when called. Must version-gate + probe index 0.
+- **GLFW_VISIBLE=FALSE breaks glReadPixels on X11** — GLFW issue #2620. Must use GLFW_VISIBLE=TRUE for correct framebuffer readback. Window can be undecorated+unfocused.
+- **GL version override must match GLSL** — 4.5COMPAT+330 creates inconsistent virglrenderer state. Use 4.3COMPAT+430 (RuneLite requires GL 4.3+, so 4.3 is fine)
+- **Depth textures vs renderbuffers on VirGL** — Depth textures can fail silently on GLES hosts (guest reports FRAMEBUFFER_COMPLETE but host FBO broken). Use renderbuffers for depth attachments.
+- **RuneLite GPU plugin has HARD FBO dependency** — scene→FBO→glBlitFramebuffer→canvas. If VirGL FBO never works, GPU plugin won't work. Alternative paths: Zink, no-ANGLE, llvmpipe.
 - VirGL software versions: virglrenderer-android 1.3.0, ANGLE 2.1.24923, Mesa 25.2.8 (proot Ubuntu)
 - Zink directly on Mali is unreliable — missing Vulkan features (`fillModeNonSolid`, `shaderClipDistance`, `logicOp`)
 - llvmpipe gives OpenGL 4.5 — GPU plugin loads but performance is CPU-bound (choppy)
@@ -160,6 +164,9 @@
 - Git Bash expands `$PATH` and `$HOME` in `adb shell` commands — use hardcoded full paths instead of variable references, or ensure vars aren't expanded locally
 - `LD_LIBRARY_PATH=$PREFIX/lib` BREAKS `virgl_test_server_android` — Termux's OpenSSL 3.x replaces system OpenSSL, missing deprecated symbols. Always `env -u LD_LIBRARY_PATH` before starting VirGL server
 - Git Bash `input text` to Termux via adb is unreliable for complex commands — use script files instead
+- **Best adb+Termux pattern**: Write self-contained .sh scripts, push to `/data/local/tmp/`, run via `adb shell "run-as com.termux bash /data/local/tmp/script.sh"`. Scripts self-bootstrap PATH/HOME internally. Avoids ALL Git Bash quoting/expansion issues.
+- `sed -i 's/\\r//' file` in nested shell quoting (Git Bash→adb→bash) strips ALL 'r' chars. Use `tr -d "\015"` instead.
+- `/data/user/0/com.termux/` vs `/data/data/com.termux/files/home/` — `run-as` resolves to former, scripts hardcode latter. Use explicit HOME in scripts, never rely on pwd-based BASH_SOURCE resolution.
 - GLFW 3.4 needs `XDG_RUNTIME_DIR=/tmp` and `GLFW_PLATFORM=x11` in proot env
 - Stale X11 lock files (`$PREFIX/tmp/.tX0-lock`) must be cleaned before starting Termux:X11
 - `TMPDIR=$PREFIX/tmp` must be set in self-bootstrap for Termux:X11 to find its temp dir via `run-as`

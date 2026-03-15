@@ -1,35 +1,43 @@
 {
-  "plan": ".claude/plans/2026-03-09-virgl-test-pipeline.md",
+  "plan": ".claude/plans/2026-03-11-virgl-fix-pipeline.md",
   "phases": [
-    {"phase": 1, "status": "done", "files": [".gitattributes", "runelite-tablet/gl-tests/scripts/deploy.sh", "runelite-tablet/gl-tests/README.md"]},
-    {"phase": 2, "status": "done", "files": ["runelite-tablet/gl-tests/scripts/install-deps.sh", "runelite-tablet/gl-tests/src/gl_test_log.h", "runelite-tablet/gl-tests/src/stb_image_write.h", "runelite-tablet/gl-tests/src/test_shaders.h"]},
-    {"phase": 3, "status": "done", "files": ["runelite-tablet/gl-tests/src/fix_inject_clipcontrol.c", "runelite-tablet/gl-tests/src/fix_flip_depth.c"]},
-    {"phase": 4, "status": "done", "files": ["runelite-tablet/gl-tests/scripts/run-tests.sh", "runelite-tablet/gl-tests/scripts/build.sh"]},
-    {"phase": 5, "status": "done", "files": ["runelite-tablet/gl-tests/scripts/install-piglit.sh"]},
-    {"phase": 6, "status": "done", "files": ["runelite-tablet/gl-tests/src/gl_test_harness.c"]},
-    {"phase": 7, "status": "blocked", "files": [], "reason": "No device connected for ADB deployment"}
+    {"phase": 0, "name": "SIGSEGV Crash Bisection", "status": "done"},
+    {"phase": 1, "name": "FBO Environment Fixes", "status": "done"},
+    {"phase": 2, "name": "FBO Code Fixes", "status": "done"},
+    {"phase": 3, "name": "Default Framebuffer Fallback", "status": "done"},
+    {"phase": 4, "name": "Alternative GPU Backend Testing", "status": "blocked"},
+    {"phase": 5, "name": "Apply Winning Config to launch-runelite.sh", "status": "done"},
+    {"phase": 6, "name": "Deploy and Full Verify", "status": "blocked"}
   ],
   "build": "pass",
+  "modified_files": [
+    "runelite-tablet/gl-tests/src/gl_test_log.h",
+    "runelite-tablet/gl-tests/src/gl_test_harness.c",
+    "runelite-tablet/gl-tests/scripts/run-tests.sh",
+    "runelite-tablet/app/src/main/assets/scripts/launch-runelite.sh"
+  ],
+  "phase_reviews": [
+    {"phase": 0, "status": "PASS", "notes": "Already implemented in prior session"},
+    {"phase": 1, "status": "PASS", "notes": "Env var changes correct"},
+    {"phase": 2, "status": "PASS", "notes": "FBO changes correct, ordering fixed"},
+    {"phase": 3, "status": "PASS", "notes": "Fallback paths correct, resource cleanup guarded"},
+    {"phase": 5, "status": "PASS", "notes": "Env vars match, GLSL versions consistent"}
+  ],
+  "review": {"status": "pass", "findings": []},
   "lint": "pass",
   "p1_fixes": "pass",
-  "review": {"status": "pass", "findings": [
-    "P2: $ADB variable unquoted word-splitting risk in deploy.sh",
-    "P2: crash_handler fprintf not fully signal-safe in gl_test_log.h",
-    "P2: top -bn1 CPU parsing varies across implementations in run-tests.sh",
-    "P2: glTexSubImage3D used directly vs resolved function pointer in gl_test_harness.c"
-  ]},
   "completeness": "pass",
   "performance": "pass",
-  "modified_files": [".gitattributes", "runelite-tablet/gl-tests/scripts/deploy.sh", "runelite-tablet/gl-tests/README.md", "runelite-tablet/gl-tests/scripts/install-deps.sh", "runelite-tablet/gl-tests/src/gl_test_log.h", "runelite-tablet/gl-tests/src/stb_image_write.h", "runelite-tablet/gl-tests/src/test_shaders.h", "runelite-tablet/gl-tests/src/fix_inject_clipcontrol.c", "runelite-tablet/gl-tests/src/fix_flip_depth.c", "runelite-tablet/gl-tests/scripts/run-tests.sh", "runelite-tablet/gl-tests/scripts/build.sh", "runelite-tablet/gl-tests/scripts/install-piglit.sh", "runelite-tablet/gl-tests/src/gl_test_harness.c"],
-  "phase_reviews": [
-    {"phase": 1, "result": "PASS", "p0": 0, "p1": 0, "p2": 1, "notes": "P2: $ADB variable unquoted word-splitting risk"},
-    {"phase": 2, "result": "PASS", "p0": 0, "p1": 0, "p2": 1, "notes": "P2: crash_handler fprintf not signal-safe (acceptable for debug tool)"},
-    {"phase": 3, "result": "PASS", "p0": 0, "p1": 0, "p2": 0, "notes": "Both shims use _Atomic for thread safety, dlsym(RTLD_NEXT) for passthrough, stderr logging"},
-    {"phase": 4, "result": "PASS", "p0": 0, "p1": 0, "p2": 1, "notes": "P2: top -bn1 CPU parsing may vary across busybox/toybox/procps-ng implementations"},
-    {"phase": 5, "result": "PASS", "p0": 0, "p1": 0, "p2": 0, "notes": "Follows install-deps.sh pattern, disk space check with df -k, idempotent, shallow clone"},
-    {"phase": 6, "result": "PASS", "p0": 1, "p1": 0, "p2": 1, "notes": "P0 fixed: pglBindBuffer(&ubo) -> (ubo). P2: glTexSubImage3D used directly vs resolved ptr"}
+  "decisions": [
+    "Phase 0 already implemented in prior session",
+    "Phase 4 BLOCKED - requires ADB device access for alternative GPU backend testing",
+    "Phase 6 BLOCKED - requires ADB device access for deploy and full verify",
+    "Fixed FBO creation ordering: FBO gen+bind BEFORE depth renderbuffer attachment",
+    "mali-native GLSL set to 140 (matches GL 3.1), mali-angle GLSL set to 430 (matches GL 4.3)"
   ],
-  "decisions": ["deploy.sh runs on host, not device - no Termux self-bootstrap needed", "Used full path to Termux bash for run-as commands", "stb_image_write.h vendored at v1.16 commit 1ee679ca", "gl_test_log.h env allowlist: GL/Mesa/VirGL/GALLIUM/DISPLAY/PROOT prefixes only", "Shims use sub-process LD_PRELOAD (not dlopen) matching actual RuneLite deployment", "Phase 4 files found pre-existing on disk from previous session, reviewed and recorded", "Phase 7 BLOCKED: no ADB device connected"],
-  "fix_attempts": [{"phase": 6, "issue": "pglBindBuffer passed &ubo instead of ubo", "fixed": true}],
-  "blocked": [{"phase": 7, "reason": "No device connected for ADB deployment"}]
+  "fix_attempts": [],
+  "blocked": [
+    {"phase": 4, "reason": "No device connected for ADB deployment"},
+    {"phase": 6, "reason": "No device connected for ADB deployment"}
+  ]
 }

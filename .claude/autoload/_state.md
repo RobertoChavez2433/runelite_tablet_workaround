@@ -1,39 +1,47 @@
 # Session State
 
-**Last Updated**: 2026-03-10 | **Session**: 51
+**Last Updated**: 2026-03-12 | **Session**: 53
 
 ## Current Phase
-- **Phase**: MVP Development — VirGL FBO Rendering Broken (Root Cause Found)
-- **Status**: Systematic debugging revealed FBO rendering is completely non-functional on VirGL. Alpha=0 after `glClear(0,0,0,1)` proves `glClear`/`glReadPixels` don't operate on the FBO at all. This is NOT a depth issue — the entire FBO pipeline is broken. `--all` SIGSEGV persists despite `GL_MAX_VIEWPORT_DIMS` stack overflow fix — deeper crash source in `log_gl_caps()`. Two commits landed: test pipeline files (14 files) + LD_LIBRARY_PATH fix in launch-runelite.sh.
+- **Phase**: MVP Development — VirGL Fix Pipeline Implemented, On-Device Testing Failed
+- **Status**: Implemented 5/7 phases of fix pipeline via `/implement` (all 6 quality gates PASS). Deployed to device and ran tests. SIGSEGV persists on `--all` mode (Phase 0 fix insufficient). ALL rendering still BLACK including default framebuffer fallback — not just FBO. Root causes hypothesized in session 52 did not resolve the issues. Need deeper investigation.
 
 ## HOT CONTEXT - Resume Here
 
 ### EXACTLY WHERE WE LEFT OFF
 
-**Session 51: Systematic debugging of BLACK rendering + SIGSEGV. Committed test pipeline (14 files) and LD_LIBRARY_PATH fix to launch-runelite.sh. Applied 3 code fixes (GL_MAX_VIEWPORT_DIMS overflow, DEPTH_COMPONENT32F→24, UBO diagnostic logging). Deployed to device, rebuilt, ran tests. Critical finding: FBO rendering completely broken on VirGL — `glClear(0,0,0,1)` produces A=0, proving the FBO color attachment is never written to. SIGSEGV in --all mode persists despite viewport dims fix.**
+**Session 53: Implemented VirGL fix pipeline (5/7 phases, 6 gates PASS). Deployed to device via device-run.sh script. On-device results: SIGSEGV still crashes --all mode; ALL rendering BLACK (FBO and default framebuffer). Phase 0 query removals didn't fix SIGSEGV. MESA_EXTENSION_OVERRIDE + 4.3COMPAT + GLSL 430 didn't fix rendering. Both shims activate correctly but still BLACK.**
 
 Key findings this session:
-1. **COMMITTED**: Test pipeline (14 files, 5203 insertions) + `env -u LD_LIBRARY_PATH` fix in launch-runelite.sh (2 separate commits)
-2. **FBO IS THE ROOT CAUSE**: `Center pixel (128,64): R=0 G=0 B=0 A=0` — since `glClearColor(0,0,0,1)` sets alpha to 1.0, getting A=0 proves `glClear` never wrote to the FBO. The entire FBO color attachment is uninitialized zeros. This is NOT a depth issue.
-3. **DEPTH_COMPONENT24 didn't help**: Switching from 32F to 24 made no difference — the problem is FBO fundamentals, not depth format
-4. **SIGSEGV deeper than GL_MAX_VIEWPORT_DIMS**: Fixed the stack overflow (GLint→GLint[2]) but `--all` still crashes. Crash happens before any `[INFO]` output from the harness. Likely another query in `log_gl_caps()` or extension enumeration via `glGetStringi`
-5. **Shims still work mechanically**: Shim A verified (glClipControl injected, glGetError=0x0000, state confirmed). Shim B intercepts correctly (GL_GREATER→GL_LESS, glClearDepth 0→1). The shims aren't the problem.
-6. **adb push directory mode crashes** on Windows Git Bash with `std::bad_alloc` — must push individual files with `MSYS_NO_PATHCONV=1`
-7. **#!/usr/bin/env bash shebangs** don't work in Termux `run-as` — must invoke via full path `/data/data/com.termux/files/usr/bin/bash script.sh`
+1. **SIGSEGV NOT fixed by Phase 0** — Removed 7 dangerous queries + added fflush fences + version-gated glGetStringi, but `--all` still crashes. The crash is NOT in the int_queries we removed — it's elsewhere (possibly extension enumeration, or running multiple modules sequentially triggers it).
+2. **ALL rendering BLACK** — Not just FBO. Default framebuffer (GLFW_VISIBLE=TRUE, depth hints) also produces R=0 G=0 B=0 A=0. This means the rendering failure is upstream of FBO: geometry/projection/vertex data is likely never reaching the GPU.
+3. **Shims activate correctly** — ClipControl shim: `glClipControl injected, glGetError=0x0000`. Depth flip shim: depth func/clear intercepted. But still BLACK — proving the issue is not depth-related.
+4. **Module 4a/4b/4c individually**: All BLACK, depth min=max=mean=0.000. Zero geometry rendered.
+5. **Deployment solved** — device-run.sh script bypasses Git Bash quoting issues. Push to /data/local/tmp/, run via `adb shell "run-as com.termux ... bash /data/local/tmp/device-run.sh"`.
 
 ### What Needs to Happen Next
 
-1. **P0: Debug VirGL FBO non-functionality** — Render to DEFAULT framebuffer (not FBO) and verify geometry appears. If yes, VirGL's FBO implementation is broken. If no, rendering itself is broken. Also try `glGetError()` after every FBO operation to find which call actually fails.
-2. **P0: Isolate --all SIGSEGV** — Run `--module 1` individually to see if Module 1 alone crashes. If it does, bisect the `log_gl_caps()` queries (remove extension enumeration, remove specific glGetIntegerv calls). If module 1 is fine alone, test `--module 2`, `--module 3` etc.
-3. **P1: If FBO doesn't work on VirGL** — Redesign depth tests to render to the DEFAULT framebuffer + `glReadPixels` from it. FBO-based testing may be fundamentally incompatible with VirGL.
+1. **P0: Debug SIGSEGV** — Run `--module 1` individually to isolate crash. The crash may only happen when running ALL modules sequentially (resource leak between modules?). Check harness.log from --all run for last output before crash.
+2. **P0: Debug BLACK rendering** — The geometry is never rendered on ANY backend config. Likely a harness bug: projection matrix, vertex data, or draw call setup is wrong. Test with a trivial triangle (no UBO, no matrices) to isolate.
+3. **P1: Check if probe_fbo_capability() ran** — The --all crash prevented the FBO probe from executing. Run `--module 7` individually to get FBO diagnostic data.
 
 ## Blockers
 
-**1. VirGL FBO rendering completely broken** — `glClear` and `glDrawArrays` don't write to FBO color attachment (A=0 after glClear(0,0,0,1) = uninitialized zeros). All FBO-based tests produce BLACK. Root cause unknown — could be VirGL's FBO implementation, a Mesa virpipe bug, or an incompatible FBO configuration.
+**1. VirGL ALL rendering BLACK** — NOT just FBO. Default framebuffer also renders black. Geometry/vertex data never reaches GPU. Upstream of depth buffer, FBO, and shims. Need trivial triangle test to isolate.
 
-**2. --all SIGSEGV in log_gl_caps()** — Crashes before any module output. `GL_MAX_VIEWPORT_DIMS` stack overflow was fixed but crash persists. Likely another problematic `glGetIntegerv` query or `glGetStringi` extension enumeration crash.
+**2. --all SIGSEGV persists** — Phase 0 query removals did NOT fix it. Crash happens before module output despite removing GL_MAX_VARYING_FLOATS etc. Root cause is elsewhere — possibly extension enumeration loop, or sequential module execution leaks resources.
 
 ## Recent Sessions
+
+### Session 53 (2026-03-12)
+**Work**: Implemented VirGL fix pipeline via `/implement` (5/7 phases, 6 quality gates PASS). Modified 4 files: gl_test_log.h, gl_test_harness.c, run-tests.sh, launch-runelite.sh. Deployed to device via device-run.sh. On-device: SIGSEGV persists, ALL rendering BLACK. Phase 0+1+2 fixes insufficient.
+**Decisions**: device-run.sh for adb deployment (bypasses Git Bash quoting). FBO creation ordering fix. mali-native GLSL=140, mali-angle GLSL=430. tr -d "\015" for CR stripping (not sed).
+**Next**: Debug SIGSEGV (run modules individually). Debug BLACK rendering (trivial triangle test). Run FBO probe (--module 7).
+
+### Session 52 (2026-03-11)
+**Work**: Root cause analysis via 3 parallel Sonnet research agents. Plan written by Sonnet agent. Adversarial review by Opus (7 MUST-FIX, 9 SHOULD-CONSIDER). All fixes incorporated into approved 6-phase plan. No code changes — plan only.
+**Decisions**: GL_DEPTH_CLAMP is highest-probability FBO fix. 4.3COMPAT+430 for version consistency. Renderbuffer instead of depth texture. GLFW_VISIBLE=TRUE required. Phase 2 deploys as single unit.
+**Next**: Implement Phase 0 (SIGSEGV fix), Phase 1 (env fixes), Phase 2 (FBO code fixes). Deploy and test.
 
 ### Session 51 (2026-03-10)
 **Work**: Committed test pipeline (14 files) + LD_LIBRARY_PATH fix. Systematic debugging: fixed GL_MAX_VIEWPORT_DIMS overflow, DEPTH_COMPONENT32F→24, UBO diagnostic logging. Deployed+rebuilt+ran on device. Critical finding: FBO rendering completely broken on VirGL (A=0 after glClear proves FBO never written to). SIGSEGV persists despite viewport dims fix.
@@ -50,26 +58,18 @@ Key findings this session:
 **Decisions**: LD_PRELOAD shim approach (not patching RuneLite). Standalone developer tool (not app integration). Sub-process LD_PRELOAD testing (not dlopen). Cross-UID deploy via staging to /data/local/tmp/. Environment allowlist for results (not dump-all).
 **Next**: `/implement` test pipeline (7 phases). Deploy, run --quick, determine winning shim. Apply to launch-runelite.sh.
 
-### Session 48 (2026-03-09)
-**Work**: VirGL socket fix achieved via 4-agent research. 11 changes: `--shared-tmp`, socket wait with `[ -S ]`, `MESA_GLX_ALPHA_BITS=0` (24-bit visual fix), glxgears instead of glxinfo, stock Mesa replaces lfdevs, `termux-x11-preference` replaces xrandr (colon syntax), `com.termux.x11.Loader` cleanup pattern. VirGL confirmed working (virgl renderer detected). GPU plugin fails: GLSL 3.30 not supported.
-**Decisions**: Stock Ubuntu Mesa for Mali (not lfdevs). Termux:X11 preferences for resolution (not xrandr). glxgears for virpipe detection (not glxinfo). MESA_GLX_ALPHA_BITS=0 for visual depth fix.
-**Next**: Add MESA_GLSL_VERSION_OVERRIDE=330 (one-line). Test GPU plugin. Software fallback resolution.
-
-### Session 47 (2026-03-09)
-**Work**: Eliminated hardcoded versions (launcher 2.7.7, Mesa 26.1.0). Fixed RuneLite always-run-launcher (auto-update). Fixed JVM flag propagation (--scale 2, RUNELITE_VMARGS=-Xmx4g). Fixed lfdevs Mesa download URL (was 404). Fixed GPU marker staleness. Deployed v2→v5 across 4 iterations. lfdevs Mesa 26.1.0-devel now confirmed installed. VirGL still broken — socket path mismatch.
-**Decisions**: Use RUNELITE_VMARGS (not JDK_JAVA_OPTIONS) for client JVM args. Use --scale 2 (launcher's native mechanism). Always delete GPU marker on setup-gpu run. Fallback Mesa version = mesa-26.1.0-devel-20260208 (actual existing tag).
-**Next**: Fix VirGL socket path (P0). Lower xrandr resolution as interim perf mitigation. Test auth in-game.
-
 ## Active Plans
 
-- **VirGL Test Pipeline** — **DEPLOYED, FBO BROKEN**. Session 51. 3 fixes applied (viewport overflow, depth format, UBO logging). On-device: compiles, shims activate, but FBO rendering completely non-functional (A=0 proves glClear doesn't write to FBO). Need to test default framebuffer rendering.
-- **GLSL Version Override** — **APPLIED**. Session 49. `MESA_GLSL_VERSION_OVERRIDE=330` added. Shaders compile.
-- **Mali GPU Acceleration** — **FBO BROKEN ON VIRGL**. VirGL connected, shaders compile, shims activate, but FBO doesn't work at all. May need to render to default framebuffer.
+- **VirGL Fix Pipeline** — **IMPLEMENTED, TESTS FAILED**. Session 53. 5/7 phases done, 6 quality gates PASS. On-device: SIGSEGV persists, rendering BLACK. `.claude/plans/2026-03-11-virgl-fix-pipeline.md`
+- **VirGL Test Pipeline** — **DEPLOYED**. Session 51. Harness updated with fix pipeline changes.
+- **Mali GPU Acceleration** — **FIXES INSUFFICIENT**. EXTENSION_OVERRIDE + version fixes didn't resolve rendering.
 - **Auth Session Refresh Fix** — **COMPLETE**. Session 45-46.
 - **Lifecycle + GPU Acceleration** — **COMPLETE**. All 3 phases.
 - **GeckoView Auth Integration** — **COMPLETE**.
 
 ## Reference
+- **VirGL fix pipeline plan**: `.claude/plans/2026-03-11-virgl-fix-pipeline.md`
+- **VirGL fix pipeline review**: `.claude/adversarial_reviews/2026-03-11-virgl-fix-pipeline/review.md`
 - **VirGL test pipeline plan**: `.claude/plans/2026-03-09-virgl-test-pipeline.md`
 - **VirGL test pipeline spec**: `.claude/specs/2026-03-09-virgl-test-pipeline-spec.md`
 - **VirGL test pipeline review**: `.claude/adversarial_reviews/2026-03-09-virgl-test-pipeline/review.md`
@@ -77,8 +77,8 @@ Key findings this session:
 - **Implement checkpoint**: `.claude/state/implement-checkpoint.json`
 - **Auth session fix plan**: `.claude/plans/2026-03-08-auth-session-refresh-fix.md`
 - **Source code**: `runelite-tablet/app/src/main/java/com/runelitetablet/`
-- **GL test source**: `runelite-tablet/gl-tests/` (14 files)
+- **GL test source**: `runelite-tablet/gl-tests/` (15 files)
 - **Research**: `.claude/research/` (9 files + README)
-- **Perf logs on device**: `~/runelite/gc.log`, `~/runelite/perf-monitor.log`, `~/runelite-launch.log`
-- **Test results on device**: `~/gl-tests/results/run-20260310-211044/`
+- **Device deploy script**: `runelite-tablet/gl-tests/scripts/device-run.sh`
+- **Test results on device**: `~/gl-tests/results/run-20260311-212430/`
 - **jcodemunch MCP**: `.mcp.json` configured (C:\Users\rseba\Projects\jcodemunch-mcp)

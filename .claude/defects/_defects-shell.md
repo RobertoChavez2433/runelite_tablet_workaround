@@ -4,27 +4,28 @@ Max 5 active. Oldest rotates to `.claude/logs/defects-archive.md`.
 
 ## Active Patterns
 
-### [SHELL] 2026-03-10: VirGL FBO rendering completely non-functional
-**Pattern**: `glClear(0,0,0,1)` + `glReadPixels` on a VirGL FBO returns A=0 (not A=255). The FBO color attachment is never written to — `glClear`, `glDrawArrays`, and `glReadPixels` all silently fail to operate on the bound FBO. All FBO-based rendering tests produce BLACK with uninitialized zeros.
-**Prevention**: Test rendering to DEFAULT framebuffer first (bypass FBO) to verify VirGL renders anything. If FBOs are fundamentally broken on VirGL, redesign tests to use default framebuffer + `glReadPixels`.
-**Ref**: @runelite-tablet/gl-tests/src/gl_test_harness.c (modules 4-9 all use FBOs)
+### [SHELL] 2026-03-12: sed CR stripping in nested shell quotes strips ALL 'r' characters
+**Pattern**: `sed -i s/\\r// file` in multi-layer shell quoting (Git Bash → adb → run-as → bash) reduces `\\r` to just `r`, stripping ALL 'r' characters from files. `export` becomes `expot`, `dirname` becomes `diname`.
+**Prevention**: Use `tr -d "\015"` for CR stripping (octal, no escaping issues). Or push a self-contained script to `/data/local/tmp/` and run it, avoiding nested quoting entirely.
+**Ref**: @runelite-tablet/gl-tests/scripts/device-run.sh
 
-### [SHELL] 2026-03-10: GL_MAX_VIEWPORT_DIMS stack buffer overflow in glGetIntegerv
-**Pattern**: `glGetIntegerv(GL_MAX_VIEWPORT_DIMS, &val)` writes 2 integers but code provided a single `GLint` — stack overflow corrupts adjacent variables, causes SIGSEGV. Other multi-value queries (e.g. `GL_MAX_VIEWPORT_DIMS`) also need array buffers.
-**Prevention**: Always use `GLint val[2]` for `glGetIntegerv` in query loops. Check GL docs for each enum's return count. Special-case multi-value queries in logging.
-**Ref**: @runelite-tablet/gl-tests/src/gl_test_log.h (log_gl_caps)
+### [SHELL] 2026-03-12: Git Bash leaks $HOME/$PATH to adb shell via nested quoting
+**Pattern**: In `adb shell "run-as com.termux bash -c 'export PATH=$PREFIX/bin:$PATH'"`, Git Bash expands `$PATH` to the Windows PATH before passing to adb, even through single quotes inside double quotes. Results in 2000+ char PATH with spaces, parentheses → syntax errors.
+**Prevention**: Use self-contained scripts pushed to `/data/local/tmp/` and run via `adb shell "run-as com.termux bash /data/local/tmp/script.sh"`. Scripts self-bootstrap Termux env internally. Never use `$PATH` or `$HOME` in inline adb commands.
+**Ref**: @runelite-tablet/gl-tests/scripts/device-run.sh
+
+### [SHELL] 2026-03-11: GL_DEPTH_CLAMP breaks virglrenderer FBO pipeline on GLES hosts
+**Pattern**: Mesa 4.5COMPAT auto-enables `GL_DEPTH_CLAMP`. GLES 3.2 host (ANGLE) has no `GL_DEPTH_CLAMP` → `GL_INVALID_ENUM`. The stale GLES error causes virglrenderer to silently discard ALL subsequent draws/clears, making FBO appear broken (A=0 after glClear). Root cause is the error cascade, not FBO itself.
+**Prevention**: Set `MESA_EXTENSION_OVERRIDE=-GL_ARB_depth_clamp,-GL_EXT_depth_clamp` to prevent Mesa from generating depth-clamp commands. Also match GL+GLSL versions (4.3COMPAT+430, not 4.5COMPAT+330). Use `MESA_DEBUG=1` to trace `GL_INVALID_ENUM` in virgl pipelines.
+**Ref**: Termux issue #15832, @runelite-tablet/gl-tests/scripts/run-tests.sh
+
+### [SHELL] 2026-03-11: GLES-unsupported glGetIntegerv tokens crash virpipe
+**Pattern**: `GL_MAX_VARYING_FLOATS` (desktop GL 2.0, 0x8B4B) is not in GLES 3.x. Querying it via virpipe causes hard crash (not just GL_INVALID_ENUM) because virpipe translation layer dereferences null mapping. Also: `glXGetProcAddressARB` NEVER returns NULL on Mesa — stubs crash when called.
+**Prevention**: Remove GLES-unsupported tokens from query tables (GL_MAX_VARYING_FLOATS, GL_MAX_CLIP_DISTANCES, GL_DEPTH_BITS, GL_STENCIL_BITS, GL_SAMPLE_BUFFERS, GL_SAMPLES, GL_SUBPIXEL_BITS). Version-gate `glGetStringi` (verify GL >= 3.0 + test index 0 before loop). Add fflush before each query for crash bisection.
+**Ref**: @runelite-tablet/gl-tests/src/gl_test_log.h (log_gl_caps, int_queries[])
 
 ### [SHELL] 2026-03-09: MESA_GLSL_VERSION_OVERRIDE missing for VirGL GPU plugin
 **Pattern**: `MESA_GL_VERSION_OVERRIDE=4.1COMPAT` overrides the GL version string but NOT the GLSL version. RuneLite GPU plugin requires GLSL 3.30 but VirGL stock Mesa reports GLSL 1.50 max. Plugin crashes with `GLSL 3.30 is not supported`.
 **Prevention**: Always set both `MESA_GL_VERSION_OVERRIDE` and `MESA_GLSL_VERSION_OVERRIDE` together. Community VirGL setups all use both (e.g., `MESA_GL_VERSION_OVERRIDE=4.3COMPAT MESA_GLSL_VERSION_OVERRIDE=430`).
 **Ref**: @runelite-tablet/app/src/main/assets/scripts/launch-runelite.sh (virpipe env block)
 
-### [SHELL] 2026-03-09: lfdevs Mesa breaks virpipe on Mali (32-bit visual BadMatch)
-**Pattern**: lfdevs Mesa (mesa-for-android-container) is built for Adreno/Turnip. When installed on Mali, virpipe selects 32-bit RGBA visual but Termux:X11 root window is 24-bit RGB. `XGetSubImage()` fails with BadMatch. glxinfo crashes before printing GL strings.
-**Prevention**: Use stock Ubuntu Mesa for Mali/VirGL (all community setups do this). Set `MESA_GLX_ALPHA_BITS=0` to force 24-bit visual. Use glxgears (XPutImage) not glxinfo (XGetImage) for virpipe detection.
-**Ref**: @runelite-tablet/app/src/main/assets/scripts/setup-gpu-mali.sh
-
-### [SHELL] 2026-03-10: LD_LIBRARY_PATH=$PREFIX/lib crashes virgl_test_server_android
-**Pattern**: Self-bootstrap `export LD_LIBRARY_PATH=$PREFIX/lib` in shell scripts causes `virgl_test_server_android` to find Termux's OpenSSL 3.x (which removed `OpenSSL_add_all_algorithms`) instead of system's OpenSSL. System's `libsqlite.so` needs that symbol → ANGLE dlopen fails → SIGSEGV. Also native GLES path: `libunwindstack.so` needs `Xzs_Construct` → same pattern.
-**Prevention**: Start VirGL server with `env -u LD_LIBRARY_PATH virgl_test_server_android`. Termux binaries have correct rpath baked in — never need LD_LIBRARY_PATH. Only set it for proot/non-Termux binaries.
-**Ref**: @runelite-tablet/gl-tests/scripts/run-tests.sh, @runelite-tablet/app/src/main/assets/scripts/launch-runelite.sh (needs same fix)
