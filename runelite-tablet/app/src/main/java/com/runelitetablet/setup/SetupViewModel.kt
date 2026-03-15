@@ -31,7 +31,9 @@ import com.runelitetablet.termux.TermuxPackageHelper
 import com.runelitetablet.ui.DisplayPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -145,6 +147,7 @@ class SetupViewModel(
 
     private val _launchState = MutableStateFlow<LaunchState>(LaunchState.Idle)
     val launchState: StateFlow<LaunchState> = _launchState.asStateFlow()
+    private var activeLaunchJob: Job? = null
 
     private val _healthStatus = MutableStateFlow<HealthCheckResult?>(null)
     val healthStatus: StateFlow<HealthCheckResult?> = _healthStatus.asStateFlow()
@@ -154,6 +157,7 @@ class SetupViewModel(
 
     private val setupStarted = AtomicBoolean(false)
     private val isRetrying = AtomicBoolean(false)
+    private var x11ReadySwitchJob: Job? = null
 
     // Stored session ID between character list fetch and character selection
     @Volatile private var pendingSessionId: String? = null
@@ -226,7 +230,7 @@ class SetupViewModel(
      * Internal launch method — fires the Termux command to run launch-runelite.sh.
      * Returns true if the command was successfully dispatched.
      */
-    private fun launch(envFilePath: String? = null): Boolean {
+    private suspend fun launch(envFilePath: String? = null): Boolean {
         AppLog.perf("launch: started")
 
         // Check Termux:X11 is installed before anything else
@@ -257,6 +261,10 @@ class SetupViewModel(
         if (x11LaunchIntent != null) {
             orchestrator.actions?.launchIntent(x11LaunchIntent)
             AppLog.step("launch", "launch: sent launchIntent for Termux:X11")
+            // Let Termux:X11 come to the foreground before the hidden Termux
+            // bootstrap begins. The actual shell launch no longer opens a
+            // visible Termux terminal session.
+            delay(700)
         } else {
             AppLog.w("STEP", "launch: could not get launch intent for Termux:X11")
         }
@@ -265,17 +273,51 @@ class SetupViewModel(
         val scriptPath = scriptManager.getScriptPath("launch-runelite.sh")
         val arguments = if (envFilePath != null) arrayOf(envFilePath) else null
         AppLog.step("launch", "launch: attempting RuneLite launch scriptPath=$scriptPath envFile=${envFilePath ?: "none"}")
-        val success = commandRunner.launch(
+        val finalSuccess = commandRunner.launchBackground(
             commandPath = scriptPath,
-            arguments = arguments,
-            sessionAction = TermuxCommandRunner.SESSION_ACTION_SWITCH_NEW
+            arguments = arguments
         )
-        AppLog.step("launch", "launch: result success=$success")
-        if (!success) {
+        AppLog.step("launch", "launch: result success=$finalSuccess")
+        if (!finalSuccess) {
             AppLog.e("STEP", "launch: failed to start RuneLite launch command")
+        } else if (x11LaunchIntent != null) {
+            waitForDisplayReadyAndSwitch(x11LaunchIntent)
         }
-        AppLog.perf("launch: completed success=$success")
-        return success
+        AppLog.perf("launch: completed success=$finalSuccess")
+        return finalSuccess
+    }
+
+    private fun waitForDisplayReadyAndSwitch(x11LaunchIntent: Intent) {
+        x11ReadySwitchJob?.cancel()
+        x11ReadySwitchJob = viewModelScope.launch {
+            repeat(20) { attempt ->
+                val result = commandRunner.execute(
+                    commandPath = "${TermuxCommandRunner.TERMUX_BIN_PATH}/bash",
+                    arguments = arrayOf(
+                        "-c",
+                        """
+                        CURRENT_FILE="${'$'}PREFIX/tmp/rlt-session/current"
+                        if [ -f "${'$'}CURRENT_FILE" ]; then
+                            SESSION_DIR="$(cat "${'$'}CURRENT_FILE" 2>/dev/null)"
+                            if [ -n "${'$'}SESSION_DIR" ] && [ -f "${'$'}SESSION_DIR/display.ready" ]; then
+                                echo READY
+                            fi
+                        fi
+                        """.trimIndent()
+                    ),
+                    background = true,
+                    timeoutMs = TermuxCommandRunner.TIMEOUT_VERIFY_MS
+                )
+                if (result.stdout?.contains("READY") == true) {
+                    orchestrator.actions?.launchIntent(x11LaunchIntent)
+                    AppLog.step("launch", "launch: switched to Termux:X11 after ready signal")
+                    return@launch
+                }
+                AppLog.step("launch", "launch: waiting for X11 ready signal attempt=${attempt + 1}")
+                delay(500)
+            }
+            AppLog.w("STEP", "launch: timed out waiting for X11 ready signal")
+        }
     }
 
     /**
@@ -283,13 +325,18 @@ class SetupViewModel(
      * Runs update check, health check, token refresh, then launches RuneLite.
      */
     fun launchRuneLite() {
+        if (activeLaunchJob?.isActive == true) {
+            AppLog.w("LAUNCH", "launchRuneLite: launch job already active, ignoring duplicate request")
+            return
+        }
+
         // Guard: don't launch if already running or starting
         val currentSession = RuneLiteSessionService.sessionState.value
         if (currentSession is SessionState.Running || currentSession is SessionState.Starting) {
             AppLog.w("LAUNCH", "launchRuneLite: session already ${currentSession::class.simpleName}, ignoring")
             return
         }
-        viewModelScope.launch {
+        activeLaunchJob = viewModelScope.launch {
             try {
                 // 1. Update check (non-blocking on failure)
                 _launchState.value = LaunchState.CheckingUpdate
@@ -342,6 +389,8 @@ class SetupViewModel(
             } catch (e: Exception) {
                 AppLog.e("LAUNCH", "launchRuneLite: unexpected exception: ${e.message}", e)
                 _launchState.value = LaunchState.Failed(e.message ?: "Unknown error")
+            } finally {
+                activeLaunchJob = null
             }
         }
     }
@@ -957,11 +1006,11 @@ class SetupViewModel(
     }
 
     /**
-     * Request battery optimization exemption for Termux.
+     * Request the next required battery optimization exemption.
      * Called from the UI when the battery optimization phase is active.
      */
     fun requestBatteryOptimization() {
-        AppLog.ui("requestBatteryOptimization: requesting for Termux")
+        AppLog.ui("requestBatteryOptimization: requesting next required exemption")
         orchestrator.requestBatteryOptimization()
         // Also request for our own app
         orchestrator.requestOwnBatteryOptimization()

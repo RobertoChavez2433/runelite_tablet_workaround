@@ -169,6 +169,33 @@ class TermuxCommandRunner(private val context: Context) {
         }
     }
 
+    fun launchBackground(
+        commandPath: String,
+        arguments: Array<String>? = null
+    ): Boolean {
+        val argsLog = arguments?.joinToString(" ")
+            ?.let { if (it.length > MAX_ARG_LOG_LENGTH) it.take(MAX_ARG_LOG_LENGTH) + "…" else it }
+            ?: "<none>"
+        AppLog.cmd(0, "launchBackground: commandPath=$commandPath args=$argsLog")
+        return try {
+            val intent = Intent(ACTION_RUN_COMMAND).apply {
+                component = ComponentName(TermuxPackageHelper.TERMUX_PACKAGE, RUN_COMMAND_SERVICE)
+                putExtra(EXTRA_COMMAND_PATH, commandPath)
+                if (arguments != null) putExtra(EXTRA_ARGUMENTS, arguments)
+                putExtra(EXTRA_BACKGROUND, true)
+            }
+            context.startService(intent)
+            AppLog.cmd(0, "launchBackground: startService success commandPath=$commandPath")
+            true
+        } catch (e: SecurityException) {
+            AppLog.e("CMD", "launchBackground: permission denied — is com.termux.permission.RUN_COMMAND granted? commandPath=$commandPath: ${e.message}", e)
+            false
+        } catch (e: Exception) {
+            AppLog.e("CMD", "launchBackground: startService failed commandPath=$commandPath: ${e.message}", e)
+            false
+        }
+    }
+
     private fun createPendingIntent(executionId: Int): PendingIntent {
         val intent = Intent(context, TermuxResultService::class.java).apply {
             putExtra("execution_id", executionId)

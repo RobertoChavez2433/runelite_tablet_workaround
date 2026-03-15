@@ -11,7 +11,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Polls Termux every [POLL_INTERVAL_MS] to check if RuneLite's Java process is alive.
+ * Polls Termux to check if RuneLite's Java process is alive.
  * Uses sentinel file ($PREFIX/tmp/.rlt-session-alive) created by launch-runelite.sh
  * and deleted when Java exits or shutdown-session.sh runs.
  *
@@ -23,7 +23,8 @@ class SessionHealthMonitor(
     private val scope: CoroutineScope
 ) {
     companion object {
-        const val POLL_INTERVAL_MS = 15_000L
+        private const val STARTUP_POLL_INTERVAL_MS = 5_000L
+        private const val RUNNING_POLL_INTERVAL_MS = 60_000L
         private const val HEALTH_CHECK_TIMEOUT_MS = 5_000L
         private const val STOPPED_THRESHOLD = 3
         private const val ERROR_THRESHOLD = 3
@@ -48,7 +49,12 @@ class SessionHealthMonitor(
                 if (emittedState != null) {
                     onStateChanged(emittedState)
                 }
-                delay(POLL_INTERVAL_MS)
+                val nextPollDelayMs = if (rawState is SessionState.Running) {
+                    RUNNING_POLL_INTERVAL_MS
+                } else {
+                    STARTUP_POLL_INTERVAL_MS
+                }
+                delay(nextPollDelayMs)
             }
         }
         pollingJob = job

@@ -92,6 +92,7 @@ class SetupOrchestrator(
 
     companion object {
         const val TERMUX_PACKAGE = "com.termux"
+        const val TERMUX_X11_PACKAGE = "com.termux.x11"
 
         /** Timeout for check-markers.sh reconciliation on startup */
         private const val MARKER_CHECK_TIMEOUT_MS = 10_000L
@@ -377,7 +378,7 @@ class SetupOrchestrator(
     private suspend fun handlePermissionsStep(): Boolean {
         // Check if everything already works (fast path for re-runs)
         val alreadyWorking = verifyPermissions()
-        if (alreadyWorking && isBatteryOptimized(TERMUX_PACKAGE)) {
+        if (alreadyWorking && hasRequiredBatteryExemptions()) {
             AppLog.step("permissions", "handlePermissionsStep: all permissions already configured")
             _permissionPhase.value = PermissionPhase.Complete
             return true
@@ -387,7 +388,7 @@ class SetupOrchestrator(
         if (alreadyWorking) {
             // Termux config + runtime permission already working, jump to battery
             AppLog.step("permissions", "handlePermissionsStep: RUN_COMMAND works, checking battery")
-            if (isBatteryOptimized(TERMUX_PACKAGE)) {
+            if (hasRequiredBatteryExemptions()) {
                 _permissionPhase.value = PermissionPhase.Complete
                 return true
             }
@@ -432,7 +433,7 @@ class SetupOrchestrator(
                 if (verifyPermissions()) {
                     AppLog.step("permissions", "advancePermissionPhase: RuntimePermission already granted, advancing to BatteryOptimization")
                     _permissionPhase.value = PermissionPhase.BatteryOptimization
-                    actions?.requestBatteryOptimization(TERMUX_PACKAGE)
+                    requestBatteryOptimization()
                 }
                 true
             }
@@ -449,14 +450,14 @@ class SetupOrchestrator(
                 }
             }
             is PermissionPhase.BatteryOptimization -> {
-                val termuxExempt = isBatteryOptimized(TERMUX_PACKAGE)
-                if (termuxExempt) {
+                val pendingPackage = getNextBatteryOptimizationPackage()
+                if (pendingPackage == null) {
                     AppLog.step("permissions", "advancePermissionPhase: BatteryOptimization verified, all phases complete")
                     _permissionPhase.value = PermissionPhase.Complete
                     completePermissionsStep()
                     true
                 } else {
-                    AppLog.step("permissions", "advancePermissionPhase: Termux not battery-exempt yet")
+                    AppLog.step("permissions", "advancePermissionPhase: battery exemption still missing for $pendingPackage")
                     false
                 }
             }
@@ -472,11 +473,18 @@ class SetupOrchestrator(
      * Uses ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS with Samsung fallback.
      */
     fun requestBatteryOptimization() {
+        val packageName = getNextBatteryOptimizationPackage() ?: TERMUX_PACKAGE
         try {
-            actions?.requestBatteryOptimization(TERMUX_PACKAGE)
+            if (packageName == TERMUX_X11_PACKAGE) {
+                // Samsung often returns immediately for auxiliary packages here without
+                // exposing a useful exemption UI. Jump straight to app settings instead.
+                actions?.openAppSettings(packageName)
+            } else {
+                actions?.requestBatteryOptimization(packageName)
+            }
         } catch (e: Exception) {
-            AppLog.w("PERM", "requestBatteryOptimization: intent failed, falling back to app settings: ${e.message}")
-            actions?.openAppSettings(TERMUX_PACKAGE)
+            AppLog.w("PERM", "requestBatteryOptimization: intent failed for $packageName, falling back to app settings: ${e.message}")
+            actions?.openAppSettings(packageName)
         }
     }
 
@@ -512,6 +520,17 @@ class SetupOrchestrator(
     fun isBatteryOptimized(packageName: String): Boolean {
         val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return false
         return pm.isIgnoringBatteryOptimizations(packageName)
+    }
+
+    private fun hasRequiredBatteryExemptions(): Boolean =
+        getNextBatteryOptimizationPackage() == null
+
+    private fun getNextBatteryOptimizationPackage(): String? {
+        return when {
+            !isBatteryOptimized(TERMUX_PACKAGE) -> TERMUX_PACKAGE
+            !isBatteryOptimized(TERMUX_X11_PACKAGE) -> TERMUX_X11_PACKAGE
+            else -> null
+        }
     }
 
     /**

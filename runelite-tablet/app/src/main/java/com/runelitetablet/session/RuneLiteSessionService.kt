@@ -61,7 +61,7 @@ class RuneLiteSessionService : Service() {
     private lateinit var commandRunner: TermuxCommandRunner
     private lateinit var scriptManager: ScriptManager
     private lateinit var prefs: SharedPreferences
-
+    private var lastNotificationText: String? = null
     override fun onCreate() {
         super.onCreate()
         AppLog.lifecycle("RuneLiteSessionService.onCreate")
@@ -180,7 +180,11 @@ class RuneLiteSessionService : Service() {
         AppLog.lifecycle("RuneLiteSessionService: switching to Termux:X11")
         val x11Intent = packageManager.getLaunchIntentForPackage(TermuxPackageHelper.TERMUX_X11_PACKAGE)
         if (x11Intent != null) {
-            x11Intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            x11Intent.addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+            )
             startActivity(x11Intent)
         } else {
             AppLog.w("SESSION", "RuneLiteSessionService: cannot launch Termux:X11 — not installed")
@@ -262,6 +266,7 @@ class RuneLiteSessionService : Service() {
     // -------------------------------------------------------------------------
 
     private fun buildNotification(contentText: String): Notification {
+        lastNotificationText = contentText
         // Tap notification -> open our app
         val contentIntent = PendingIntent.getActivity(
             this, 0,
@@ -305,6 +310,9 @@ class RuneLiteSessionService : Service() {
     }
 
     private fun updateNotification(text: String) {
+        if (text == lastNotificationText) {
+            return
+        }
         val nm = getSystemService(NotificationManager::class.java)
         nm.notify(NOTIFICATION_ID, buildNotification(text))
     }

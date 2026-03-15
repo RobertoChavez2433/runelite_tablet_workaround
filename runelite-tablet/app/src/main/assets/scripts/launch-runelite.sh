@@ -2,13 +2,105 @@
 # No set -e — we want to see ALL errors, not exit on the first one
 set -uo pipefail
 
+TERMUX_PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+if [ -f "$TERMUX_PREFIX/etc/profile" ]; then
+    # Populate PREFIX, PATH, TMPDIR, and the usual Termux shell env even when
+    # this script is launched from a non-login session.
+    # shellcheck disable=SC1091
+    . "$TERMUX_PREFIX/etc/profile"
+fi
+export PREFIX="${PREFIX:-$TERMUX_PREFIX}"
+export PATH="$PREFIX/bin:$PATH"
+export TMPDIR="${TMPDIR:-$PREFIX/tmp}"
+mkdir -p "$TMPDIR"
+
 LOGFILE="$HOME/runelite-launch.log"
+PERF_MONITOR_ENABLED="${RLT_ENABLE_PERF_MONITOR:-0}"
+LAUNCH_LOCK_DIR="$PREFIX/tmp/.rlt-launch.lock"
+LAUNCH_LOCK_PID_FILE="$LAUNCH_LOCK_DIR/pid"
+SESSION_ROOT_DIR="$PREFIX/tmp/rlt-session"
+CURRENT_SESSION_FILE="$SESSION_ROOT_DIR/current"
 # Termux uses $PREFIX/tmp, not /tmp — resolve the actual X11 socket path
 X11_SOCKET_DIR="$PREFIX/tmp/.X11-unix"
+TERMUX_X11_BIN="$PREFIX/bin/termux-x11"
+TERMUX_X11_PREF_BIN="$PREFIX/bin/termux-x11-preference"
 # Initialize PIDs for cleanup trap (set -u requires these to exist)
 X11_PID=""
 PERF_MONITOR_PID=""
 echo "=== RuneLite launch $(date) ===" | tee "$LOGFILE"
+
+acquire_launch_lock() {
+    if mkdir "$LAUNCH_LOCK_DIR" 2>/dev/null; then
+        echo "$$" > "$LAUNCH_LOCK_PID_FILE"
+        return 0
+    fi
+
+    if [ -f "$LAUNCH_LOCK_PID_FILE" ]; then
+        local existing_pid
+        existing_pid="$(cat "$LAUNCH_LOCK_PID_FILE" 2>/dev/null || true)"
+        if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
+            echo "Another RuneLite launch is already in progress (PID $existing_pid); exiting duplicate launcher." | tee -a "$LOGFILE"
+            exit 0
+        fi
+    fi
+
+    rm -rf "$LAUNCH_LOCK_DIR" 2>/dev/null || true
+    if mkdir "$LAUNCH_LOCK_DIR" 2>/dev/null; then
+        echo "$$" > "$LAUNCH_LOCK_PID_FILE"
+        return 0
+    fi
+
+    echo "Failed to acquire RuneLite launch lock; exiting." | tee -a "$LOGFILE"
+    exit 1
+}
+
+release_launch_lock() {
+    rm -rf "$LAUNCH_LOCK_DIR" 2>/dev/null || true
+}
+
+session_file() {
+    printf '%s/%s' "$SESSION_DIR" "$1"
+}
+
+write_session_value() {
+    local key="$1"
+    local value="$2"
+    printf '%s\n' "$value" > "$(session_file "$key")"
+}
+
+clear_current_session_marker() {
+    if [ -f "$CURRENT_SESSION_FILE" ] && [ "$(cat "$CURRENT_SESSION_FILE" 2>/dev/null || true)" = "$SESSION_DIR" ]; then
+        rm -f "$CURRENT_SESSION_FILE" 2>/dev/null || true
+    fi
+}
+
+acquire_launch_lock
+
+find_pids_by_cmdline() {
+    local pattern="$1"
+    local proc cmdline
+    for proc in /proc/[0-9]*; do
+        [ -r "$proc/cmdline" ] || continue
+        cmdline="$(tr '\0' ' ' < "$proc/cmdline" 2>/dev/null || true)"
+        case "$cmdline" in
+            *"$pattern"*)
+                basename "$proc"
+                ;;
+        esac
+    done
+}
+
+stop_termux_x11() {
+    local pid=""
+    for pid in $(find_pids_by_cmdline 'com.termux.x11.Loader') \
+               $(find_pids_by_cmdline 'termux-x11'); do
+        kill "$pid" 2>/dev/null || true
+    done
+    am broadcast -a com.termux.x11.ACTION_STOP --user 0 2>/dev/null || true
+    rm -f "$TMPDIR/.tX0-lock" 2>/dev/null || true
+    rm -f "$TMPDIR/.X0-lock" 2>/dev/null || true
+    rm -f "$X11_SOCKET_DIR/X0" 2>/dev/null || true
+}
 
 # ===================================================================
 # Credential injection — MUST happen before cleanup_previous because
@@ -36,6 +128,7 @@ fi
 cleanup_previous() {
     echo "Cleaning up previous session..." | tee -a "$LOGFILE"
     local killed=0
+    local pid=""
 
     # Kill Java (RuneLite) inside proot — match the main class or jar
     for pid in $(pgrep -f 'net.runelite.client.RuneLite' 2>/dev/null) \
@@ -53,10 +146,14 @@ cleanup_previous() {
     # Kill PulseAudio (we'll restart it fresh)
     pulseaudio --kill 2>/dev/null && killed=$((killed+1))
 
-    # Kill previous termux-x11 server process
-    # The actual X server binary is 'com.termux.x11.Loader', not 'termux-x11'
-    pkill -f 'termux-x11' 2>/dev/null && killed=$((killed+1))
-    pkill -f 'com.termux.x11.Loader' 2>/dev/null && killed=$((killed+1))
+    # Kill previous Termux:X11 server process by cmdline. `ps` only reports the
+    # binary name (`app_process`) on this tablet, so match /proc/*/cmdline.
+    for pid in $(find_pids_by_cmdline 'com.termux.x11.Loader') \
+               $(find_pids_by_cmdline 'termux-x11'); do
+        kill "$pid" 2>/dev/null && killed=$((killed+1))
+    done
+    stop_termux_x11
+    sleep 0.5
 
     # Kill previous perf monitor if still running
     pkill -f 'perf-monitor.log' 2>/dev/null && killed=$((killed+1))
@@ -81,6 +178,14 @@ cleanup_previous() {
 }
 
 cleanup_previous
+
+SESSION_ID="$(date +%Y%m%d-%H%M%S)-$$"
+SESSION_DIR="$SESSION_ROOT_DIR/$SESSION_ID"
+mkdir -p "$SESSION_DIR"
+printf '%s\n' "$SESSION_DIR" > "$CURRENT_SESSION_FILE"
+write_session_value launcher.pid "$$"
+write_session_value state starting
+echo "Session directory: $SESSION_DIR" | tee -a "$LOGFILE"
 
 # ===================================================================
 # EXIT trap — comprehensive cleanup when this session ends
@@ -113,7 +218,7 @@ cleanup_on_exit() {
 
     # Kill X11 server (binary is 'com.termux.x11.Loader', not 'termux-x11')
     [ -n "${X11_PID:-}" ] && kill "$X11_PID" 2>/dev/null
-    pkill -f 'com.termux.x11.Loader' 2>/dev/null || true
+    stop_termux_x11
 
     # Send stop broadcast to Termux:X11 Android app
     am broadcast -a com.termux.x11.ACTION_STOP --user 0 2>/dev/null || true
@@ -123,6 +228,10 @@ cleanup_on_exit() {
     # deployed one already. It's cleaned up after sourcing at the top of this script.
     rm -f "$PREFIX/tmp/.rlt-creds-"*.sh 2>/dev/null || true
     rm -f "$PREFIX/tmp/.rlt-session-alive" 2>/dev/null || true
+    write_session_value state stopped
+    clear_current_session_marker
+    rm -rf "$SESSION_DIR" 2>/dev/null || true
+    release_launch_lock
 
     echo "Shutdown complete" | tee -a "$LOGFILE"
 }
@@ -139,26 +248,38 @@ pulseaudio --start --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1" \
 
 # Start Termux:X11
 echo "Starting Termux:X11..." | tee -a "$LOGFILE"
-termux-x11 :0 &
-X11_PID=$!
-
-# Wait for X11 socket to be ready (up to 10 seconds)
+if [ ! -x "$TERMUX_X11_BIN" ]; then
+    echo "ERROR: Termux:X11 launcher missing at $TERMUX_X11_BIN" | tee -a "$LOGFILE"
+    exit 1
+fi
+mkdir -p "$X11_SOCKET_DIR"
 echo "Waiting for X11 socket..." | tee -a "$LOGFILE"
 X11_READY=false
-for i in $(seq 1 50); do
-    if [ -e "$X11_SOCKET_DIR/X0" ]; then
-        X11_READY=true
-        break
-    fi
-    sleep 0.2
+for attempt in 1 2; do
+    "$TERMUX_X11_BIN" :0 &
+    X11_PID=$!
+
+    for i in $(seq 1 60); do
+        if [ -e "$X11_SOCKET_DIR/X0" ]; then
+            X11_READY=true
+            break
+        fi
+        sleep 0.2
+    done
+
+    [ "$X11_READY" = true ] && break
+
+    echo "X11 socket attempt $attempt failed; restarting Termux:X11..." | tee -a "$LOGFILE"
+    stop_termux_x11
+    sleep 1
 done
 
 if [ "$X11_READY" = false ]; then
-    echo "ERROR: X11 socket not ready after 10 seconds" | tee -a "$LOGFILE"
+    echo "ERROR: X11 socket not ready after 30 seconds" | tee -a "$LOGFILE"
     echo "Contents of $PREFIX/tmp/:" | tee -a "$LOGFILE"
     ls -laR "$PREFIX/tmp/" 2>&1 | tee -a "$LOGFILE"
     echo "" | tee -a "$LOGFILE"
-    echo "Is Termux:X11 app running? Check that it's open." | tee -a "$LOGFILE"
+    echo "Termux:X11 launch is handled by the Android app; socket never appeared." | tee -a "$LOGFILE"
     echo "" | tee -a "$LOGFILE"
     echo "Press Enter to exit..."
     [ -t 0 ] && read -r || sleep 5
@@ -166,17 +287,19 @@ if [ "$X11_READY" = false ]; then
 fi
 
 echo "X11 socket ready" | tee -a "$LOGFILE"
-
-# Auto-switch to Termux:X11 so the user sees the display without manually switching apps.
-echo "Switching to Termux:X11..." | tee -a "$LOGFILE"
-am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity 2>&1 | tee -a "$LOGFILE" || true
+write_session_value x11.pid "$X11_PID"
+write_session_value state x11-ready
 
 # Set Termux:X11 preferences from the shell as backup.
 # The primary mechanism is the CHANGE_PREFERENCE broadcast sent from the Kotlin launch() method.
 # Syntax: termux-x11-preference key:value (colon separator, NOT equals)
 echo "Setting Termux:X11 preferences (shell backup)..." | tee -a "$LOGFILE"
-timeout 5 termux-x11-preference fullscreen:true 2>&1 | tee -a "$LOGFILE" || true
-timeout 5 termux-x11-preference showAdditionalKbd:false 2>&1 | tee -a "$LOGFILE" || true
+if [ -x "$TERMUX_X11_PREF_BIN" ]; then
+    timeout 5 "$TERMUX_X11_PREF_BIN" fullscreen:true 2>&1 | tee -a "$LOGFILE" || true
+    timeout 5 "$TERMUX_X11_PREF_BIN" showAdditionalKbd:false 2>&1 | tee -a "$LOGFILE" || true
+else
+    echo "WARNING: Termux:X11 preference helper missing at $TERMUX_X11_PREF_BIN" | tee -a "$LOGFILE"
+fi
 
 # Build credential env var forwarding for proot.
 # Env vars set in the outer Termux shell are NOT inherited by proot-distro login (Spike C result).
@@ -214,16 +337,17 @@ if [ "$GPU_VENDOR" = "adreno" ]; then
         echo "Adreno GPU: binding /dev/kgsl-3d0" | tee -a "$LOGFILE"
     fi
 elif [ "$GPU_VENDOR" = "mali" ]; then
-    # Mali: start VirGL server (ANGLE backend first, then native GLES fallback)
+    # Mali: native VirGL is the validated rendering path on the tablet.
+    # ANGLE reaches a ready socket but still breaks texture upload/context handling.
     pkill -f virgl_test_server 2>/dev/null || true
     sleep 0.5
 
     if command -v virgl_test_server_android >/dev/null 2>&1; then
         VIRGL_SOCKET="$PREFIX/tmp/.virgl_test"
 
-        # Tier 1: VirGL + ANGLE (Vulkan backend)
-        echo "Starting VirGL+ANGLE server..." | tee -a "$LOGFILE"
-        env -u LD_LIBRARY_PATH virgl_test_server_android --angle-gl &
+        # Native VirGL only. If this does not come up cleanly, fall back to software.
+        echo "Starting VirGL native GLES server..." | tee -a "$LOGFILE"
+        env -u LD_LIBRARY_PATH virgl_test_server_android &
         VIRGL_PID=$!
 
         # Wait for server to be ready (PID alive AND socket exists)
@@ -237,35 +361,16 @@ elif [ "$GPU_VENDOR" = "mali" ]; then
         done
 
         if [ "$VIRGL_READY" = true ]; then
-            echo "VirGL+ANGLE server started (PID $VIRGL_PID, socket ready)" | tee -a "$LOGFILE"
-            PROOT_GPU_ENV="mali-angle"
+            echo "VirGL native GLES server started (PID $VIRGL_PID, socket ready)" | tee -a "$LOGFILE"
+            PROOT_GPU_ENV="mali-native"
+            write_session_value virgl.pid "$VIRGL_PID"
         else
-            echo "VirGL+ANGLE failed (socket: $(ls -la "$VIRGL_SOCKET" 2>&1)), trying native GLES..." | tee -a "$LOGFILE"
+            echo "VirGL native GLES failed (socket: $(ls -la "$VIRGL_SOCKET" 2>&1)), using software rendering" | tee -a "$LOGFILE"
             kill $VIRGL_PID 2>/dev/null || true
             rm -f "$VIRGL_SOCKET" 2>/dev/null || true
-
-            # Tier 2: VirGL + native GLES
-            env -u LD_LIBRARY_PATH virgl_test_server_android &
-            VIRGL_PID=$!
-
-            VIRGL_READY=false
-            for i in $(seq 1 30); do
-                if kill -0 $VIRGL_PID 2>/dev/null && [ -S "$VIRGL_SOCKET" ]; then
-                    VIRGL_READY=true
-                    break
-                fi
-                sleep 0.2
-            done
-
-            if [ "$VIRGL_READY" = true ]; then
-                echo "VirGL native GLES server started (PID $VIRGL_PID, socket ready)" | tee -a "$LOGFILE"
-                PROOT_GPU_ENV="mali-native"
-            else
-                echo "VirGL unavailable (socket: $(ls -la "$VIRGL_SOCKET" 2>&1)), using software rendering" | tee -a "$LOGFILE"
-                kill $VIRGL_PID 2>/dev/null || true
-                VIRGL_PID=""
-                PROOT_GPU_ENV=""
-            fi
+            VIRGL_PID=""
+            PROOT_GPU_ENV=""
+            rm -f "$(session_file virgl.pid)" 2>/dev/null || true
         fi
     else
         echo "virgl_test_server_android not found — software rendering" | tee -a "$LOGFILE"
@@ -281,12 +386,14 @@ fi
 # $PREFIX/tmp is bind-mounted into proot as /tmp, so both sides can see it.
 touch "$PREFIX/tmp/.rlt-session-alive"
 echo "Session sentinel created" | tee -a "$LOGFILE"
+write_session_value state backend-starting
 
 # Re-check VirGL server is still alive (it may have crashed after initial health check)
 if [ -n "$VIRGL_PID" ] && ! kill -0 "$VIRGL_PID" 2>/dev/null; then
     echo "WARNING: VirGL server died before launch — falling back to software rendering" | tee -a "$LOGFILE"
     VIRGL_PID=""
     PROOT_GPU_ENV=""
+    rm -f "$(session_file virgl.pid)" 2>/dev/null || true
 fi
 
 # Set display resolution via Termux:X11 preferences (xrandr doesn't work — no transform support).
@@ -304,6 +411,7 @@ echo "VirGL socket: $(ls -la "$PREFIX/tmp/.virgl_test" 2>&1)" | tee -a "$LOGFILE
 proot-distro login ubuntu --shared-tmp $GPU_BIND -- bash -c "
     export DISPLAY=:0
     export PULSE_SERVER=tcp:127.0.0.1:4713
+    SESSION_DIR_IN_PROOT='/tmp/rlt-session/${SESSION_ID}'
 
     # Source credentials if available (Spike C: must source INSIDE proot)
     if [ -n '${PROOT_ENV_FILE}' ] && [ -f '${PROOT_ENV_FILE}' ]; then
@@ -346,6 +454,9 @@ proot-distro login ubuntu --shared-tmp $GPU_BIND -- bash -c "
         export VTEST_SOCKET_NAME=/tmp/.virgl_test
         export MESA_GLX_ALPHA_BITS=0
         export MESA_NO_ERROR=1
+        # GL_DEPTH_CLAMP fix: Mesa 4.5COMPAT auto-enables GL_DEPTH_CLAMP but GLES host
+        # returns GL_INVALID_ENUM, causing virglrenderer to discard all subsequent draws.
+        export MESA_EXTENSION_OVERRIDE=-GL_ARB_depth_clamp,-GL_EXT_depth_clamp
 
         echo \"VirGL socket visible: \$(ls -la /tmp/.virgl_test 2>&1)\" >&2
 
@@ -356,15 +467,17 @@ proot-distro login ubuntu --shared-tmp $GPU_BIND -- bash -c "
         echo \"VirGL glxgears check: \$GL_RENDERER\" >&2
 
         if echo \"\$GL_RENDERER\" | grep -qi \"virgl\"; then
-            OVERRIDE=\"4.5COMPAT\"
-            [ \"\$PROOT_GPU_ENV\" = \"mali-native\" ] && OVERRIDE=\"3.1COMPAT\"
+            # The validated working path on the tablet is native VirGL with the
+            # same GL 4.3 / GLSL 430 overrides used by the test harness.
+            OVERRIDE=\"4.3COMPAT\"
+            GLSL_OVERRIDE=\"430\"
             export MESA_GL_VERSION_OVERRIDE=\"\$OVERRIDE\"
-            export MESA_GLSL_VERSION_OVERRIDE=330
+            export MESA_GLSL_VERSION_OVERRIDE=\"\$GLSL_OVERRIDE\"
             GPU_AVAILABLE=true
-            echo \"GPU acceleration: ENABLED (VirGL, GL=\$OVERRIDE GLSL=330)\" >&2
+            echo \"GPU acceleration: ENABLED (VirGL, GL=\$OVERRIDE GLSL=\$GLSL_OVERRIDE)\" >&2
         else
             echo \"GPU acceleration: VirGL not detected (\$GL_RENDERER), falling back to software\" >&2
-            unset GALLIUM_DRIVER VTEST_SOCKET_NAME MESA_GLX_ALPHA_BITS MESA_NO_ERROR
+            unset GALLIUM_DRIVER VTEST_SOCKET_NAME MESA_GLX_ALPHA_BITS MESA_NO_ERROR MESA_EXTENSION_OVERRIDE
         fi
     else
         echo \"GPU acceleration: UNAVAILABLE (software rendering)\" >&2
@@ -388,33 +501,40 @@ proot-distro login ubuntu --shared-tmp $GPU_BIND -- bash -c "
 </openbox_config>
 OBCFG
     openbox --sm-disable &
+    OPENBOX_PID=\$!
+    echo \"\$OPENBOX_PID\" > \"\$SESSION_DIR_IN_PROOT/openbox.pid\"
     sleep 0.5
 
     cd /root/runelite
 
-    # --- Performance monitoring (background) ---
     PERF_LOG=\"/root/runelite/perf-monitor.log\"
     echo '=== Performance monitor started ===' > \"\$PERF_LOG\"
-    (
-        while true; do
-            echo \"--- \$(date +%H:%M:%S) ---\" >> \"\$PERF_LOG\"
-            # Memory: total/used/free in MB
-            free -m | head -2 >> \"\$PERF_LOG\"
-            # CPU load averages
-            cat /proc/loadavg >> \"\$PERF_LOG\"
-            # Top 5 CPU-consuming processes
-            ps aux --sort=-%cpu 2>/dev/null | head -6 >> \"\$PERF_LOG\" || true
-            echo '' >> \"\$PERF_LOG\"
-            sleep 5
-        done
-    ) &
-    PERF_PID=\$!
+    if [ \"${PERF_MONITOR_ENABLED}\" = \"1\" ]; then
+        (
+            while true; do
+                echo \"--- \$(date +%H:%M:%S) ---\" >> \"\$PERF_LOG\"
+                # Memory: total/used/free in MB
+                free -m | head -2 >> \"\$PERF_LOG\"
+                # CPU load averages
+                cat /proc/loadavg >> \"\$PERF_LOG\"
+                # Top 5 CPU-consuming processes
+                ps aux --sort=-%cpu 2>/dev/null | head -6 >> \"\$PERF_LOG\" || true
+                echo '' >> \"\$PERF_LOG\"
+                sleep 5
+            done
+        ) &
+        PERF_PID=\$!
+        echo \"\$PERF_PID\" > \"\$SESSION_DIR_IN_PROOT/perf.pid\"
+    else
+        echo 'Performance monitor disabled for normal launches' >> \"\$PERF_LOG\"
+    fi
 
     # Report display and GL info before launch
     echo '=== Display info ===' | tee -a \"\$PERF_LOG\"
     xrandr 2>&1 | tee -a \"\$PERF_LOG\" || true
     echo '=== GL info ===' | tee -a \"\$PERF_LOG\"
     glxinfo 2>/dev/null | grep -iE '(renderer|version|vendor|direct)' | tee -a \"\$PERF_LOG\" || true
+    echo ready > \"\$SESSION_DIR_IN_PROOT/display.ready\"
 
     # GC logging flags (OpenJDK 11 unified logging)
     GC_LOG_FLAGS=\"-Xlog:gc*:file=/root/runelite/gc.log:time,uptime,level,tags:filecount=2,filesize=5M\"
@@ -447,16 +567,19 @@ OBCFG
 
     # Write PID file for health monitoring (read by SessionHealthMonitor)
     echo \"\$JAVA_PID\" > /root/.rlt-session.pid
+    echo \"\$JAVA_PID\" > \"\$SESSION_DIR_IN_PROOT/java.pid\"
     echo \"RuneLite started with PID \$JAVA_PID\" >&2
 
     # Wait for java to exit
     wait \$JAVA_PID
     JAVA_EXIT=\$?
     rm -f /root/.rlt-session.pid
+    rm -f \"\$SESSION_DIR_IN_PROOT/java.pid\"
     rm -f /tmp/.rlt-session-alive
 
     # Clean up perf monitor
-    kill \$PERF_PID 2>/dev/null || true
+    [ -n \"\$PERF_PID\" ] && kill \$PERF_PID 2>/dev/null || true
+    rm -f \"\$SESSION_DIR_IN_PROOT/perf.pid\" \"\$SESSION_DIR_IN_PROOT/openbox.pid\"
     exit \$JAVA_EXIT
 " 2>&1 | tee -a "$LOGFILE"
 

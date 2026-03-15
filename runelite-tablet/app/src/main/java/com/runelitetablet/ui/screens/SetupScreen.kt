@@ -846,8 +846,9 @@ private fun PermissionPhaseContent(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     Text(
-                        text = "Termux needs to run in the background without being killed by Android. " +
-                            "Tap below and select \"Allow\" to exempt Termux from battery optimization.",
+                        text = "Both Termux and Termux:X11 must be allowed to run without Samsung " +
+                            "putting them to sleep. On this tablet, the button may open App info " +
+                            "first. If it does, tap Battery, then choose Unrestricted, then come back here.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 12.dp)
@@ -860,7 +861,7 @@ private fun PermissionPhaseContent(
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Allow Background Activity")
+                        Text("Open Battery Settings")
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -872,7 +873,7 @@ private fun PermissionPhaseContent(
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("I've allowed it - check now")
+                        Text("I've changed it - check now")
                     }
                 }
 
