@@ -2,6 +2,25 @@
 *.png
 diag-output.txt
 glxinfo-full.txt
+/perf-captures/
+/.vscode/
+/_tmp_*
+/combined-*.txt
+/early-glxgears-*.log
+/genfix-glxgears-*.log
+/glxgears-*.log
+/hybrid-*.log
+/hybrid-*.txt
+/hybrid-*-logcat.txt
+/proc-net-unix-*.txt
+/real-hybrid-*.log
+/real-hybrid-*-logcat.txt
+/retest-glxgears-*.log
+/stock-*.log
+/stock-*.txt
+/stock-*-logcat.txt
+/triggerfix-*.log
+/window_dump.xml
 
 # Local MCP config
 .mcp.json
