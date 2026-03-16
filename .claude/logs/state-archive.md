@@ -6,6 +6,56 @@ Session history archive. See `.claude/autoload/_state.md` for current state (las
 
 ## March 2026
 
+### Session 59 (2026-03-15)
+**Work**: Added native renderer timing and X11-side cadence counters, extended the real RuneLite evidence harness, forced RuneLite GPU settings (`unlockFps=true`, `fpsTarget=120`, `vsyncMode=OFF`), and captured internal-hybrid default-res, half-res, and `--scale 1` evidence runs. Also wired the combined probe harness so it can drive `internal-hybrid` synthetic controls, then captured the first fullscreen `glxgears` control attempt and invalidated it after confirming install and probe overlapped and Android force-stopped the app during install.
+**Decisions**: The Android-present step is no longer the main suspect; the remaining ceiling is upstream of it. Future synthetic `internal-hybrid` control runs must be strictly sequential after deploy.
+**Next**: Rerun the internal-hybrid VirGL fullscreen `glxgears` control sequentially, then continue upstream client-path diagnostics.
+
+### Session 58 (2026-03-15)
+**Work**: Debugged the in-app Java-side X server experiment until `internal-hybrid` successfully booted real RuneLite. Added startup-log preservation in `launch-runelite.sh`, widened diagnosis with raw logcat, proved donor `libXlorie.so` must be extracted from the installed `com.termux.x11` APK rather than loaded from `nativeLibraryDir`, fixed the extraction target so it writes into the Termux runtime filesystem instead of `ctx.getFilesDir()`, rebuilt and installed the app, and captured the first successful clean-start `internal-hybrid` real RuneLite runs at default-res and half-res.
+**Decisions**: The in-app bootstrap route is now a real measurement path, not just a spike. But the first working captures still land in essentially the same sustained FPS envelope as the external hybrid path, so bootstrap ownership alone is not the missing unlock.
+**Next**: Compare `internal-hybrid` against the external hybrid path as a runtime architecture question and then pivot toward deeper presentation-path changes if the envelope still does not move.
+
+### Session 57 (2026-03-15)
+**Work**: Started the first in-app Java-side X server experiment. Added an in-app `com.termux.x11.CmdEntryPoint`, launched it via `app_process` from our APK, introduced an `internal-hybrid` presentation variant in `launch-runelite.sh`, updated `HybridX11TestReceiver` and `scripts/hybrid-x11-runelite-evidence.ps1` to drive that variant, and built/installed the app. Captured the first clean-start `internal-hybrid` real RuneLite run. The run failed before X11 socket creation and never reached client initialization.
+**Decisions**: The stock/hybrid X11 comparator remains the baseline, not the answer. The app-owned server route is still the right direction, but the next blocker is earlier than rendering or pacing: the in-app `CmdEntryPoint` path must create the X11 socket and stay alive before it can be measured against RuneLite.
+**Next**: Capture direct `app_process` stdout/stderr for the in-app `CmdEntryPoint` launch, fix the earliest boot failure until the X11 socket appears, and only then re-run real RuneLite on `internal-hybrid`.
+
+### Session 56 (2026-03-15)
+**Work**: Extended the real RuneLite evidence path into a true stock-vs-hybrid comparator on the shared launcher path. Patched `launch-runelite.sh` and `HybridX11TestReceiver` so the real launcher can run either `stock` or `hybrid`, updated `scripts/hybrid-x11-runelite-evidence.ps1` to emit variant-aware visible-surface stats plus average/median FPS summaries, and captured matching 30-second clean-start real RuneLite runs for both variants. Then added and validated a forced half-res GPU display override (`1480x924`) on the hybrid path.
+**Decisions**: Stock and hybrid perform in essentially the same sustained FPS band on the current X11/VirGL path, so the remaining ceiling is not credibly hybrid-only. Lowering GPU display resolution to `1480x924` does not materially improve the sustained envelope, so the current X11/VirGL route does not look viable for a true sustained `120 FPS` target without a deeper redesign.
+**Next**: Pivot away from parity-only testing and toward a path that can plausibly beat the current X11/VirGL ceiling, either via a deeper presentation-path redesign or a more aggressive app-owned/direct-surface route.
+
+### Session 55 (2026-03-15)
+**Work**: Added clean-start host-side harnesses for synthetic X11 probes and real RuneLite evidence. Validated clean-start stock/hybrid synthetic probes, corrected an invalid parallel probe attempt, and captured the first clean-start real RuneLite evidence run on the hybrid host. Verified real RuneLite reaches `running`, the GPU plugin is active on `virgl`, the visible hybrid surface is voted `120.00 Hz`, and sustained rendering is still mostly around the `50-65 FPS` range rather than `120 FPS`.
+**Decisions**: The hybrid RuneLite evidence harness is now the default measurement method for top-level performance claims. Synthetic probes remain useful for quick isolation, but they no longer define success or failure by themselves.
+**Next**: Use the real RuneLite evidence harness to drive the next optimization pass on the X11/VirGL presentation chain, or build a like-for-like stock real RuneLite comparator if needed.
+
+### Session 54 (2026-03-15)
+**Work**: Created and advanced the `spike/direct-android-surface` branch. Added a live hybrid iteration log, validated direct app-owned surface `120 fps`, proved `TERMUX_X11_OVERRIDE_PACKAGE` routing into our app, built a functioning hybrid host activity that launches real RuneLite with native VirGL, restored safe trackpad-style touch semantics, and ran multiple stock vs hybrid VirGL probes. Latest result before the clean-start harness work: hybrid split-start probes still collapse around `0.4 FPS`.
+**Decisions**: Stay on the existing Linux RuneLite path. Use hybrid option `C` first. Touchscreen must remain trackpad-style only; no direct-touch injection. Real hardware mouse/touchpad stays real pointer input.
+**Next**: Replace ad hoc probe runs with clean-start harnesses, then measure real RuneLite instead of relying only on synthetic clients.
+
+### Session 53 (2026-03-12)
+**Work**: Implemented VirGL fix pipeline via `/implement` (5/7 phases, 6 quality gates PASS). Modified 4 files: `gl_test_log.h`, `gl_test_harness.c`, `run-tests.sh`, `launch-runelite.sh`. Deployed to device via `device-run.sh`. On-device: SIGSEGV persists and all rendering is black. Phase 0+1+2 fixes were insufficient.
+**Decisions**: `device-run.sh` for adb deployment to bypass Git Bash quoting issues. FBO creation ordering fix. `mali-native` uses GLSL 140, `mali-angle` uses GLSL 430. Use `tr -d "\\015"` for CR stripping instead of `sed`.
+**Next**: Debug SIGSEGV by running modules individually, debug black rendering with a trivial triangle path, and run the FBO probe (`--module 7`).
+
+### Session 52 (2026-03-11)
+**Work**: Root-cause analysis via 3 parallel research agents. Plan written by a Sonnet agent. Adversarial review by Opus found 7 MUST-FIX and 9 SHOULD-CONSIDER issues, all incorporated into the approved 6-phase plan. No code changes in this session.
+**Decisions**: `GL_DEPTH_CLAMP` is the highest-probability FBO fix. Use `4.3COMPAT+430` for version consistency. Prefer a renderbuffer over a depth texture. `GLFW_VISIBLE=TRUE` is required. Phase 2 should deploy as a single unit.
+**Next**: Implement Phase 0 (SIGSEGV fix), Phase 1 (env fixes), and Phase 2 (FBO code fixes), then deploy and test.
+
+### Session 51 (2026-03-10)
+**Work**: Committed the test pipeline (14 files) plus an `LD_LIBRARY_PATH` fix. Systematic debugging fixed `GL_MAX_VIEWPORT_DIMS` overflow, `DEPTH_COMPONENT32F` to `DEPTH_COMPONENT24`, and added UBO diagnostic logging. Deployed, rebuilt, and ran on device. Critical finding: FBO rendering is completely broken on VirGL, and SIGSEGV persisted despite the viewport-dims fix.
+**Decisions**: Use `DEPTH_COMPONENT24` over `32F`. Use `MSYS_NO_PATHCONV=1` for adb from Git Bash. Push individual files rather than directories. Invoke scripts via a full bash path rather than shebangs.
+**Next**: Test rendering to the default framebuffer, isolate SIGSEGV by running module 1 individually, and redesign tests if FBO is fundamentally broken on VirGL.
+
+### Session 50 (2026-03-10)
+**Work**: Implemented the VirGL test pipeline via `/implement` (Phases 1-6, 13 files, 6 quality gates PASS). Fixed 4 P2 review nitpicks, deployed to device, and resolved 3 deployment bugs (`LD_LIBRARY_PATH`, X11 locks, `TMPDIR`). First successful on-device run showed VirGL+ANGLE works and both shims activate correctly, but all depth tests rendered black.
+**Decisions**: Use `env -u LD_LIBRARY_PATH` for the VirGL server because of Termux OpenSSL conflicts. Always kill and clean X11 before starting to avoid stale locks. Set `TMPDIR` and `XDG_RUNTIME_DIR` in self-bootstrap. Set `GLFW_PLATFORM=x11` for GLFW 3.4.
+**Next**: Debug the black rendering path, fix Modules 1-3 SIGSEGV, apply the `LD_LIBRARY_PATH` fix to `launch-runelite.sh`, and commit the files.
+
 ### Session 48 (2026-03-09)
 **Work**: VirGL socket fix achieved via 4-agent research. 11 changes: `--shared-tmp`, socket wait with `[ -S ]`, `MESA_GLX_ALPHA_BITS=0` (24-bit visual fix), glxgears instead of glxinfo, stock Mesa replaces lfdevs, `termux-x11-preference` replaces xrandr (colon syntax), `com.termux.x11.Loader` cleanup pattern. VirGL confirmed working (virgl renderer detected). GPU plugin fails: GLSL 3.30 not supported.
 **Decisions**: Stock Ubuntu Mesa for Mali (not lfdevs). Termux:X11 preferences for resolution (not xrandr). glxgears for virpipe detection (not glxinfo). MESA_GLX_ALPHA_BITS=0 for visual depth fix.
@@ -55,6 +105,13 @@ Session history archive. See `.claude/autoload/_state.md` for current state (las
 ---
 
 ## February 2026
+
+## March 2026
+
+### Session 60 (2026-03-15)
+**Work**: Added a working `internal-hybrid` `direct-jvm` real RuneLite launch mode and wired it through the real evidence harness. Fixed two harness issues on the way there: appended Termux `runelite-launch.log` history was causing false-positive readiness, and seeded direct classpaths were being corrupted by Windows CRLF. Validated fresh launcher-vs-direct evidence runs, added a classpath-override directory for patched jars, pulled the live RuneLite jars from the device, and saved a bytecode dump of `GpuPlugin` to confirm the concrete next patch target in `prepareInterfaceTexture(...)` / `drawUi(...)`.
+**Decisions**: Bypassing the RuneLite launcher bootstrap is not the missing unlock. Keep `direct-jvm` as the patch/testing vehicle and move the next work to targeted client-side jar experiments instead of more launcher/X11 ownership changes.
+**Next**: Patch the RuneLite GPU client path, starting with the interface upload / synchronization path in `client-1.12.20.jar`, then measure that patched jar through the new override path.
 
 ### Session 39 (2026-02-24)
 **Work**: First on-device test session. Fixed 3 bugs: shell syntax (16 unescaped `"` in bash -c block), env file premature deletion, stateStore cache not cleared on ABSENT reconciliation. GPU packages install correctly but VirGL doesn't work — Ubuntu ARM64 Mesa missing virpipe driver.
@@ -208,3 +265,8 @@ Session history archive. See `.claude/autoload/_state.md` for current state (las
 **Work**: Brainstormed GeckoView auth integration design. Explored full auth codebase via agent (5 files, ~1327 lines). Made 6 design decisions. Presented 6 design sections, all approved. Wrote design doc.
 **Decisions**: Dedicated GeckoAuthActivity, no Custom Tabs fallback, single launch both steps, Activity does token exchange internally, ActivityResult API, immediate cancel on back press.
 **Next**: Implement design (4 phases), verify on device, then Slice 4+5.
+
+### Session 49 (2026-03-09)
+**Work**: Investigated GPU plugin black screen via 8 research agents. Root cause: reversed-Z depth buffer requires `glClipControl` (GL 4.5) which VirGL doesn't support. `GL_ARB_clip_control` confirmed absent from extension list. `MESA_NO_ERROR=1` masked the failure. Applied GLSL 330 override (shaders compile) and GL 4.5 override (didn't fix — LWJGL checks function pointers not just version string). Captured full VirGL capability dump. Designed 3-tier test pipeline via `/brainstorming` -> `/adversarial-review` -> `/writing-plans`. 6 MUST-FIX items found and addressed.
+**Decisions**: LD_PRELOAD shim approach (not patching RuneLite). Standalone developer tool (not app integration). Sub-process LD_PRELOAD testing (not dlopen). Cross-UID deploy via staging to /data/local/tmp/. Environment allowlist for results (not dump-all).
+**Next**: `/implement` test pipeline (7 phases). Deploy, run --quick, determine winning shim. Apply to launch-runelite.sh.
