@@ -15,6 +15,9 @@ export TMPDIR="${TMPDIR:-$PREFIX/tmp}"
 mkdir -p "$TMPDIR"
 
 LOGFILE="$HOME/runelite-launch.log"
+INTERNAL_X11_LOGFILE="$HOME/internal-x11-start.log"
+TERMUX_RUNELITE_SETTINGS_DIR="$HOME/.runelite"
+TERMUX_DIRECT_CLASSPATH_FILE="$TERMUX_RUNELITE_SETTINGS_DIR/direct-classpath.txt"
 PERF_MONITOR_ENABLED="${RLT_ENABLE_PERF_MONITOR:-0}"
 LAUNCH_LOCK_DIR="$PREFIX/tmp/.rlt-launch.lock"
 LAUNCH_LOCK_PID_FILE="$LAUNCH_LOCK_DIR/pid"
@@ -24,10 +27,24 @@ CURRENT_SESSION_FILE="$SESSION_ROOT_DIR/current"
 X11_SOCKET_DIR="$PREFIX/tmp/.X11-unix"
 TERMUX_X11_BIN="$PREFIX/bin/termux-x11"
 TERMUX_X11_PREF_BIN="$PREFIX/bin/termux-x11-preference"
+HYBRID_X11_OVERRIDE_PACKAGE="com.runelitetablet"
+HYBRID_X11_HOST_COMPONENT="com.runelitetablet/.presentation.hybrid.HybridX11HostActivity"
+STOCK_X11_HOST_COMPONENT="com.termux.x11/.MainActivity"
+X11_PRESENTATION_VARIANT="hybrid"
+X11_OVERRIDE_PACKAGE="$HYBRID_X11_OVERRIDE_PACKAGE"
+X11_HOST_COMPONENT="$HYBRID_X11_HOST_COMPONENT"
+X11_SERVER_MODE="external"
+GPU_DISPLAY_RESOLUTION_OVERRIDE=""
+RUNELITE_SCALE_OVERRIDE=""
+JAVA2D_PROFILE_OVERRIDE=""
+MESA_PROFILE_OVERRIDE=""
+VIRGL_SERVER_PROFILE_OVERRIDE=""
+RUNELITE_LAUNCH_MODE_OVERRIDE=""
 # Initialize PIDs for cleanup trap (set -u requires these to exist)
 X11_PID=""
 PERF_MONITOR_PID=""
-echo "=== RuneLite launch $(date) ===" | tee "$LOGFILE"
+mkdir -p "$TERMUX_RUNELITE_SETTINGS_DIR"
+echo "=== RuneLite launch $(date) ===" | tee -a "$LOGFILE"
 
 acquire_launch_lock() {
     if mkdir "$LAUNCH_LOCK_DIR" 2>/dev/null; then
@@ -58,6 +75,101 @@ release_launch_lock() {
     rm -rf "$LAUNCH_LOCK_DIR" 2>/dev/null || true
 }
 
+parse_launcher_args() {
+    ENV_FILE=""
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --x11-presentation)
+                if [ "$#" -lt 2 ]; then
+                    echo "ERROR: --x11-presentation requires a value" | tee -a "$LOGFILE"
+                    exit 1
+                fi
+                X11_PRESENTATION_VARIANT="$2"
+                shift 2
+                ;;
+            --gpu-display-resolution)
+                if [ "$#" -lt 2 ]; then
+                    echo "ERROR: --gpu-display-resolution requires a value" | tee -a "$LOGFILE"
+                    exit 1
+                fi
+                GPU_DISPLAY_RESOLUTION_OVERRIDE="$2"
+                shift 2
+                ;;
+            --runelite-scale)
+                if [ "$#" -lt 2 ]; then
+                    echo "ERROR: --runelite-scale requires a value" | tee -a "$LOGFILE"
+                    exit 1
+                fi
+                RUNELITE_SCALE_OVERRIDE="$2"
+                shift 2
+                ;;
+            --java2d-profile)
+                if [ "$#" -lt 2 ]; then
+                    echo "ERROR: --java2d-profile requires a value" | tee -a "$LOGFILE"
+                    exit 1
+                fi
+                JAVA2D_PROFILE_OVERRIDE="$2"
+                shift 2
+                ;;
+            --mesa-profile)
+                if [ "$#" -lt 2 ]; then
+                    echo "ERROR: --mesa-profile requires a value" | tee -a "$LOGFILE"
+                    exit 1
+                fi
+                MESA_PROFILE_OVERRIDE="$2"
+                shift 2
+                ;;
+            --virgl-server-profile)
+                if [ "$#" -lt 2 ]; then
+                    echo "ERROR: --virgl-server-profile requires a value" | tee -a "$LOGFILE"
+                    exit 1
+                fi
+                VIRGL_SERVER_PROFILE_OVERRIDE="$2"
+                shift 2
+                ;;
+            --runelite-launch-mode)
+                if [ "$#" -lt 2 ]; then
+                    echo "ERROR: --runelite-launch-mode requires a value" | tee -a "$LOGFILE"
+                    exit 1
+                fi
+                RUNELITE_LAUNCH_MODE_OVERRIDE="$2"
+                shift 2
+                ;;
+            *)
+                if [ -z "$ENV_FILE" ]; then
+                    ENV_FILE="$1"
+                    shift
+                else
+                    echo "WARNING: ignoring unexpected launcher argument: $1" | tee -a "$LOGFILE"
+                    shift
+                fi
+                ;;
+        esac
+    done
+
+    case "$X11_PRESENTATION_VARIANT" in
+        hybrid)
+            X11_OVERRIDE_PACKAGE="$HYBRID_X11_OVERRIDE_PACKAGE"
+            X11_HOST_COMPONENT="$HYBRID_X11_HOST_COMPONENT"
+            X11_SERVER_MODE="external"
+            ;;
+        stock)
+            X11_OVERRIDE_PACKAGE=""
+            X11_HOST_COMPONENT="$STOCK_X11_HOST_COMPONENT"
+            X11_SERVER_MODE="external"
+            ;;
+        internal-hybrid)
+            X11_OVERRIDE_PACKAGE=""
+            X11_HOST_COMPONENT="$HYBRID_X11_HOST_COMPONENT"
+            X11_SERVER_MODE="internal"
+            ;;
+        *)
+            echo "ERROR: unsupported X11 presentation variant '$X11_PRESENTATION_VARIANT'" | tee -a "$LOGFILE"
+            exit 1
+            ;;
+    esac
+}
+
 session_file() {
     printf '%s/%s' "$SESSION_DIR" "$1"
 }
@@ -74,6 +186,7 @@ clear_current_session_marker() {
     fi
 }
 
+parse_launcher_args "$@"
 acquire_launch_lock
 
 find_pids_by_cmdline() {
@@ -93,6 +206,7 @@ find_pids_by_cmdline() {
 stop_termux_x11() {
     local pid=""
     for pid in $(find_pids_by_cmdline 'com.termux.x11.Loader') \
+               $(find_pids_by_cmdline 'com.termux.x11.CmdEntryPoint') \
                $(find_pids_by_cmdline 'termux-x11'); do
         kill "$pid" 2>/dev/null || true
     done
@@ -106,7 +220,6 @@ stop_termux_x11() {
 # Credential injection — MUST happen before cleanup_previous because
 # the old launch script's EXIT trap deletes .rlt-launch-env.sh
 # ===================================================================
-ENV_FILE="${1:-}"
 if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
     echo "Sourcing credentials from env file..." | tee -a "$LOGFILE"
     # shellcheck disable=SC1090
@@ -149,6 +262,7 @@ cleanup_previous() {
     # Kill previous Termux:X11 server process by cmdline. `ps` only reports the
     # binary name (`app_process`) on this tablet, so match /proc/*/cmdline.
     for pid in $(find_pids_by_cmdline 'com.termux.x11.Loader') \
+               $(find_pids_by_cmdline 'com.termux.x11.CmdEntryPoint') \
                $(find_pids_by_cmdline 'termux-x11'); do
         kill "$pid" 2>/dev/null && killed=$((killed+1))
     done
@@ -167,6 +281,7 @@ cleanup_previous() {
     # It gets cleaned up after sourcing (line 115) and in cleanup_on_exit().
     rm -f "$PREFIX/tmp/.rlt-creds-"*.sh 2>/dev/null || true
     rm -f "$PREFIX/tmp/.rlt-session-alive" 2>/dev/null || true
+    rm -f "$INTERNAL_X11_LOGFILE" 2>/dev/null || true
 
     # Brief pause to let processes die
     if [ "$killed" -gt 0 ]; then
@@ -253,15 +368,40 @@ if [ ! -x "$TERMUX_X11_BIN" ]; then
     exit 1
 fi
 mkdir -p "$X11_SOCKET_DIR"
+if [ -n "$X11_OVERRIDE_PACKAGE" ]; then
+    export TERMUX_X11_OVERRIDE_PACKAGE="$X11_OVERRIDE_PACKAGE"
+    echo "Termux:X11 presentation variant: $X11_PRESENTATION_VARIANT server=$X11_SERVER_MODE override=$TERMUX_X11_OVERRIDE_PACKAGE" | tee -a "$LOGFILE"
+else
+    unset TERMUX_X11_OVERRIDE_PACKAGE
+    echo "Termux:X11 presentation variant: $X11_PRESENTATION_VARIANT server=$X11_SERVER_MODE override=<none>" | tee -a "$LOGFILE"
+fi
 echo "Waiting for X11 socket..." | tee -a "$LOGFILE"
 X11_READY=false
 for attempt in 1 2; do
-    "$TERMUX_X11_BIN" :0 &
+    if [ "$X11_SERVER_MODE" = "internal" ]; then
+        APP_APK_PATH="$(pm path com.runelitetablet 2>/dev/null | head -n 1 | sed 's/^package://')"
+        if [ -z "$APP_APK_PATH" ]; then
+            echo "ERROR: failed to resolve com.runelitetablet base.apk for internal CmdEntryPoint launch" | tee -a "$LOGFILE"
+            exit 1
+        fi
+        echo "Internal CmdEntryPoint attempt $attempt apk=$APP_APK_PATH" | tee -a "$LOGFILE"
+        : > "$INTERNAL_X11_LOGFILE"
+        env CLASSPATH="$APP_APK_PATH" /system/bin/app_process -Xnoimage-dex2oat / \
+            --nice-name="termux-x11 com.runelitetablet :0" com.termux.x11.CmdEntryPoint :0 \
+            > "$INTERNAL_X11_LOGFILE" 2>&1 &
+    else
+        "$TERMUX_X11_BIN" :0 &
+    fi
     X11_PID=$!
+    echo "X11 launch pid: $X11_PID" | tee -a "$LOGFILE"
 
     for i in $(seq 1 60); do
         if [ -e "$X11_SOCKET_DIR/X0" ]; then
             X11_READY=true
+            break
+        fi
+        if ! kill -0 "$X11_PID" 2>/dev/null; then
+            echo "X11 process $X11_PID exited before socket creation on poll $i" | tee -a "$LOGFILE"
             break
         fi
         sleep 0.2
@@ -270,6 +410,12 @@ for attempt in 1 2; do
     [ "$X11_READY" = true ] && break
 
     echo "X11 socket attempt $attempt failed; restarting Termux:X11..." | tee -a "$LOGFILE"
+    if [ "$X11_SERVER_MODE" = "internal" ]; then
+        echo "--- internal x11 start log (attempt $attempt) ---" | tee -a "$LOGFILE"
+        tail -n 200 "$INTERNAL_X11_LOGFILE" 2>&1 | tee -a "$LOGFILE" || true
+        echo "--- internal x11 process snapshot (attempt $attempt) ---" | tee -a "$LOGFILE"
+        toybox ps -A -o PID,PPID,NAME,ARGS 2>/dev/null | grep -E "($X11_PID|app_process|CmdEntryPoint|termux-x11)" | tee -a "$LOGFILE" || true
+    fi
     stop_termux_x11
     sleep 1
 done
@@ -278,6 +424,14 @@ if [ "$X11_READY" = false ]; then
     echo "ERROR: X11 socket not ready after 30 seconds" | tee -a "$LOGFILE"
     echo "Contents of $PREFIX/tmp/:" | tee -a "$LOGFILE"
     ls -laR "$PREFIX/tmp/" 2>&1 | tee -a "$LOGFILE"
+    if [ "$X11_SERVER_MODE" = "internal" ]; then
+        echo "" | tee -a "$LOGFILE"
+        echo "Contents of $INTERNAL_X11_LOGFILE:" | tee -a "$LOGFILE"
+        tail -n 200 "$INTERNAL_X11_LOGFILE" 2>&1 | tee -a "$LOGFILE" || true
+        echo "" | tee -a "$LOGFILE"
+        echo "Internal X11 process snapshot:" | tee -a "$LOGFILE"
+        toybox ps -A -o PID,PPID,NAME,ARGS 2>/dev/null | grep -E '(app_process|CmdEntryPoint|termux-x11)' | tee -a "$LOGFILE" || true
+    fi
     echo "" | tee -a "$LOGFILE"
     echo "Termux:X11 launch is handled by the Android app; socket never appeared." | tee -a "$LOGFILE"
     echo "" | tee -a "$LOGFILE"
@@ -289,6 +443,21 @@ fi
 echo "X11 socket ready" | tee -a "$LOGFILE"
 write_session_value x11.pid "$X11_PID"
 write_session_value state x11-ready
+write_session_value x11.variant "$X11_PRESENTATION_VARIANT"
+write_session_value x11.server "$X11_SERVER_MODE"
+write_session_value x11.override "${TERMUX_X11_OVERRIDE_PACKAGE:-<stock>}"
+write_session_value x11.internal.log "$INTERNAL_X11_LOGFILE"
+
+if [ -n "$X11_HOST_COMPONENT" ]; then
+    echo "Launching X11 host activity: $X11_HOST_COMPONENT" | tee -a "$LOGFILE"
+    if am start --activity-single-top --activity-clear-top -n "$X11_HOST_COMPONENT" >/dev/null 2>&1; then
+        echo "X11 host activity launched" | tee -a "$LOGFILE"
+    else
+        echo "WARNING: failed to launch X11 host activity $X11_HOST_COMPONENT" | tee -a "$LOGFILE"
+    fi
+else
+    echo "No app-owned X11 host activity requested; using stock Termux:X11 activity" | tee -a "$LOGFILE"
+fi
 
 # Set Termux:X11 preferences from the shell as backup.
 # The primary mechanism is the CHANGE_PREFERENCE broadcast sent from the Kotlin launch() method.
@@ -337,17 +506,44 @@ if [ "$GPU_VENDOR" = "adreno" ]; then
         echo "Adreno GPU: binding /dev/kgsl-3d0" | tee -a "$LOGFILE"
     fi
 elif [ "$GPU_VENDOR" = "mali" ]; then
-    # Mali: native VirGL is the validated rendering path on the tablet.
-    # ANGLE reaches a ready socket but still breaks texture upload/context handling.
+    # Mali: native VirGL is the validated baseline on the tablet. Alternate
+    # server profiles are exposed only for bounded A/B testing.
     pkill -f virgl_test_server 2>/dev/null || true
     sleep 0.5
 
     if command -v virgl_test_server_android >/dev/null 2>&1; then
         VIRGL_SOCKET="$PREFIX/tmp/.virgl_test"
+        VIRGL_SERVER_PROFILE="${RLT_VIRGL_SERVER_PROFILE:-${VIRGL_SERVER_PROFILE_OVERRIDE:-default}}"
+        VIRGL_SERVER_ARGS=""
+        VIRGL_SERVER_DESCRIPTION="native-gles"
 
-        # Native VirGL only. If this does not come up cleanly, fall back to software.
-        echo "Starting VirGL native GLES server..." | tee -a "$LOGFILE"
-        env -u LD_LIBRARY_PATH virgl_test_server_android &
+        case "$VIRGL_SERVER_PROFILE" in
+            default)
+                VIRGL_SERVER_ARGS=""
+                VIRGL_SERVER_DESCRIPTION="native-gles"
+                ;;
+            no-loop-or-fork)
+                VIRGL_SERVER_ARGS="--no-loop-or-fork"
+                VIRGL_SERVER_DESCRIPTION="native-gles no-loop-or-fork"
+                ;;
+            angle-gl)
+                VIRGL_SERVER_ARGS="--angle-gl"
+                VIRGL_SERVER_DESCRIPTION="angle-gl"
+                ;;
+            angle-vulkan)
+                VIRGL_SERVER_ARGS="--angle-vulkan"
+                VIRGL_SERVER_DESCRIPTION="angle-vulkan"
+                ;;
+            *)
+                echo "WARNING: unknown VirGL server profile '$VIRGL_SERVER_PROFILE'; using default" | tee -a "$LOGFILE"
+                VIRGL_SERVER_ARGS=""
+                VIRGL_SERVER_DESCRIPTION="native-gles"
+                VIRGL_SERVER_PROFILE="default"
+                ;;
+        esac
+
+        echo "Starting VirGL server profile '$VIRGL_SERVER_PROFILE' ($VIRGL_SERVER_DESCRIPTION)..." | tee -a "$LOGFILE"
+        env -u LD_LIBRARY_PATH virgl_test_server_android $VIRGL_SERVER_ARGS &
         VIRGL_PID=$!
 
         # Wait for server to be ready (PID alive AND socket exists)
@@ -361,11 +557,12 @@ elif [ "$GPU_VENDOR" = "mali" ]; then
         done
 
         if [ "$VIRGL_READY" = true ]; then
-            echo "VirGL native GLES server started (PID $VIRGL_PID, socket ready)" | tee -a "$LOGFILE"
+            echo "VirGL server started profile='$VIRGL_SERVER_PROFILE' (PID $VIRGL_PID, socket ready)" | tee -a "$LOGFILE"
             PROOT_GPU_ENV="mali-native"
             write_session_value virgl.pid "$VIRGL_PID"
+            write_session_value virgl.profile "$VIRGL_SERVER_PROFILE"
         else
-            echo "VirGL native GLES failed (socket: $(ls -la "$VIRGL_SOCKET" 2>&1)), using software rendering" | tee -a "$LOGFILE"
+            echo "VirGL server profile='$VIRGL_SERVER_PROFILE' failed (socket: $(ls -la "$VIRGL_SOCKET" 2>&1)), using software rendering" | tee -a "$LOGFILE"
             kill $VIRGL_PID 2>/dev/null || true
             rm -f "$VIRGL_SOCKET" 2>/dev/null || true
             VIRGL_PID=""
@@ -399,8 +596,25 @@ fi
 # Set display resolution via Termux:X11 preferences (xrandr doesn't work — no transform support).
 # GPU path: native resolution. Software path: half-res for 4x fewer pixels.
 if [ -n "$PROOT_GPU_ENV" ]; then
-    echo "Setting display: native resolution (GPU available)" | tee -a "$LOGFILE"
-    timeout 5 termux-x11-preference displayResolutionMode:native 2>&1 | tee -a "$LOGFILE" || true
+    case "$GPU_DISPLAY_RESOLUTION_OVERRIDE" in
+        "")
+            echo "Setting display: native resolution (GPU available)" | tee -a "$LOGFILE"
+            timeout 5 termux-x11-preference displayResolutionMode:native 2>&1 | tee -a "$LOGFILE" || true
+            ;;
+        native)
+            echo "Setting display: forced native resolution (GPU override)" | tee -a "$LOGFILE"
+            timeout 5 termux-x11-preference displayResolutionMode:native 2>&1 | tee -a "$LOGFILE" || true
+            ;;
+        custom:*)
+            CUSTOM_GPU_RESOLUTION="${GPU_DISPLAY_RESOLUTION_OVERRIDE#custom:}"
+            echo "Setting display: forced custom GPU resolution $CUSTOM_GPU_RESOLUTION" | tee -a "$LOGFILE"
+            timeout 5 termux-x11-preference displayResolutionMode:custom "displayResolutionCustom:$CUSTOM_GPU_RESOLUTION" 2>&1 | tee -a "$LOGFILE" || true
+            ;;
+        *)
+            echo "WARNING: unsupported GPU display resolution override '$GPU_DISPLAY_RESOLUTION_OVERRIDE'; using native" | tee -a "$LOGFILE"
+            timeout 5 termux-x11-preference displayResolutionMode:native 2>&1 | tee -a "$LOGFILE" || true
+            ;;
+    esac
 else
     echo "Setting display: 1480x924 (software rendering, half-res)" | tee -a "$LOGFILE"
     timeout 5 termux-x11-preference displayResolutionMode:custom displayResolutionCustom:1480x924 2>&1 | tee -a "$LOGFILE" || true
@@ -408,183 +622,390 @@ fi
 
 echo "Launching RuneLite..." | tee -a "$LOGFILE"
 echo "VirGL socket: $(ls -la "$PREFIX/tmp/.virgl_test" 2>&1)" | tee -a "$LOGFILE"
-proot-distro login ubuntu --shared-tmp $GPU_BIND -- bash -c "
-    export DISPLAY=:0
-    export PULSE_SERVER=tcp:127.0.0.1:4713
-    SESSION_DIR_IN_PROOT='/tmp/rlt-session/${SESSION_ID}'
+echo "Outer preflight: proot-distro=$(command -v proot-distro || echo missing) bash=$(command -v bash || echo missing) HOME=$HOME PREFIX=$PREFIX" | tee -a "$LOGFILE"
+echo "Starting proot smoke test..." | tee -a "$LOGFILE"
+proot-distro login ubuntu --shared-tmp $GPU_BIND -- bash -lc 'echo PROOT_SMOKE_OK; echo HOME=$HOME USER=${USER:-<unset>} PWD=$PWD; id; ls -ld /root /root/runelite 2>&1' 2>&1 | tee -a "$LOGFILE"
+PROOT_SMOKE_EXIT=${PIPESTATUS[0]}
+echo "Proot smoke test exit code: $PROOT_SMOKE_EXIT" | tee -a "$LOGFILE"
+if [ "$PROOT_SMOKE_EXIT" -ne 0 ]; then
+    exit "$PROOT_SMOKE_EXIT"
+fi
 
-    # Source credentials if available (Spike C: must source INSIDE proot)
-    if [ -n '${PROOT_ENV_FILE}' ] && [ -f '${PROOT_ENV_FILE}' ]; then
-        source '${PROOT_ENV_FILE}'
-        rm -f '${PROOT_ENV_FILE}'
-    fi
+PROOT_LAUNCH_SCRIPT_TERMUX="$PREFIX/tmp/.rlt-proot-launch-$SESSION_ID.sh"
+PROOT_LAUNCH_SCRIPT_IN_PROOT="/tmp/.rlt-proot-launch-$SESSION_ID.sh"
+cat > "$PROOT_LAUNCH_SCRIPT_TERMUX" <<'PROOT_LAUNCH_EOF'
+#!/bin/bash
+set -uo pipefail
 
-    # Brief delay for X11 to initialize before GPU detection and xrandr
-    sleep 0.5
+export DISPLAY=:0
+export PULSE_SERVER=tcp:127.0.0.1:4713
+SESSION_DIR_IN_PROOT="${RLT_SESSION_DIR_IN_PROOT:?missing RLT_SESSION_DIR_IN_PROOT}"
+PROOT_ENV_FILE="${RLT_PROOT_ENV_FILE:-}"
+PROOT_GPU_ENV="${RLT_PROOT_GPU_ENV:-}"
+PERF_MONITOR_ENABLED="${RLT_INNER_PERF_MONITOR_ENABLED:-0}"
+RUNELITE_TARGET_FPS="${RLT_INNER_TARGET_FPS:-120}"
+RUNELITE_UNLOCK_FPS="${RLT_INNER_UNLOCK_FPS:-true}"
+RUNELITE_VSYNC_MODE="${RLT_INNER_VSYNC_MODE:-OFF}"
+RUNELITE_SCALE_VALUE="${RLT_INNER_SCALE:-2}"
+JAVA2D_PROFILE="${RLT_INNER_JAVA2D_PROFILE:-default}"
+PERF_PID=''
 
-    # Skip errors for all Mesa operations (applies to both GPU and software paths)
+if [ -n "$PROOT_ENV_FILE" ] && [ -f "$PROOT_ENV_FILE" ]; then
+    source "$PROOT_ENV_FILE"
+    rm -f "$PROOT_ENV_FILE"
+fi
+
+mkdir -p "$SESSION_DIR_IN_PROOT"
+echo "Proot preflight: HOME=$HOME USER=${USER:-<unset>} PWD=$PWD" >&2
+id >&2 || true
+echo "Proot preflight: root dirs" >&2
+ls -ld /root /root/runelite >&2 || true
+echo "Proot preflight: commands java=$(command -v java || echo missing) openbox=$(command -v openbox || echo missing) xrandr=$(command -v xrandr || echo missing) glxinfo=$(command -v glxinfo || echo missing) glxgears=$(command -v glxgears || echo missing)" >&2
+
+sleep 0.5
+export MESA_NO_ERROR=1
+GPU_AVAILABLE=false
+
+if [ "$PROOT_GPU_ENV" = "adreno" ]; then
+    export MESA_LOADER_DRIVER_OVERRIDE=zink
+    export GALLIUM_DRIVER=zink
+    export TU_DEBUG=noconform
     export MESA_NO_ERROR=1
+    export ZINK_DESCRIPTORS=lazy
 
-    # ---------------------------------------------------------------
-    # GPU acceleration detection
-    # ---------------------------------------------------------------
-    GPU_AVAILABLE=false
-    PROOT_GPU_ENV='${PROOT_GPU_ENV}'
-
-    if [ \"\$PROOT_GPU_ENV\" = \"adreno\" ]; then
-        # Adreno: Zink + Turnip
-        export MESA_LOADER_DRIVER_OVERRIDE=zink
-        export GALLIUM_DRIVER=zink
-        export TU_DEBUG=noconform
-        export MESA_NO_ERROR=1
-        export ZINK_DESCRIPTORS=lazy
-
-        GL_RENDERER=\$(glxinfo 2>/dev/null | grep -i \"opengl renderer\" || true)
-        if echo \"\$GL_RENDERER\" | grep -qi \"zink\"; then
-            GPU_AVAILABLE=true
-            echo \"GPU acceleration: ENABLED (Zink+Turnip)\" >&2
-        else
-            echo \"GPU acceleration: Zink failed, falling back to software\" >&2
-            unset MESA_LOADER_DRIVER_OVERRIDE GALLIUM_DRIVER TU_DEBUG MESA_NO_ERROR ZINK_DESCRIPTORS
-        fi
-
-    elif [ \"\$PROOT_GPU_ENV\" = \"mali-angle\" ] || [ \"\$PROOT_GPU_ENV\" = \"mali-native\" ]; then
-        # Mali: VirGL — force 24-bit visual to avoid BadMatch on XGetImage (depth mismatch)
-        export GALLIUM_DRIVER=virpipe
-        export VTEST_SOCKET_NAME=/tmp/.virgl_test
-        export MESA_GLX_ALPHA_BITS=0
-        export MESA_NO_ERROR=1
-        # GL_DEPTH_CLAMP fix: Mesa 4.5COMPAT auto-enables GL_DEPTH_CLAMP but GLES host
-        # returns GL_INVALID_ENUM, causing virglrenderer to discard all subsequent draws.
-        export MESA_EXTENSION_OVERRIDE=-GL_ARB_depth_clamp,-GL_EXT_depth_clamp
-
-        echo \"VirGL socket visible: \$(ls -la /tmp/.virgl_test 2>&1)\" >&2
-
-        # glxinfo crashes with BadMatch on XGetImage (32-bit vs 24-bit visual mismatch).
-        # Use glxgears instead — it uses XPutImage (write), not XGetImage (read).
-        GEARS_OUTPUT=\$(timeout 3 glxgears -info 2>&1 || true)
-        GL_RENDERER=\$(echo \"\$GEARS_OUTPUT\" | grep -i \"GL_RENDERER\" | head -1 || true)
-        echo \"VirGL glxgears check: \$GL_RENDERER\" >&2
-
-        if echo \"\$GL_RENDERER\" | grep -qi \"virgl\"; then
-            # The validated working path on the tablet is native VirGL with the
-            # same GL 4.3 / GLSL 430 overrides used by the test harness.
-            OVERRIDE=\"4.3COMPAT\"
-            GLSL_OVERRIDE=\"430\"
-            export MESA_GL_VERSION_OVERRIDE=\"\$OVERRIDE\"
-            export MESA_GLSL_VERSION_OVERRIDE=\"\$GLSL_OVERRIDE\"
-            GPU_AVAILABLE=true
-            echo \"GPU acceleration: ENABLED (VirGL, GL=\$OVERRIDE GLSL=\$GLSL_OVERRIDE)\" >&2
-        else
-            echo \"GPU acceleration: VirGL not detected (\$GL_RENDERER), falling back to software\" >&2
-            unset GALLIUM_DRIVER VTEST_SOCKET_NAME MESA_GLX_ALPHA_BITS MESA_NO_ERROR MESA_EXTENSION_OVERRIDE
-        fi
+    GL_RENDERER=$(glxinfo 2>/dev/null | grep -i "opengl renderer" || true)
+    if echo "$GL_RENDERER" | grep -qi "zink"; then
+        GPU_AVAILABLE=true
+        echo "GPU acceleration: ENABLED (Zink+Turnip)" >&2
     else
-        echo \"GPU acceleration: UNAVAILABLE (software rendering)\" >&2
+        echo "GPU acceleration: Zink failed, falling back to software" >&2
+        unset MESA_LOADER_DRIVER_OVERRIDE GALLIUM_DRIVER TU_DEBUG MESA_NO_ERROR ZINK_DESCRIPTORS
     fi
+elif [ "$PROOT_GPU_ENV" = "mali-angle" ] || [ "$PROOT_GPU_ENV" = "mali-native" ]; then
+    export GALLIUM_DRIVER=virpipe
+    export VTEST_SOCKET_NAME=/tmp/.virgl_test
+    export MESA_GLX_ALPHA_BITS=0
+    export MESA_NO_ERROR=1
+    export MESA_EXTENSION_OVERRIDE=-GL_ARB_depth_clamp,-GL_EXT_depth_clamp
 
-    # Resolution is set via Termux:X11 preferences (outside proot, before launch).
-    # xrandr --newmode/--scale don't work — Termux:X11 doesn't implement RandR transforms.
+    echo "VirGL socket visible: $(ls -la /tmp/.virgl_test 2>&1)" >&2
+    GEARS_OUTPUT=$(timeout 3 glxgears -info 2>&1 || true)
+    GL_RENDERER=$(echo "$GEARS_OUTPUT" | grep -i "GL_RENDERER" | head -1 || true)
+    echo "VirGL glxgears check: $GL_RENDERER" >&2
 
-    # Start openbox window manager so RuneLite is maximized to fill the display.
-    mkdir -p /root/.config/openbox
-    cat > /root/.config/openbox/rc.xml << 'OBCFG'
-<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<openbox_config xmlns=\"http://openbox.org/3.4/rc\"
-    xmlns:xi=\"http://www.w3.org/2001/XInclude\">
+    if echo "$GL_RENDERER" | grep -qi "virgl"; then
+        OVERRIDE="4.3COMPAT"
+        GLSL_OVERRIDE="430"
+        export MESA_GL_VERSION_OVERRIDE="$OVERRIDE"
+        export MESA_GLSL_VERSION_OVERRIDE="$GLSL_OVERRIDE"
+        GPU_AVAILABLE=true
+        echo "GPU acceleration: ENABLED (VirGL, GL=$OVERRIDE GLSL=$GLSL_OVERRIDE)" >&2
+    else
+        echo "GPU acceleration: VirGL not detected ($GL_RENDERER), falling back to software" >&2
+        unset GALLIUM_DRIVER VTEST_SOCKET_NAME MESA_GLX_ALPHA_BITS MESA_NO_ERROR MESA_EXTENSION_OVERRIDE
+    fi
+else
+    echo "GPU acceleration: UNAVAILABLE (software rendering)" >&2
+fi
+
+mkdir -p /root/.config/openbox
+cat > /root/.config/openbox/rc.xml <<'OBCFG'
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_config xmlns="http://openbox.org/3.4/rc"
+    xmlns:xi="http://www.w3.org/2001/XInclude">
   <applications>
-    <application class=\"*\" groupclass=\"*\">
+    <application class="*" groupclass="*">
       <decor>no</decor>
       <maximized>yes</maximized>
     </application>
   </applications>
 </openbox_config>
 OBCFG
-    openbox --sm-disable &
-    OPENBOX_PID=\$!
-    echo \"\$OPENBOX_PID\" > \"\$SESSION_DIR_IN_PROOT/openbox.pid\"
-    sleep 0.5
+openbox --sm-disable &
+OPENBOX_PID=$!
+echo "Openbox launch pid=$OPENBOX_PID cwd=$PWD" >&2
+echo "$OPENBOX_PID" > "$SESSION_DIR_IN_PROOT/openbox.pid"
+sleep 0.5
 
-    cd /root/runelite
+cd /root/runelite || {
+    echo "ERROR: failed to cd to /root/runelite" >&2
+    exit 1
+}
+echo "Proot preflight: entered $(pwd)" >&2
+ls -la >&2 || true
 
-    PERF_LOG=\"/root/runelite/perf-monitor.log\"
-    echo '=== Performance monitor started ===' > \"\$PERF_LOG\"
-    if [ \"${PERF_MONITOR_ENABLED}\" = \"1\" ]; then
-        (
-            while true; do
-                echo \"--- \$(date +%H:%M:%S) ---\" >> \"\$PERF_LOG\"
-                # Memory: total/used/free in MB
-                free -m | head -2 >> \"\$PERF_LOG\"
-                # CPU load averages
-                cat /proc/loadavg >> \"\$PERF_LOG\"
-                # Top 5 CPU-consuming processes
-                ps aux --sort=-%cpu 2>/dev/null | head -6 >> \"\$PERF_LOG\" || true
-                echo '' >> \"\$PERF_LOG\"
-                sleep 5
-            done
-        ) &
-        PERF_PID=\$!
-        echo \"\$PERF_PID\" > \"\$SESSION_DIR_IN_PROOT/perf.pid\"
+PERF_LOG="/root/runelite/perf-monitor.log"
+echo '=== Performance monitor started ===' > "$PERF_LOG"
+if [ "$PERF_MONITOR_ENABLED" = "1" ]; then
+    (
+        while true; do
+            echo "--- $(date +%H:%M:%S) ---" >> "$PERF_LOG"
+            free -m | head -2 >> "$PERF_LOG"
+            cat /proc/loadavg >> "$PERF_LOG"
+            ps aux --sort=-%cpu 2>/dev/null | head -6 >> "$PERF_LOG" || true
+            echo '' >> "$PERF_LOG"
+            sleep 5
+        done
+    ) &
+    PERF_PID=$!
+    echo "$PERF_PID" > "$SESSION_DIR_IN_PROOT/perf.pid"
+else
+    echo 'Performance monitor disabled for normal launches' >> "$PERF_LOG"
+fi
+
+echo '=== Display info ===' | tee -a "$PERF_LOG"
+xrandr 2>&1 | tee -a "$PERF_LOG" || true
+echo '=== GL info ===' | tee -a "$PERF_LOG"
+glxinfo 2>/dev/null | grep -iE '(renderer|version|vendor|direct)' | tee -a "$PERF_LOG" || true
+echo ready > "$SESSION_DIR_IN_PROOT/display.ready"
+
+GC_LOG_FLAGS="-Xlog:gc*:file=/root/runelite/gc.log:time,uptime,level,tags:filecount=2,filesize=5M"
+RUNELITE_SETTINGS_DIR="/root/.runelite"
+RUNELITE_SETTINGS_FILE="$RUNELITE_SETTINGS_DIR/settings.properties"
+mkdir -p "$RUNELITE_SETTINGS_DIR"
+touch "$RUNELITE_SETTINGS_FILE"
+MESA_PROFILE="${RLT_INNER_MESA_PROFILE:-${MESA_PROFILE_OVERRIDE:-default}}"
+VIRGL_SERVER_PROFILE="${RLT_VIRGL_SERVER_PROFILE:-${VIRGL_SERVER_PROFILE_OVERRIDE:-default}}"
+RUNELITE_LAUNCH_MODE="${RLT_RUNELITE_LAUNCH_MODE:-${RUNELITE_LAUNCH_MODE_OVERRIDE:-launcher}}"
+upsert_runelite_setting() {
+    local key="$1"
+    local value="$2"
+    if grep -q "^${key}=" "$RUNELITE_SETTINGS_FILE" 2>/dev/null; then
+        sed -i "s|^${key}=.*|${key}=${value}|" "$RUNELITE_SETTINGS_FILE"
     else
-        echo 'Performance monitor disabled for normal launches' >> \"\$PERF_LOG\"
+        printf '%s=%s\n' "$key" "$value" >> "$RUNELITE_SETTINGS_FILE"
     fi
+}
+remove_runelite_setting() {
+    local key="$1"
+    sed -i "/^${key}=.*/d" "$RUNELITE_SETTINGS_FILE" 2>/dev/null || true
+}
+upsert_runelite_setting "gpu.unlockFps" "$RUNELITE_UNLOCK_FPS"
+upsert_runelite_setting "gpu.fpsTarget" "$RUNELITE_TARGET_FPS"
+upsert_runelite_setting "gpu.vsyncMode" "$RUNELITE_VSYNC_MODE"
+echo "Configured RuneLite GPU settings: unlockFps=$RUNELITE_UNLOCK_FPS fpsTarget=$RUNELITE_TARGET_FPS vsyncMode=$RUNELITE_VSYNC_MODE" >&2
+upsert_runelite_setting "fpscontrol.limitFps" "false"
+upsert_runelite_setting "fpscontrol.limitFpsUnfocused" "false"
+upsert_runelite_setting "fpscontrol.maxFps" "360"
+upsert_runelite_setting "fpscontrol.maxFpsUnfocused" "15"
+upsert_runelite_setting "fpscontrol.drawFps" "false"
+remove_runelite_setting "gpu.drawDistance"
+remove_runelite_setting "gpu.expandedMapLoadingChunks"
+remove_runelite_setting "gpu.smoothBanding"
+remove_runelite_setting "gpu.antiAliasingMode"
+remove_runelite_setting "gpu.uiScalingMode"
+remove_runelite_setting "gpu.anisotropicFilteringLevel"
+remove_runelite_setting "gpu.removeVertexSnapping"
+echo "Configured RuneLite GPU profile: default (cleared branch-forced GPU profile overrides)" >&2
 
-    # Report display and GL info before launch
-    echo '=== Display info ===' | tee -a \"\$PERF_LOG\"
-    xrandr 2>&1 | tee -a \"\$PERF_LOG\" || true
-    echo '=== GL info ===' | tee -a \"\$PERF_LOG\"
-    glxinfo 2>/dev/null | grep -iE '(renderer|version|vendor|direct)' | tee -a \"\$PERF_LOG\" || true
-    echo ready > \"\$SESSION_DIR_IN_PROOT/display.ready\"
+case "$MESA_PROFILE" in
+    default)
+        unset mesa_glthread
+        unset LIBGL_DRI3_DISABLE
+        echo "Configured Mesa profile: default" >&2
+        ;;
+    glthread)
+        export mesa_glthread=true
+        unset LIBGL_DRI3_DISABLE
+        echo "Configured Mesa profile: glthread mesa_glthread=true" >&2
+        ;;
+    dri3-off)
+        unset mesa_glthread
+        export LIBGL_DRI3_DISABLE=1
+        echo "Configured Mesa profile: dri3-off LIBGL_DRI3_DISABLE=1" >&2
+        ;;
+    *)
+        unset mesa_glthread
+        unset LIBGL_DRI3_DISABLE
+        echo "WARNING: unknown Mesa profile '$MESA_PROFILE'; using default" >&2
+        ;;
+esac
 
-    # GC logging flags (OpenJDK 11 unified logging)
-    GC_LOG_FLAGS=\"-Xlog:gc*:file=/root/runelite/gc.log:time,uptime,level,tags:filecount=2,filesize=5M\"
-
-    # Conditional JVM flags based on GPU availability
-    # Always --scale 2 for readable UI on high-DPI tablet display
-    SCALE_FLAG='--scale 2'
-    if [ \"\$GPU_AVAILABLE\" = true ]; then
-        GPU_FLAGS=''
-        echo 'Using GPU-accelerated rendering' >&2
-    else
+SCALE_FLAG="--scale $RUNELITE_SCALE_VALUE"
+case "$JAVA2D_PROFILE" in
+    default)
+        if [ "$GPU_AVAILABLE" = true ]; then
+            GPU_FLAGS=''
+            echo 'Using GPU-accelerated rendering' >&2
+        else
+            GPU_FLAGS='-Dsun.java2d.opengl=false -Dsun.java2d.xrender=true -Dsun.java2d.pmoffscreen=true'
+            echo 'Using software rendering (half-res for performance)' >&2
+        fi
+        ;;
+    xrender)
         GPU_FLAGS='-Dsun.java2d.opengl=false -Dsun.java2d.xrender=true -Dsun.java2d.pmoffscreen=true'
-        echo 'Using software rendering (half-res for performance)' >&2
+        echo 'Using forced Java2D XRender profile' >&2
+        ;;
+    opengl)
+        GPU_FLAGS='-Dsun.java2d.opengl=true -Dsun.java2d.xrender=false -Dsun.java2d.pmoffscreen=false'
+        echo 'Using forced Java2D OpenGL profile' >&2
+        ;;
+    *)
+        GPU_FLAGS=''
+        echo "WARNING: unknown Java2D profile '$JAVA2D_PROFILE'; using default flags" >&2
+        ;;
+esac
+
+export RUNELITE_VMARGS="-Xmx4g -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=50 $GC_LOG_FLAGS $GPU_FLAGS"
+echo "RUNELITE_VMARGS=$RUNELITE_VMARGS" >&2
+echo "Configured Java2D profile: $JAVA2D_PROFILE" >&2
+echo "Configured RuneLite scale: $RUNELITE_SCALE_VALUE" >&2
+echo "Configured VirGL server profile: $VIRGL_SERVER_PROFILE" >&2
+echo "Configured RuneLite launch mode: $RUNELITE_LAUNCH_MODE" >&2
+
+extract_direct_classpath_from_log() {
+    local log_path="${1:-/root/runelite-launch.log}"
+    local direct_line
+    direct_line="$(grep -F 'JvmLauncher - Running [' "$log_path" 2>/dev/null | tail -n 1 || true)"
+    if [ -z "$direct_line" ]; then
+        return 1
     fi
 
-    # Always run through the launcher — it handles client jar auto-updates.
-    # Bypassing the launcher freezes client jars at their initial version,
-    # causing silent login failures when OSRS updates weekly.
-    #
-    # JVM flags must be passed via RUNELITE_VMARGS (env var read by Launcher.java)
-    # because the launcher spawns the client as a CHILD process — flags on the
-    # launcher java command only apply to the launcher, not the client.
-    # RUNELITE_VMARGS is appended AFTER bootstrap's -Xmx768m, so last-Xmx wins.
-    # --scale controls -Dsun.java2d.uiScale passed to client (2 for GPU, 1 for software).
-    export RUNELITE_VMARGS=\"-Xmx4g -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=50 \$GC_LOG_FLAGS \$GPU_FLAGS\"
-    echo \"RUNELITE_VMARGS=\$RUNELITE_VMARGS\" >&2
-    echo \"Running RuneLite via launcher (scale=\$SCALE_FLAG)\" >&2
-    java -jar RuneLite.jar \$SCALE_FLAG --insecure-write-credentials --debug &
-    JAVA_PID=\$!
+    direct_line="${direct_line#* -cp, }"
+    direct_line="${direct_line%%, -XX:+DisableAttachMechanism*}"
+    if [ -z "$direct_line" ]; then
+        return 1
+    fi
 
-    # Write PID file for health monitoring (read by SessionHealthMonitor)
-    echo \"\$JAVA_PID\" > /root/.rlt-session.pid
-    echo \"\$JAVA_PID\" > \"\$SESSION_DIR_IN_PROOT/java.pid\"
-    echo \"RuneLite started with PID \$JAVA_PID\" >&2
+    printf '%s\n' "$direct_line"
+}
 
-    # Wait for java to exit
-    wait \$JAVA_PID
-    JAVA_EXIT=\$?
-    rm -f /root/.rlt-session.pid
-    rm -f \"\$SESSION_DIR_IN_PROOT/java.pid\"
-    rm -f /tmp/.rlt-session-alive
+apply_direct_classpath_overrides() {
+    local original_classpath="$1"
+    local override_dir="$2"
+    local entry basename override_path
+    local updated_classpath=""
+    local replaced_count=0
+    local IFS=':'
 
-    # Clean up perf monitor
-    [ -n \"\$PERF_PID\" ] && kill \$PERF_PID 2>/dev/null || true
-    rm -f \"\$SESSION_DIR_IN_PROOT/perf.pid\" \"\$SESSION_DIR_IN_PROOT/openbox.pid\"
-    exit \$JAVA_EXIT
-" 2>&1 | tee -a "$LOGFILE"
+    [ -n "$original_classpath" ] || return 1
+    [ -d "$override_dir" ] || {
+        printf '%s\n' "$original_classpath"
+        return 0
+    }
+
+    for entry in $original_classpath; do
+        basename="${entry##*/}"
+        override_path="$override_dir/$basename"
+        if [ -f "$override_path" ]; then
+            entry="$override_path"
+            replaced_count=$((replaced_count + 1))
+        fi
+
+        if [ -n "$updated_classpath" ]; then
+            updated_classpath="${updated_classpath}:$entry"
+        else
+            updated_classpath="$entry"
+        fi
+    done
+
+    if [ "$replaced_count" -gt 0 ]; then
+        echo "Applied $replaced_count direct RuneLite classpath override(s) from $override_dir" >&2
+    fi
+
+    printf '%s\n' "$updated_classpath"
+}
+
+DIRECT_CLASSPATH_FILE="$RUNELITE_SETTINGS_DIR/direct-classpath.txt"
+DIRECT_CLASSPATH_OVERRIDE_DIR="$RUNELITE_SETTINGS_DIR/repository2-overrides"
+DIRECT_MAIN_CLASS="net.runelite.client.RuneLite"
+CLIENT_ARGS="--insecure-write-credentials --debug"
+
+case "$RUNELITE_LAUNCH_MODE" in
+    launcher)
+        echo "Running RuneLite via launcher (scale=$SCALE_FLAG)" >&2
+        java -jar RuneLite.jar $SCALE_FLAG --insecure-write-credentials --debug &
+        JAVA_PID=$!
+        ;;
+    direct-jvm)
+        DIRECT_CLASSPATH="${RLT_DIRECT_CLASSPATH:-}"
+        if [ -n "$DIRECT_CLASSPATH" ]; then
+            DIRECT_CLASSPATH="$(printf '%s' "$DIRECT_CLASSPATH" | tr -d '\r')"
+        fi
+        if [ -z "$DIRECT_CLASSPATH" ] && [ -f "$DIRECT_CLASSPATH_FILE" ]; then
+            DIRECT_CLASSPATH="$(tr -d '\r' < "$DIRECT_CLASSPATH_FILE" 2>/dev/null || true)"
+        fi
+        if [ -z "$DIRECT_CLASSPATH" ]; then
+            DIRECT_CLASSPATH="$(extract_direct_classpath_from_log || true)"
+        fi
+        if [ -z "$DIRECT_CLASSPATH" ]; then
+            echo "ERROR: direct-jvm launch requested but no saved RuneLite classpath was found" >&2
+            exit 1
+        fi
+        DIRECT_CLASSPATH="$(apply_direct_classpath_overrides "$DIRECT_CLASSPATH" "$DIRECT_CLASSPATH_OVERRIDE_DIR")"
+
+        echo "Running RuneLite direct-jvm with saved classpath" >&2
+        bash -lc "exec java $RUNELITE_VMARGS -cp \"$DIRECT_CLASSPATH\" $DIRECT_MAIN_CLASS $CLIENT_ARGS" &
+        JAVA_PID=$!
+        ;;
+    *)
+        echo "ERROR: unsupported RuneLite launch mode '$RUNELITE_LAUNCH_MODE'" >&2
+        exit 1
+        ;;
+esac
+
+echo "$JAVA_PID" > /root/.rlt-session.pid
+echo "$JAVA_PID" > "$SESSION_DIR_IN_PROOT/java.pid"
+echo running > "$SESSION_DIR_IN_PROOT/state"
+echo "$RUNELITE_LAUNCH_MODE" > "$SESSION_DIR_IN_PROOT/runelite.launch.mode"
+echo "RuneLite started with PID $JAVA_PID" >&2
+
+wait $JAVA_PID
+JAVA_EXIT=$?
+if [ "$RUNELITE_LAUNCH_MODE" = "launcher" ]; then
+    LAST_DIRECT_CLASSPATH="$(extract_direct_classpath_from_log || true)"
+    if [ -n "$LAST_DIRECT_CLASSPATH" ]; then
+        printf '%s\n' "$LAST_DIRECT_CLASSPATH" > "$DIRECT_CLASSPATH_FILE"
+    fi
+fi
+rm -f /root/.rlt-session.pid
+rm -f "$SESSION_DIR_IN_PROOT/java.pid"
+rm -f /tmp/.rlt-session-alive
+[ -n "$PERF_PID" ] && kill "$PERF_PID" 2>/dev/null || true
+rm -f "$SESSION_DIR_IN_PROOT/perf.pid" "$SESSION_DIR_IN_PROOT/openbox.pid"
+exit $JAVA_EXIT
+PROOT_LAUNCH_EOF
+chmod 700 "$PROOT_LAUNCH_SCRIPT_TERMUX"
+echo "Wrote proot launch script: $PROOT_LAUNCH_SCRIPT_TERMUX" | tee -a "$LOGFILE"
+OUTER_DIRECT_CLASSPATH="${RLT_DIRECT_CLASSPATH:-}"
+if [ -n "$OUTER_DIRECT_CLASSPATH" ]; then
+    OUTER_DIRECT_CLASSPATH="$(printf '%s' "$OUTER_DIRECT_CLASSPATH" | tr -d '\r')"
+fi
+if [ -z "$OUTER_DIRECT_CLASSPATH" ] && [ -f "$TERMUX_DIRECT_CLASSPATH_FILE" ]; then
+    OUTER_DIRECT_CLASSPATH="$(tr -d '\r' < "$TERMUX_DIRECT_CLASSPATH_FILE" 2>/dev/null || true)"
+fi
+if [ -z "$OUTER_DIRECT_CLASSPATH" ] && [ -f "$LOGFILE" ]; then
+    OUTER_DIRECT_CLASSPATH="$(extract_direct_classpath_from_log "$LOGFILE" || true)"
+fi
+if [ -n "$OUTER_DIRECT_CLASSPATH" ]; then
+    echo "Resolved direct RuneLite classpath from Termux state" | tee -a "$LOGFILE"
+fi
+proot-distro login ubuntu --shared-tmp $GPU_BIND -- env \
+    RLT_SESSION_DIR_IN_PROOT="/tmp/rlt-session/$SESSION_ID" \
+    RLT_PROOT_ENV_FILE="$PROOT_ENV_FILE" \
+    RLT_PROOT_GPU_ENV="$PROOT_GPU_ENV" \
+    RLT_INNER_PERF_MONITOR_ENABLED="$PERF_MONITOR_ENABLED" \
+    RLT_INNER_TARGET_FPS="${RLT_RUNELITE_TARGET_FPS:-120}" \
+    RLT_INNER_UNLOCK_FPS="${RLT_RUNELITE_UNLOCK_FPS:-true}" \
+    RLT_INNER_VSYNC_MODE="${RLT_RUNELITE_VSYNC_MODE:-OFF}" \
+    RLT_INNER_SCALE="${RLT_RUNELITE_SCALE:-${RUNELITE_SCALE_OVERRIDE:-2}}" \
+    RLT_INNER_JAVA2D_PROFILE="${RLT_JAVA2D_PROFILE:-${JAVA2D_PROFILE_OVERRIDE:-default}}" \
+    RLT_INNER_MESA_PROFILE="${RLT_MESA_PROFILE:-${MESA_PROFILE_OVERRIDE:-default}}" \
+    RLT_VIRGL_SERVER_PROFILE="${RLT_VIRGL_SERVER_PROFILE:-${VIRGL_SERVER_PROFILE_OVERRIDE:-default}}" \
+    RLT_RUNELITE_LAUNCH_MODE="${RLT_RUNELITE_LAUNCH_MODE:-${RUNELITE_LAUNCH_MODE_OVERRIDE:-launcher}}" \
+    RLT_DIRECT_CLASSPATH="$OUTER_DIRECT_CLASSPATH" \
+    bash "$PROOT_LAUNCH_SCRIPT_IN_PROOT" 2>&1 | tee -a "$LOGFILE"
+rm -f "$PROOT_LAUNCH_SCRIPT_TERMUX" 2>/dev/null || true
 
 # PIPESTATUS[0] captures proot-distro exit code, not tee's exit code.
 EXIT_CODE=${PIPESTATUS[0]}
+if [ "${RLT_RUNELITE_LAUNCH_MODE:-${RUNELITE_LAUNCH_MODE_OVERRIDE:-launcher}}" = "launcher" ]; then
+    LAST_DIRECT_CLASSPATH="$(extract_direct_classpath_from_log "$LOGFILE" || true)"
+    if [ -n "$LAST_DIRECT_CLASSPATH" ]; then
+        printf '%s\n' "$LAST_DIRECT_CLASSPATH" > "$TERMUX_DIRECT_CLASSPATH_FILE"
+        echo "Saved direct RuneLite classpath to $TERMUX_DIRECT_CLASSPATH_FILE" | tee -a "$LOGFILE"
+    fi
+fi
 echo "RuneLite exited with code: $EXIT_CODE" | tee -a "$LOGFILE"
 
 if [ $EXIT_CODE -ne 0 ]; then

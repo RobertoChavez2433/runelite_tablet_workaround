@@ -1,0 +1,158 @@
+package com.termux.x11
+
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.graphics.Rect
+import android.graphics.Point
+import android.graphics.drawable.ColorDrawable
+import android.util.AttributeSet
+import android.view.Surface
+import android.view.SurfaceHolder
+import android.view.SurfaceView
+import android.view.inputmethod.InputMethodManager
+import androidx.annotation.Keep
+import com.runelitetablet.logging.AppLog
+
+/**
+ * Minimal host-side subset of upstream LorieView.
+ *
+ * This is intentionally trimmed to the rendering and connection lifecycle
+ * needed to validate option C before porting the full input stack.
+ */
+@Keep
+class LorieView : SurfaceView {
+    interface Callback {
+        fun changed(surfaceWidth: Int, surfaceHeight: Int, screenWidth: Int, screenHeight: Int)
+    }
+
+    private val clipboard by lazy {
+        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    }
+    private val inputMethodManager by lazy {
+        context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+    }
+    private val size = Point()
+
+    private var callback: Callback? = null
+    private var lastClipboardText: String? = null
+
+    private val surfaceCallback = object : SurfaceHolder.Callback {
+        override fun surfaceCreated(holder: SurfaceHolder) {
+            holder.setFormat(BGRA_8888)
+            AppLog.lifecycle("Hybrid LorieView.surfaceCreated")
+        }
+
+        override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+            surfaceChanged(holder.surface)
+            size.set(measuredWidth, measuredHeight)
+            AppLog.step(
+                "hybrid_x11",
+                "Hybrid LorieView.surfaceChanged holder=${width}x$height measured=${size.x}x${size.y} format=$format"
+            )
+            callback?.changed(size.x, size.y, size.x, size.y)
+        }
+
+        override fun surfaceDestroyed(holder: SurfaceHolder) {
+            surfaceChanged(null)
+            AppLog.lifecycle("Hybrid LorieView.surfaceDestroyed")
+            callback?.changed(0, 0, 0, 0)
+        }
+    }
+
+    constructor(context: Context) : super(context) {
+        init()
+    }
+
+    constructor(context: Context, attrs: AttributeSet?) : super(context, attrs) {
+        init()
+    }
+
+    constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int) : super(context, attrs, defStyleAttr) {
+        init()
+    }
+
+    private fun init() {
+        holder.addCallback(surfaceCallback)
+        nativeInit()
+    }
+
+    fun setCallback(callback: Callback?) {
+        this.callback = callback
+        triggerCallback()
+    }
+
+    fun triggerCallback() {
+        setFocusable(true)
+        setFocusableInTouchMode(true)
+        requestFocus()
+        background = object : ColorDrawable(0) {
+            override fun isStateful(): Boolean = true
+            override fun hasFocusStateSpecified(): Boolean = true
+        }
+
+        val frame: Rect = holder.surfaceFrame
+        post {
+            surfaceCallback.surfaceChanged(holder, BGRA_8888, frame.width(), frame.height())
+        }
+    }
+
+    @Keep
+    fun resetIme() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            inputMethodManager.invalidateInput(this)
+        } else {
+            @Suppress("DEPRECATION")
+            inputMethodManager.restartInput(this)
+        }
+    }
+
+    @Keep
+    fun setClipboardText(text: String) {
+        lastClipboardText = text
+        clipboard.setPrimaryClip(ClipData.newPlainText("X11 clipboard", text))
+    }
+
+    @Keep
+    fun requestClipboard() {
+        val text = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()
+        if (!text.isNullOrEmpty() && text != lastClipboardText) {
+            sendClipboardEvent(text.toByteArray(Charsets.UTF_8))
+        }
+    }
+
+    private external fun nativeInit()
+    private external fun surfaceChanged(surface: Surface?)
+    external fun sendClipboardAnnounce()
+    private external fun sendClipboardEvent(text: ByteArray)
+    external fun sendMouseEvent(x: Float, y: Float, whichButton: Int, buttonDown: Boolean, relative: Boolean)
+    fun sendMouseWheelEvent(deltaX: Float, deltaY: Float) {
+        sendMouseEvent(deltaX, deltaY, 4, false, true)
+    }
+    external fun sendTouchEvent(action: Int, id: Int, x: Int, y: Int)
+    external fun sendStylusEvent(
+        x: Float,
+        y: Float,
+        pressure: Int,
+        tiltX: Int,
+        tiltY: Int,
+        orientation: Int,
+        buttons: Int,
+        eraser: Boolean,
+        mouseMode: Boolean
+    )
+    external fun sendKeyEvent(scanCode: Int, keyCode: Int, keyDown: Boolean, a: Int): Boolean
+    external fun sendTextEvent(text: ByteArray)
+
+    companion object {
+        private const val BGRA_8888 = 5
+
+        @JvmStatic external fun connect(fd: Int)
+        @JvmStatic external fun connected(): Boolean
+        @JvmStatic external fun startLogcat(fd: Int)
+        @JvmStatic external fun setClipboardSyncEnabled(enabled: Boolean, ignored: Boolean)
+        @JvmStatic external fun sendWindowChange(width: Int, height: Int, framerate: Int, name: String)
+        @JvmStatic external fun requestStylusEnabled(enabled: Boolean)
+        @JvmStatic external fun requestConnection(): Boolean
+    }
+}

@@ -21,6 +21,8 @@ interface PresentationBackend {
 
     fun createLaunchIntent(context: Context): Intent?
 
+    fun shouldForegroundBeforeBootstrap(): Boolean = true
+
     fun createSwitchIntent(context: Context): Intent? =
         createLaunchIntent(context)?.apply {
             addFlags(

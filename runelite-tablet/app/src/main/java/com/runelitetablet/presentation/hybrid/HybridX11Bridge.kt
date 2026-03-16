@@ -9,7 +9,9 @@ import kotlinx.coroutines.flow.asStateFlow
 
 data class HybridX11BridgeState(
     val broadcastCount: Int = 0,
+    val generation: Int = 0,
     val binderAlive: Boolean = false,
+    val binderToken: Int = 0,
     val lastEvent: String = "idle",
     val lastUpdatedAtMs: Long = 0L
 )
@@ -30,12 +32,23 @@ object HybridX11Bridge {
 
     fun attach(newService: ICmdEntryInterface) {
         val binder = newService.asBinder()
+        if (!binder.isBinderAlive) {
+            AppLog.w("HYBRID_X11", "HybridX11Bridge: ignoring dead binder attach")
+            return
+        }
+
+        var sameBinder = false
         synchronized(lock) {
+            val previousBinder = service?.asBinder()
+            sameBinder = previousBinder != null && previousBinder == binder
+            val nextGeneration = if (sameBinder) _state.value.generation else _state.value.generation + 1
             service = newService
             _state.value = HybridX11BridgeState(
                 broadcastCount = _state.value.broadcastCount + 1,
+                generation = nextGeneration,
                 binderAlive = binder.isBinderAlive,
-                lastEvent = "attached",
+                binderToken = binder.hashCode(),
+                lastEvent = if (sameBinder) "duplicate_binder" else "attached",
                 lastUpdatedAtMs = System.currentTimeMillis()
             )
         }
@@ -52,10 +65,13 @@ object HybridX11Bridge {
             AppLog.w("HYBRID_X11", "HybridX11Bridge: linkToDeath failed: ${e.message}")
         }
 
-        AppLog.step(
-            "hybrid_x11",
-            "HybridX11Bridge: attached broadcastCount=${_state.value.broadcastCount} binderAlive=${binder.isBinderAlive}"
-        )
+        if (!sameBinder) {
+            AppLog.step(
+                "hybrid_x11",
+                "HybridX11Bridge: attached broadcastCount=${_state.value.broadcastCount} generation=${_state.value.generation} " +
+                    "binderToken=${binder.hashCode()} binderAlive=${binder.isBinderAlive}"
+            )
+        }
     }
 
     fun currentService(): ICmdEntryInterface? = service

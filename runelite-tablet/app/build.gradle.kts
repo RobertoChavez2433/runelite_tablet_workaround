@@ -5,6 +5,12 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+val localAppData = System.getenv("LOCALAPPDATA")?.replace("\\", "/")
+val winBisonExecutable =
+    localAppData?.let {
+        "$it/Microsoft/WinGet/Packages/WinFlexBison.win_flex_bison_Microsoft.Winget.Source_8wekyb3d8bbwe/win_bison.exe"
+    }
+
 android {
     namespace = "com.runelitetablet"
     compileSdk = 35
@@ -17,6 +23,14 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        externalNativeBuild {
+            cmake {
+                if (winBisonExecutable != null) {
+                    arguments += "-DBISON_EXECUTABLE=$winBisonExecutable"
+                }
+            }
+        }
     }
 
     buildTypes {
@@ -52,6 +66,12 @@ android {
         // GeckoView's ExoPlayer transitive dependency references POST_NOTIFICATIONS
         // but we don't use notifications — suppress to avoid false positive lint error
         disable += "NotificationPermission"
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("../../third_party/termux-x11-upstream/app/src/main/cpp/CMakeLists.txt")
+        }
     }
 }
 

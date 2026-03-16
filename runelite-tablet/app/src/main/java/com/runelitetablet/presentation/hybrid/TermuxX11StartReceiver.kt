@@ -26,6 +26,20 @@ class TermuxX11StartReceiver : BroadcastReceiver() {
             HybridX11Bridge.clear("missing_binder")
             return
         }
+        val binderToken = binder.hashCode()
+        if (!binder.isBinderAlive) {
+            if (lastIgnoredDeadBinderToken != binderToken) {
+                lastIgnoredDeadBinderToken = binderToken
+                AppLog.w("HYBRID_X11", "TermuxX11StartReceiver: ignoring dead ACTION_START binder")
+            }
+            return
+        }
+        lastIgnoredDeadBinderToken = 0
+
+        val currentBinder = HybridX11Bridge.currentService()?.asBinder()
+        if (currentBinder != null && currentBinder == binder && currentBinder.isBinderAlive) {
+            return
+        }
 
         val service = ICmdEntryInterface.Stub.asInterface(binder)
         if (service == null) {
@@ -46,5 +60,8 @@ class TermuxX11StartReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_START = "com.termux.x11.CmdEntryPoint.ACTION_START"
+
+        @Volatile
+        private var lastIgnoredDeadBinderToken: Int = 0
     }
 }

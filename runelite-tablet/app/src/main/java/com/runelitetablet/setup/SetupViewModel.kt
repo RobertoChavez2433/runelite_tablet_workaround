@@ -16,6 +16,7 @@ import com.runelitetablet.auth.CredentialManager
 import com.runelitetablet.auth.GameCharacter
 import com.runelitetablet.auth.GeckoAuthActivity
 import com.runelitetablet.auth.JagexOAuth2Manager
+import com.runelitetablet.auth.LaunchEnvDeployer
 import com.runelitetablet.auth.OAuthException
 import com.runelitetablet.auth.SessionValidation
 import com.runelitetablet.auth.PkceHelper
@@ -247,13 +248,18 @@ class SetupViewModel(
 
         // Bring the presentation surface owner to the foreground via SetupActions.
         val presentationIntent = presentationBackend.createLaunchIntent(context)
-        if (presentationIntent != null) {
+        if (presentationIntent != null && presentationBackend.shouldForegroundBeforeBootstrap()) {
             orchestrator.actions?.launchIntent(presentationIntent)
             AppLog.step("launch", "launch: sent launchIntent for ${presentationBackend.displayName}")
             // Let Termux:X11 come to the foreground before the hidden Termux
             // bootstrap begins. The actual shell launch no longer opens a
             // visible Termux terminal session.
             delay(700)
+        } else if (presentationIntent != null) {
+            AppLog.step(
+                "launch",
+                "launch: deferring foreground handoff for ${presentationBackend.displayName} to the shell/bootstrap path"
+            )
         } else {
             AppLog.w("STEP", "launch: could not get launch intent for ${presentationBackend.displayName}")
         }
@@ -447,35 +453,10 @@ class SetupViewModel(
         // Deploy env file into Termux's home dir via RUN_COMMAND stdin.
         // The app's private filesDir is not accessible to Termux (different UID),
         // so we pipe the content through TermuxCommandRunner the same way scripts are deployed.
-        var envFilePath: String? = null
-        // Fix 8: credentialManager I/O must run off the Main thread
-        val creds = withContext(Dispatchers.IO) { credentialManager.getCredentials() }
-        if (creds != null) {
-            try {
-                val termuxEnvPath = "${TermuxCommandRunner.TERMUX_HOME_PATH}/.rlt-launch-env.sh"
-                val content = buildString {
-                    appendLine("export JX_SESSION_ID=\"${shellEscape(creds.sessionId)}\"")
-                    appendLine("export JX_CHARACTER_ID=\"${shellEscape(creds.characterId)}\"")
-                    appendLine("export JX_DISPLAY_NAME=\"${shellEscape(creds.displayName)}\"")
-                }
-                val deployCommand = "cat > $termuxEnvPath && chmod 600 $termuxEnvPath"
-                val result = commandRunner.execute(
-                    commandPath = "${TermuxCommandRunner.TERMUX_BIN_PATH}/bash",
-                    arguments = arrayOf("-c", deployCommand),
-                    stdin = content,
-                    background = true,
-                    timeoutMs = TermuxCommandRunner.TIMEOUT_VERIFY_MS
-                )
-                if (result.isSuccess) {
-                    envFilePath = termuxEnvPath
-                    AppLog.step("auth", "performLaunch: env file deployed to Termux at $termuxEnvPath (credentials masked)")
-                } else {
-                    AppLog.e("AUTH", "performLaunch: failed to deploy env file: exitCode=${result.exitCode} error=${result.error}")
-                }
-            } catch (e: Exception) {
-                AppLog.e("AUTH", "performLaunch: failed to deploy env file: ${e.message}", e)
-            }
-        }
+        val envFilePath = LaunchEnvDeployer.deployToTermuxHome(
+            credentialManager = credentialManager,
+            commandRunner = commandRunner
+        )
 
         val launchSuccess = launch(envFilePath)
         if (launchSuccess) {

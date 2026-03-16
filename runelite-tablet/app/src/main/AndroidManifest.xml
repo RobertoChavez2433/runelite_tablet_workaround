@@ -50,6 +50,12 @@
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
 
+        <activity
+            android:name=".presentation.hybrid.HybridX11HostActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
+
         <service
             android:name=".termux.TermuxResultService"
             android:exported="false" />
@@ -78,8 +84,11 @@
             android:name=".presentation.hybrid.HybridX11TestReceiver"
             android:exported="true">
             <intent-filter>
+                <action android:name="com.runelitetablet.action.OPEN_HYBRID_X11_HOST" />
                 <action android:name="com.runelitetablet.action.START_HYBRID_X11_TEST" />
                 <action android:name="com.runelitetablet.action.STOP_HYBRID_X11_TEST" />
+                <action android:name="com.runelitetablet.action.PROBE_HYBRID_X11_FDS" />
+                <action android:name="com.runelitetablet.action.RUN_HYBRID_X11_CLIENT" />
             </intent-filter>
         </receiver>
     </application>
