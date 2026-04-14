@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import androidx.activity.result.ActivityResult
 import com.runelitetablet.auth.AuthResult
+import com.runelitetablet.domain.logging.CorrelationId
 import com.runelitetablet.auth.GeckoAuthActivity
 import com.runelitetablet.auth.JagexOAuth2Manager
 import com.runelitetablet.auth.GameCharacter
@@ -39,9 +40,10 @@ class AuthCoordinator(
     fun getDisplayName(): String? = credentialStore.getDisplayName()
 
     fun startLogin() {
+        val corrId = CorrelationId.generate("auth")
         val actions = orchestrator.actions
         if (actions == null) {
-            logger?.e("AUTH", "startLogin: no actions bound")
+            logger?.e("AUTH", "startLogin: no actions bound", correlationId = corrId)
             onScreenChange(AppScreen.AuthError("Activity not available"))
             return
         }
@@ -59,11 +61,12 @@ class AuthCoordinator(
             context, step1Url, step2Url, codeVerifier,
             step1State, step2State, nonce
         )
-        logger?.step("auth", "startLogin: launching GeckoAuthActivity")
+        logger?.step("auth", "startLogin: launching GeckoAuthActivity", correlationId = corrId)
         actions.launchAuthActivity(intent)
     }
 
-    fun handleAuthResult(result: ActivityResult) {
+    fun handleAuthResult(result: ActivityResult, correlationId: String? = null) {
+        logger?.state("AuthCoordinator.handleAuthResult: resultCode=${result.resultCode}", correlationId = correlationId)
         when (result.resultCode) {
             Activity.RESULT_OK -> {
                 val data = result.data ?: run {
@@ -71,6 +74,7 @@ class AuthCoordinator(
                     return
                 }
                 val loginProvider = data.getStringExtra(GeckoAuthActivity.RESULT_LOGIN_PROVIDER) ?: "jagex"
+                logger?.step("auth", "handleAuthResult: loginProvider=$loginProvider hasAccessToken=${data.getStringExtra(GeckoAuthActivity.RESULT_ACCESS_TOKEN) != null} hasIdToken=${data.getStringExtra(GeckoAuthActivity.RESULT_ID_TOKEN) != null}", correlationId = correlationId)
                 val accessToken = data.getStringExtra(GeckoAuthActivity.RESULT_ACCESS_TOKEN)
                 val refreshToken = data.getStringExtra(GeckoAuthActivity.RESULT_REFRESH_TOKEN)
                 val idToken = data.getStringExtra(GeckoAuthActivity.RESULT_ID_TOKEN)
@@ -160,34 +164,44 @@ class AuthCoordinator(
 
     fun skipLogin() { onScreenChange(AppScreen.Launch) }
 
-    suspend fun navigateToLaunchOrResume() {
+    suspend fun navigateToLaunchOrResume(correlationId: String? = null) {
         if (pendingLaunchAfterAuth.compareAndSet(true, false)) {
-            logger?.step("auth", "navigateToLaunchOrResume: auto-resuming launch")
+            logger?.step("auth", "navigateToLaunchOrResume: auto-resuming launch", correlationId = correlationId)
             onPerformLaunch()
         } else {
+            logger?.step("auth", "navigateToLaunchOrResume: showing launch screen", correlationId = correlationId)
             onScreenChange(AppScreen.Launch)
         }
     }
 
-    suspend fun refreshIfNeeded(): AuthResult {
+    suspend fun refreshIfNeeded(correlationId: String? = null): AuthResult {
+        val corrId = if (correlationId != null) CorrelationId.nested(correlationId, "refresh") else CorrelationId.generate("refresh")
+        logger?.step("auth", "refreshIfNeeded: checking token expiry parentCorrId=$correlationId", correlationId = corrId)
         val expiry = withContext(ioDispatcher) { credentialStore.getAccessTokenExpiry() }
         val now = System.currentTimeMillis() / 1000L
-        if (now < expiry - 60) return AuthResult.Valid
+        if (now < expiry - 60) { logger?.step("auth", "refreshIfNeeded: token still valid ttl=${expiry - now}s", correlationId = corrId); return AuthResult.Valid }
 
         val refreshToken = withContext(ioDispatcher) { credentialStore.getRefreshToken() }
-            ?: return AuthResult.NeedsLogin
+            ?: run { logger?.w("AUTH", "refreshIfNeeded: no refresh token, needs login", correlationId = corrId); return AuthResult.NeedsLogin }
 
+        return performTokenRefresh(refreshToken, corrId)
+    }
+
+    private suspend fun performTokenRefresh(refreshToken: String, correlationId: String? = null): AuthResult {
         return try {
+            logger?.step("auth", "performTokenRefresh: exchanging refresh token", correlationId = correlationId)
             val response = oAuth2Manager.refreshTokens(refreshToken)
             withContext(ioDispatcher) {
                 credentialStore.storeTokens(response.accessToken, response.refreshToken, response.accessTokenExpiry)
             }
+            logger?.step("auth", "performTokenRefresh: tokens refreshed successfully", correlationId = correlationId)
             AuthResult.Refreshed
         } catch (e: OAuthException) {
+            logger?.w("AUTH", "performTokenRefresh: OAuthException httpCode=${e.httpCode}", correlationId = correlationId)
             if (e.httpCode == 401 || e.httpCode == 400) AuthResult.NeedsLogin
             else AuthResult.NetworkError(e)
         } catch (e: CancellationException) { throw e }
-        catch (e: Exception) { AuthResult.NetworkError(e) }
+        catch (e: Exception) { logger?.e("AUTH", "performTokenRefresh: unexpected error", throwable = e, correlationId = correlationId); AuthResult.NetworkError(e) }
     }
 
     fun signOut() {

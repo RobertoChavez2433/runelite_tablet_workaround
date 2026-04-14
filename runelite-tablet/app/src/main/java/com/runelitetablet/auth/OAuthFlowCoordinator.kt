@@ -1,5 +1,6 @@
 package com.runelitetablet.auth
 
+import com.runelitetablet.domain.logging.Logger
 import java.net.URLDecoder
 
 /**
@@ -17,7 +18,8 @@ class OAuthFlowCoordinator(
     private val codeVerifier: String,
     private val expectedStep1State: String,
     private val expectedStep2State: String,
-    private val expectedNonce: String
+    private val expectedNonce: String,
+    private val logger: Logger? = null
 ) {
     enum class State {
         LOADING_STEP1, AWAITING_STEP1_REDIRECT, EXCHANGING_TOKENS,
@@ -45,33 +47,61 @@ class OAuthFlowCoordinator(
         data class Error(val message: String) : Result()
     }
 
+    private fun transition(newState: State, reason: String) {
+        val oldState = currentState
+        currentState = newState
+        logger?.state("OAuthFlow: $oldState → $newState ($reason)")
+    }
+
     fun parseStep1Redirect(uri: String): Step1ParseResult? {
-        if (currentState != State.LOADING_STEP1 && currentState != State.AWAITING_STEP1_REDIRECT) return null
-        currentState = State.AWAITING_STEP1_REDIRECT
+        val redactedUri = uri.take(30) + if (uri.length > 30) "...[redacted]" else ""
+        logger?.state("OAuthFlow.parseStep1Redirect: state=$currentState uri=$redactedUri")
+        if (currentState != State.LOADING_STEP1 && currentState != State.AWAITING_STEP1_REDIRECT) {
+            logger?.w("AUTH", "OAuthFlow.parseStep1Redirect: ignored, wrong state=$currentState")
+            return null
+        }
+        transition(State.AWAITING_STEP1_REDIRECT, "step1 redirect received")
 
         val params = parseJagexUri(uri)
+        logger?.d("AUTH", "OAuthFlow: parsed ${params.size} params, keys=${params.keys}")
         val code = params["code"] ?: run {
-            currentState = State.ERROR
+            transition(State.ERROR, "missing authorization code")
             return Step1ParseResult.Error("Invalid login redirect: missing authorization code")
         }
         val state = params["state"]
         if (state != expectedStep1State) {
-            currentState = State.ERROR
+            transition(State.ERROR, "state mismatch")
             return Step1ParseResult.Error("Security check failed: state mismatch")
         }
+        logger?.d("AUTH", "OAuthFlow: step1 params validated, code present, state matched")
 
-        currentState = State.EXCHANGING_TOKENS
+        transition(State.EXCHANGING_TOKENS, "step1 params valid")
         return Step1ParseResult.CodeCaptured(code)
     }
 
     suspend fun exchangeAndRoute(code: String, step2Url: String): Result {
-        val tokenResponse = oauthManager.exchangeCodeForTokens(code, codeVerifier)
+        logger?.state("OAuthFlow.exchangeAndRoute: state=$currentState, exchanging code for tokens")
+        val exchangeStartMs = System.currentTimeMillis()
+        val tokenResponse = try {
+            oauthManager.exchangeCodeForTokens(code, codeVerifier)
+        } catch (e: Exception) {
+            val elapsed = System.currentTimeMillis() - exchangeStartMs
+            logger?.e("AUTH", "OAuthFlow.exchangeAndRoute: token exchange failed after ${elapsed}ms: ${e.message}")
+            transition(State.ERROR, "token exchange failed: ${e.message}")
+            return Result.Error("Token exchange failed: ${e.message}")
+        }
+        val exchangeMs = System.currentTimeMillis() - exchangeStartMs
+        if (exchangeMs > 10_000) logger?.w("AUTH", "OAuthFlow: token exchange slow (${exchangeMs}ms) — possible timeout risk")
+        logger?.d("AUTH", "OAuthFlow: token exchange complete, hasIdToken=${tokenResponse.idToken != null}, " +
+            "hasAccessToken=${tokenResponse.accessToken != null}, expiresIn=${tokenResponse.expiresIn}")
         val idToken = tokenResponse.idToken
         val loginProvider = if (idToken != null) oauthManager.parseLoginProvider(idToken) else "jagex"
+        logger?.d("AUTH", "OAuthFlow: loginProvider=$loginProvider")
 
         return when (loginProvider) {
             "runescape" -> {
-                currentState = State.DONE_SUCCESS
+                transition(State.DONE_SUCCESS, "runescape login, single-step complete")
+                logger?.state("OAuthFlow: tokens handed off to credential store (provider=runescape)")
                 Result.Success(loginProvider, tokenResponse.accessToken, tokenResponse.refreshToken,
                     tokenResponse.idToken, tokenResponse.expiresIn, tokenResponse.accessTokenExpiry)
             }
@@ -80,42 +110,48 @@ class OAuthFlowCoordinator(
                 step1RefreshToken = tokenResponse.refreshToken
                 step1ExpiresIn = tokenResponse.expiresIn
                 step1AccessTokenExpiry = tokenResponse.accessTokenExpiry
-                currentState = State.LOADING_STEP2
+                transition(State.LOADING_STEP2, "jagex login, need step2 consent")
                 Result.LoadStep2(step2Url)
             }
         }
     }
 
     fun parseStep2Redirect(uri: String): Result {
+        val redactedUri = uri.substringBefore("#") + "#[redacted]"
+        logger?.state("OAuthFlow.parseStep2Redirect: state=$currentState uri=$redactedUri")
         if (currentState != State.LOADING_STEP2 && currentState != State.AWAITING_STEP2_REDIRECT) {
+            logger?.w("AUTH", "OAuthFlow.parseStep2Redirect: ignored, wrong state=$currentState")
             return Result.Error("Invalid state for Step 2 redirect: $currentState")
         }
-        currentState = State.AWAITING_STEP2_REDIRECT
+        transition(State.AWAITING_STEP2_REDIRECT, "step2 redirect received")
 
         val fragment = uri.substringAfter("#", "")
         if (fragment.isEmpty()) {
-            currentState = State.ERROR
+            transition(State.ERROR, "fragment not available")
             return Result.Error("Could not capture consent token: fragment not available")
         }
 
         val params = parseFragmentParams(fragment)
+        logger?.d("AUTH", "OAuthFlow: parsed ${params.size} fragment params, keys=${params.keys}")
         val idToken = params["id_token"]
         val state = params["state"]
 
         if (idToken == null) {
-            currentState = State.ERROR
+            transition(State.ERROR, "missing id_token")
             return Result.Error("Could not capture consent token: missing id_token")
         }
         if (state != expectedStep2State) {
-            currentState = State.ERROR
+            transition(State.ERROR, "consent state mismatch")
             return Result.Error("Security check failed: consent state mismatch")
         }
         if (!oauthManager.verifyNonce(idToken, expectedNonce)) {
-            currentState = State.ERROR
+            transition(State.ERROR, "nonce mismatch")
             return Result.Error("Security check failed: nonce mismatch")
         }
+        logger?.d("AUTH", "OAuthFlow: step2 params validated, id_token present, state+nonce matched")
 
-        currentState = State.DONE_SUCCESS
+        transition(State.DONE_SUCCESS, "step2 consent complete")
+        logger?.state("OAuthFlow: tokens handed off to credential store (provider=jagex)")
         return Result.Success("jagex", step1AccessToken, step1RefreshToken,
             idToken, step1ExpiresIn, step1AccessTokenExpiry)
     }

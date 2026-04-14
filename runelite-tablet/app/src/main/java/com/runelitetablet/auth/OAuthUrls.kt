@@ -1,6 +1,7 @@
 package com.runelitetablet.auth
 
 import android.net.Uri
+import com.runelitetablet.logging.AppLog
 
 /**
  * Pure functions that build OAuth2 authorization URLs for the Jagex 2-step flow.
@@ -24,6 +25,7 @@ object OAuthUrls {
      * Uses the launcher client with PKCE.
      */
     fun buildStep1AuthUrl(codeVerifier: String, state: String): Uri {
+        AppLog.d("AUTH", "OAuthUrls.buildStep1AuthUrl: endpoint=$AUTH_ENDPOINT client=$LAUNCHER_CLIENT_ID params=7 redirect=$LAUNCHER_REDIRECT_URI")
         val codeChallenge = PkceHelper.deriveChallenge(codeVerifier)
         return Uri.parse(AUTH_ENDPOINT).buildUpon()
             .appendQueryParameter("client_id", LAUNCHER_CLIENT_ID)
@@ -41,6 +43,7 @@ object OAuthUrls {
      * Uses the consent client with hybrid response_type (id_token code).
      */
     fun buildStep2ConsentUrl(state: String, nonce: String): Uri {
+        AppLog.d("AUTH", "OAuthUrls.buildStep2ConsentUrl: endpoint=$AUTH_ENDPOINT client=$CONSENT_CLIENT_ID params=6 redirect=http://localhost")
         return Uri.parse(AUTH_ENDPOINT).buildUpon()
             .appendQueryParameter("client_id", CONSENT_CLIENT_ID)
             .appendQueryParameter("response_type", "id_token code")

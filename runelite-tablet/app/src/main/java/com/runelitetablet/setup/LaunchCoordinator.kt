@@ -3,6 +3,7 @@ package com.runelitetablet.setup
 import android.content.Context
 import android.content.Intent
 import com.runelitetablet.auth.AuthResult
+import com.runelitetablet.domain.logging.CorrelationId
 import com.runelitetablet.auth.LaunchEnvDeployer
 import com.runelitetablet.auth.SessionValidation
 import com.runelitetablet.auth.JagexOAuth2Manager
@@ -56,42 +57,60 @@ class LaunchCoordinator(
         if (activeLaunchJob?.isActive == true) return
         val s = RuneLiteSessionService.sessionState.value
         if (s is SessionState.Running || s is SessionState.Starting) return
+        val corrId = CorrelationId.generate("launch")
+        logger?.state("LaunchCoordinator.launchRuneLite: starting pre-launch sequence", corrId)
         activeLaunchJob = scope.launch {
             try {
                 _launchState.value = LaunchState.CheckingUpdate
+                logger?.state("LaunchCoordinator: checking for updates", correlationId = corrId)
                 parseUpdateOutput(runUpdateCheck())
                 _launchState.value = LaunchState.CheckingHealth
-                val health = runHealthCheck()
+                logger?.state("LaunchCoordinator: running health check", correlationId = corrId)
+                val health = runHealthCheck(correlationId = corrId)
                 _healthStatus.value = health
                 if (health is HealthCheckResult.Degraded) {
+                    logger?.w("LAUNCH", "LaunchCoordinator: health check degraded failures=${health.failures}", correlationId = corrId)
                     _launchState.value = LaunchState.Failed("Setup incomplete: ${health.failures.joinToString()}")
                     _showHealthDialog.value = health.failures; return@launch
                 }
-                performLaunch()
+                performLaunch(correlationId = corrId)
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { _launchState.value = LaunchState.Failed(e.message ?: "Unknown error") }
+            catch (e: Exception) { logger?.e("LAUNCH", "LaunchCoordinator: launch error", throwable = e, correlationId = corrId); _launchState.value = LaunchState.Failed(e.message ?: "Unknown error") }
             finally { activeLaunchJob = null }
         }
     }
 
-    suspend fun performLaunch() {
+    suspend fun performLaunch(correlationId: String? = null) {
+        logger?.state("LaunchCoordinator.performLaunch: starting", correlationId = correlationId)
         val hasCredentials = withContext(ioDispatcher) { credentialStore.hasCredentials() }
+        logger?.state("LaunchCoordinator: hasCredentials=$hasCredentials", correlationId = correlationId)
         if (hasCredentials) {
             _launchState.value = LaunchState.RefreshingTokens
-            when (authCoordinator.refreshIfNeeded()) {
+            val authCorrId = if (correlationId != null) CorrelationId.nested(correlationId, "auth-refresh") else null
+            logger?.state("LaunchCoordinator: refreshing auth tokens parentCorrId=$correlationId childCorrId=$authCorrId", correlationId = correlationId)
+            when (val authResult = authCoordinator.refreshIfNeeded(correlationId = authCorrId)) {
                 is AuthResult.NeedsLogin -> {
+                    logger?.w("LAUNCH", "LaunchCoordinator: auth needs login, redirecting", correlationId = correlationId)
                     authCoordinator.pendingLaunchAfterAuth.set(true)
                     _launchState.value = LaunchState.Idle; authCoordinator.startLogin(); return
                 }
-                is AuthResult.NetworkError -> {}
-                else -> {}
+                is AuthResult.NetworkError -> {
+                    logger?.w("LAUNCH", "LaunchCoordinator: auth refresh network error, continuing", correlationId = correlationId)
+                }
+                else -> {
+                    logger?.state("LaunchCoordinator: auth refresh result=$authResult", correlationId = correlationId)
+                }
             }
             val sessionId = withContext(ioDispatcher) { credentialStore.getCredentials() }?.sessionId
             if (sessionId != null && sessionId.isNotEmpty()) {
                 _launchState.value = LaunchState.ValidatingSession
+                logger?.state("LaunchCoordinator: validating session", correlationId = correlationId)
                 when (oAuth2Manager.validateSession(sessionId)) {
-                    is SessionValidation.Valid -> {}
+                    is SessionValidation.Valid -> {
+                        logger?.state("LaunchCoordinator: session valid", correlationId = correlationId)
+                    }
                     is SessionValidation.Expired -> {
+                        logger?.w("LAUNCH", "LaunchCoordinator: session expired, redirecting to login", correlationId = correlationId)
                         authCoordinator.pendingLaunchAfterAuth.set(true)
                         withContext(ioDispatcher) { credentialStore.clearCredentials() }
                         if (orchestrator.actions == null) {
@@ -100,27 +119,44 @@ class LaunchCoordinator(
                         }
                         _launchState.value = LaunchState.Idle; authCoordinator.startLogin(); return
                     }
-                    is SessionValidation.NetworkError -> {}
+                    is SessionValidation.NetworkError -> {
+                        logger?.w("LAUNCH", "LaunchCoordinator: session validation network error, continuing", correlationId = correlationId)
+                    }
                 }
             }
         }
         _launchState.value = LaunchState.Launching
+        logger?.state("LaunchCoordinator: deploying env file backend=${presentationBackend.id}", correlationId = correlationId)
         val envFilePath = LaunchEnvDeployer.deployToTermuxHome(credentialStore, commandRunner)
-        val success = launchInternal(envFilePath)
-        if (success) { _launchState.value = LaunchState.Idle; startSessionService() }
-        else { _launchState.value = LaunchState.Failed("Failed to start RuneLite launch command") }
+        logger?.state("LaunchCoordinator: envFilePath=$envFilePath hasEnvFile=${envFilePath != null}", correlationId = correlationId)
+        logger?.d("LAUNCH", "LaunchCoordinator: env contents=[tokens redacted] backend=${presentationBackend.id}", correlationId = correlationId)
+        val success = launchInternal(envFilePath, correlationId)
+        if (success) {
+            logger?.state("LaunchCoordinator: launch succeeded, starting session service", correlationId = correlationId)
+            _launchState.value = LaunchState.Idle
+            startSessionService(correlationId)
+        } else {
+            logger?.e("LAUNCH", "LaunchCoordinator: launch failed", correlationId = correlationId)
+            _launchState.value = LaunchState.Failed("Failed to start RuneLite launch command")
+        }
     }
 
-    private suspend fun launchInternal(envFilePath: String? = null): Boolean {
-        if (!presentationBackend.isInstalled(packageChecker)) return false
+    private suspend fun launchInternal(envFilePath: String? = null, correlationId: String? = null): Boolean {
+        if (!presentationBackend.isInstalled(packageChecker)) {
+            logger?.w("LAUNCH", "launchInternal: backend ${presentationBackend.id} not installed", correlationId = correlationId)
+            return false
+        }
         presentationBackend.applyLaunchPreferences(context, displayPreferences)
         val presentationIntent = presentationBackend.createLaunchIntent(context)
         if (presentationIntent != null && presentationBackend.shouldForegroundBeforeBootstrap()) {
+            logger?.d("LAUNCH", "launchInternal: foregrounding ${presentationBackend.id} before bootstrap", correlationId = correlationId)
             orchestrator.actions?.launchIntent(presentationIntent); delay(700)
         }
         val scriptPath = scriptDeployer.getScriptPath("launch-runelite.sh")
         val arguments = if (envFilePath != null) arrayOf(envFilePath) else null
+        logger?.state("launchInternal: dispatching command scriptPath=$scriptPath envFile=$envFilePath backend=${presentationBackend.id}", correlationId = correlationId)
         val success = commandRunner.launchBackground(commandPath = scriptPath, arguments = arguments)
+        logger?.state("launchInternal: command dispatched success=$success", correlationId = correlationId)
         if (success && presentationIntent != null && presentationBackend.shouldWaitForReadySignal()) {
             waitForDisplayReadyAndSwitch(presentationIntent)
         }
@@ -163,7 +199,7 @@ class LaunchCoordinator(
         }
     }
 
-    private suspend fun runHealthCheck(): HealthCheckResult = try {
+    private suspend fun runHealthCheck(correlationId: String? = null): HealthCheckResult = try {
         if (!scriptDeployer.deployScripts()) HealthCheckResult.Inconclusive
         else {
             val output = commandRunner.execute(commandPath = scriptDeployer.getScriptPath("health-check.sh"), background = true, timeoutMs = 10_000L).stdout ?: ""
@@ -173,11 +209,13 @@ class LaunchCoordinator(
         }
     } catch (e: TimeoutCancellationException) { HealthCheckResult.Inconclusive } catch (e: CancellationException) { throw e } catch (_: Exception) { HealthCheckResult.Inconclusive }
 
-    private fun startSessionService() {
+    private fun startSessionService(correlationId: String? = null) {
+        logger?.state("startSessionService: starting foreground service", correlationId = correlationId)
         if (!orchestrator.hasNotificationPermission()) orchestrator.actions?.requestNotificationPermission()
         context.startForegroundService(Intent(context, RuneLiteSessionService::class.java).apply {
             action = RuneLiteSessionService.ACTION_START_SESSION
         })
+        logger?.state("startSessionService: session service start confirmed", correlationId = correlationId)
     }
 
     fun stopSession() {
