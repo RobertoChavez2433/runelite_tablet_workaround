@@ -45,14 +45,14 @@ class SessionHealthMonitorTest {
 
     @Test
     fun `checkHealth returns Running when sentinel file exists`() = runTest {
-        configureHealthResponse("RUNNING")
+        configureHealthResponse("session=yes virgl=n/a")
         val state = monitor.checkHealth()
         assertEquals(SessionState.Running, state)
     }
 
     @Test
     fun `checkHealth returns Stopped when sentinel file absent`() = runTest {
-        configureHealthResponse("STOPPED")
+        configureHealthResponse("session=no virgl=n/a")
         val state = monitor.checkHealth()
         assertEquals(SessionState.Stopped, state)
     }
@@ -62,7 +62,7 @@ class SessionHealthMonitorTest {
         configureHealthResponse("SOMETHING_ELSE")
         val state = monitor.checkHealth()
         assertTrue("Expected SessionState.Error, got $state", state is SessionState.Error)
-        assertEquals("Health check: unexpected output", (state as SessionState.Error).message)
+        assertTrue((state as SessionState.Error).message.contains("unexpected output"))
     }
 
     @Test
@@ -79,7 +79,7 @@ class SessionHealthMonitorTest {
 
     @Test
     fun `debounce requires 3 consecutive STOPPED before transitioning`() = testScope.runTest {
-        configureHealthResponse("STOPPED")
+        configureHealthResponse("session=no virgl=n/a")
         val emittedStates = mutableListOf<SessionState>()
 
         val job = monitor.startPolling { emittedStates.add(it) }
@@ -97,7 +97,7 @@ class SessionHealthMonitorTest {
 
     @Test
     fun `debounce emits Running immediately without debounce`() = testScope.runTest {
-        configureHealthResponse("RUNNING")
+        configureHealthResponse("session=yes virgl=n/a")
         val emittedStates = mutableListOf<SessionState>()
 
         val job = monitor.startPolling { emittedStates.add(it) }
@@ -112,7 +112,7 @@ class SessionHealthMonitorTest {
     @Test
     fun `debounce stopped count resets on Running`() = testScope.runTest {
         // Start with STOPPED to accumulate count
-        configureHealthResponse("STOPPED")
+        configureHealthResponse("session=no virgl=n/a")
         val emittedStates = mutableListOf<SessionState>()
 
         val job = monitor.startPolling { emittedStates.add(it) }
@@ -121,11 +121,11 @@ class SessionHealthMonitorTest {
         advanceTimeBy(5_001L) // 2nd poll: STOPPED (count=2, suppressed)
 
         // Switch to RUNNING — emits immediately and resets counters
-        configureHealthResponse("RUNNING")
+        configureHealthResponse("session=yes virgl=n/a")
         advanceTimeBy(5_001L) // 3rd poll: RUNNING (emitted, counters reset)
 
         // Switch back to STOPPED — needs 3 fresh consecutive
-        configureHealthResponse("STOPPED")
+        configureHealthResponse("session=no virgl=n/a")
         advanceTimeBy(60_001L) // 4th poll: STOPPED (count=1, suppressed — 60s interval after RUNNING)
         advanceTimeBy(5_001L)  // 5th poll: STOPPED (count=2, suppressed)
 
@@ -138,7 +138,7 @@ class SessionHealthMonitorTest {
 
     @Test
     fun `stopPolling resets counters`() = testScope.runTest {
-        configureHealthResponse("STOPPED")
+        configureHealthResponse("session=no virgl=n/a")
         val firstStates = mutableListOf<SessionState>()
         val job1 = monitor.startPolling { firstStates.add(it) }
         advanceTimeBy(5_001L) // 2nd poll: count=2
@@ -162,7 +162,7 @@ class SessionHealthMonitorTest {
 
     @Test
     fun `error debounce requires 3 consecutive errors before emitting`() = testScope.runTest {
-        configureHealthResponse("GARBAGE")
+        configureHealthResponse("GARBAGE_NO_SESSION_KEY")
         val emittedStates = mutableListOf<SessionState>()
 
         val job = monitor.startPolling { emittedStates.add(it) }
@@ -180,7 +180,7 @@ class SessionHealthMonitorTest {
 
     @Test
     fun `checkHealth sends correct command path and arguments`() = runTest {
-        configureHealthResponse("RUNNING")
+        configureHealthResponse("session=yes virgl=n/a")
         monitor.checkHealth()
 
         assertEquals(1, fakeRunner.executedCommands.size)
