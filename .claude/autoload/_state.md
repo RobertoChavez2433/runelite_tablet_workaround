@@ -1,31 +1,32 @@
 # Session State
 
-**Last Updated**: 2026-03-16 | **Session**: 61
+**Last Updated**: 2026-04-14 | **Session**: 63
 
 ## Current Phase
-- **Phase**: Direct Android Surface Spike — Presentation Pipeline 120 FPS Optimization
-- **Status**: Full 4-phase optimization plan APPROVED. Spec written, API-audited (all endpoints verified current via Context7 + web research), blast radius analyzed, and implementation plan saved. Key insight: VirGL vtest synchronous readback is the structural bottleneck (~10-25ms/frame), Xlorie legacy drawing fallback is active on Mali (wrong format: `R8G8B8X8_UNORM` maps to `GL_RGB8`, should be `R8G8B8A8_UNORM`), and `waitForNextFrame` caps at ~60 FPS via 2-vsync cadence. Ready to begin Phase 1 implementation.
+- **Phase**: Clean Architecture Refactor + Testing Pipeline (prerequisite for 120 FPS iteration)
+- **Status**: Comprehensive spec written (`.claude/specs/2026-04-14-clean-architecture-refactor-spec.md`). 8 phases, ~115 checklist items. Reviewed language choice (Kotlin stays — Android system integration requires it). Hard constraints established: 200 LoC max per class/method, 50 LoC max per initializer/provider/factory. Real-component testing philosophy (no mocking frameworks, only 5 Android-boundary fakes). Ready to begin Phase 1.
 
 ## HOT CONTEXT - Resume Here
 
 ### EXACTLY WHERE WE LEFT OFF
 
-**Session 61: Deep analysis of the presentation pipeline bottleneck, then full brainstorming spec + API audit + implementation plan.**
+**Session 63: Architecture review, clean architecture spec, testing pipeline design.**
 
-Key findings this session:
-1. **VirGL vtest synchronous readback identified as THE main bottleneck** — every frame does `glReadPixels` (2-5ms) + socket busy-wait + CPU memcpy + ShmPutImage + `glTexSubImage2D` re-upload. Total: 10-25ms/frame fully serialized.
-2. **Xlorie legacy drawing is active because of wrong RGBA format** — code retries with `R8G8B8X8_UNORM` (value 2, `GL_RGB8`) which Mali rejects for EGLImage. Should use `R8G8B8A8_UNORM` (value 1, `GL_RGBA8`).
-3. **`waitForNextFrame` creates 2-vsync cap** — set after `eglSwapBuffers`, not cleared until next choreographer callback. At 120Hz = ~60 FPS max theoretical.
-4. **All APIs verified current** — `AHardwareBuffer_sendHandleToUnixSocket`, `eglCreateSyncKHR` (native fence), `eglDupNativeFenceFDANDROID`, `eglWaitSyncKHR`, `eglPresentationTimeANDROID`, `eglGetNativeClientBufferANDROID`, `glEGLImageTargetTexture2DOES` — all confirmed current for API 34 on Immortalis-G720.
-5. **`EGL_ANDROID_native_fence_sync` confirmed on Mali** — both native driver and ANGLE backend support it.
-6. **AFBC preservation confirmed** — omitting CPU flags on AHB allocation preserves ARM Frame Buffer Compression.
-7. **VirGL THREAD_SYNC already enabled** — Termux virglrenderer build hardcodes it, so this is NOT an untapped optimization.
+This session pivoted from direct 120fps implementation to establishing the architecture + testing foundation first. Key decisions:
+
+1. **Kotlin stays** — evaluated switching languages; concluded the problem is hard in any language and Kotlin is the best tool for deep Android system integration (AIDL, Binder IPC, Services, BroadcastReceivers). No cross-platform framework supports this.
+2. **Clean architecture spec written** — domain/data/presentation layer split with hard boundaries. Domain layer = pure Kotlin, zero Android imports.
+3. **200 LoC hard limit on classes and methods** — 5 god classes (SetupViewModel 1,147, SetupOrchestrator 790, GeckoAuthActivity 512, HybridX11HostActivity 351, JagexOAuth2Manager 506) must be decomposed.
+4. **50 LoC hard limit on bootstraps** — all initializers, providers, factories, `onCreate()` methods, DI modules must be ≤50 lines. AppContainer split into 7 focused modules.
+5. **Real components first, fakes only at Android boundary** — no Mockito/MockK. Only 5 fakes (CommandRunner, CredentialStore, PackageChecker, SetupStateStore, Logger). Real OkHttp + MockWebServer for network tests. Real extracted classes tested directly.
+6. **Zero tests exist today** — 45 Kotlin files, 0 test files, 0 CI/CD.
 
 ### What Needs to Happen Next
 
-1. **P0: Begin Phase 1 — Fix legacy drawing fallback** — instrument `rendererTestCapabilities()`, change format to `R8G8B8A8_UNORM`, verify EGLImage path works on Mali.
-2. **P0: Measure Phase 1 result** — expect ~60-65 FPS (from ~50 baseline).
-3. **P1: Then Phase 2 — Remove `waitForNextFrame`** — start with Option A (post-swap fence only), measure, then Option B if safe.
+1. **P0: Execute Phase 1 — Foundation** — create test dirs, add deps, extract 4 interfaces (CommandRunner, CredentialStore, Logger, PackageChecker), write first test (PkceHelperTest), verify `./gradlew test` passes.
+2. **P0: Execute Phase 2 — DI Container + Bootstrap Enforcement** — create 7 DI modules (≤50 lines each), slim bootstraps, create TestAppContainer.
+3. **P1: Execute Phase 3 — God Class Decomposition** — split 5 god classes into ≤200 LoC each.
+4. **P1: 120 FPS work is BLOCKED on Phase 4+ completion** — need fast iteration loop before changing rendering pipeline.
 
 ## Blockers
 
@@ -37,10 +38,15 @@ Key findings this session:
 
 ## Recent Sessions
 
+### Session 63 (2026-04-14)
+**Work**: Reviewed language choice (Kotlin vs alternatives). Ran 4 parallel research agents: current coupling analysis, rendering pipeline audit, testability gaps survey, Kotlin clean architecture best practices. Wrote comprehensive refactor spec with 8 phases, ~115 checklist items, 200 LoC class limit, 50 LoC bootstrap limit, real-component testing philosophy.
+**Decisions**: Kotlin stays. 200 LoC hard limit on classes/methods. 50 LoC hard limit on bootstraps. No mocking frameworks — only 5 Android-boundary fakes. Domain layer must have zero Android imports. AppContainer split into 7 modules.
+**Next**: Begin Phase 1 (test foundation + interface extraction).
+
 ### Session 61 (2026-03-16)
-**Work**: Deep analysis of presentation pipeline via 11 parallel research agents. Identified VirGL vtest synchronous readback as main bottleneck, Xlorie legacy drawing active due to wrong RGBA format, and `waitForNextFrame` 2-vsync cap. Wrote comprehensive 4-phase spec (`.claude/specs/2026-03-16-presentation-pipeline-120fps-spec.md`), verified all 8 APIs via Context7 + web research, found key correction (`R8G8B8X8_UNORM` → `R8G8B8A8_UNORM`), analyzed blast radius (11 files, 2 new), wrote 24-step implementation plan.
-**Decisions**: 4-phase approach approved: (1) Fix RGBA format, (2) Remove frame pacing cap, (3) Hybrid lifecycle parity, (4) AHardwareBuffer zero-copy bypass. Skip patched-jar experiments for now — native pipeline optimization has higher expected ROI.
-**Next**: Begin Phase 1 implementation (instrument + fix `rendererTestCapabilities()`).
+**Work**: Deep analysis of presentation pipeline. Identified VirGL vtest synchronous readback as main bottleneck, Xlorie legacy drawing active due to wrong RGBA format, `waitForNextFrame` 2-vsync cap. Wrote 4-phase spec, verified all 8 APIs, wrote 24-step implementation plan.
+**Decisions**: 4-phase approach: (1) Fix RGBA format, (2) Remove frame pacing cap, (3) Hybrid lifecycle parity, (4) AHardwareBuffer zero-copy bypass.
+**Next**: Begin Phase 1 implementation (now blocked on architecture refactor).
 
 ### Session 60 (2026-03-15)
 **Work**: Added a working `direct-jvm` real RuneLite launch mode, wired it through the real evidence harness, fixed launch-state false positives caused by appended Termux logs, fixed CRLF corruption in seeded direct classpaths, and validated a fresh launcher-vs-direct comparison. Added a direct-classpath override directory so patched jars can be injected without mutating the launcher-managed repository, then pulled and disassembled the live RuneLite jars to confirm the next patch target in `GpuPlugin.prepareInterfaceTexture(...)` / `drawUi(...)`.
@@ -52,24 +58,15 @@ Key findings this session:
 **Decisions**: The Android-present step is no longer the main suspect; the remaining ceiling is upstream in Linux/AWT/X11 frame production.
 **Next**: Rerun the `internal-hybrid` synthetic control sequentially, then continue upstream client-path diagnostics.
 
-### Session 58 (2026-03-15)
-**Work**: Debugged the in-app `CmdEntryPoint` route until `internal-hybrid` successfully booted real RuneLite. Added startup-log preservation in `launch-runelite.sh`, proved donor `libXlorie.so` must be extracted from installed APK, fixed extraction target to Termux runtime filesystem.
-**Decisions**: The in-app bootstrap route is now a real measurement path, not just a spike.
-**Next**: Compare `internal-hybrid` against the external hybrid path then pivot toward deeper presentation-path changes.
-
-### Session 57 (2026-03-15)
-**Work**: Started the first in-app Java-side X server experiment. Added in-app `CmdEntryPoint.java`, introduced `internal-hybrid` presentation variant, built and installed app. First run failed before X11 socket creation.
-**Decisions**: Stay on the app-owned server route. Debug boot path directly.
-**Next**: Fix CmdEntryPoint boot failure.
-
 ## Active Plans
 
-- **Presentation Pipeline 120 FPS Optimization** — **APPROVED**. Session 61. 4 phases, 24 steps. Spec + plan + blast radius complete. Ready for Phase 1.
-- **Direct Android Surface Spike** — **SUPERSEDED by above plan**. Sessions 54-60 established the hybrid path, evidence harness, and direct-jvm vehicle. The new 120 FPS plan subsumes this.
-- **VirGL Fix Pipeline** — **IMPLEMENTED, SUPERSEDED**. Session 53. Historical.
+- **Clean Architecture Refactor + Testing Pipeline** — **SPEC WRITTEN**. Session 63. 8 phases, ~115 checklist items. Spec: `.claude/specs/2026-04-14-clean-architecture-refactor-spec.md`. Ready for Phase 1.
+- **Presentation Pipeline 120 FPS Optimization** — **APPROVED, BLOCKED on refactor**. Session 61. 4 phases, 24 steps. Spec + plan + blast radius complete. Needs testing pipeline from refactor before implementation.
+- **Direct Android Surface Spike** — **SUPERSEDED**. Sessions 54-60.
 - **Auth Session Refresh Fix** — **COMPLETE**. Session 45-46.
 
 ## Reference
+- **Clean architecture refactor spec**: `.claude/specs/2026-04-14-clean-architecture-refactor-spec.md`
 - **120 FPS spec**: `.claude/specs/2026-03-16-presentation-pipeline-120fps-spec.md`
 - **120 FPS plan**: `.claude/plans/2026-03-16-presentation-pipeline-120fps.md`
 - **120 FPS blast radius**: `.claude/dependency_graphs/2026-03-16-presentation-pipeline-120fps/blast-radius.md`

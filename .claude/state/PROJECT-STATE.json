@@ -3,14 +3,14 @@
     "app_name": "Runelite for Tablet",
     "app_version": "0.1.0",
     "description": "Android installer app that runs the real RuneLite client on Samsung Tab S10 Ultra via Termux + proot-distro",
-    "last_updated": "2026-03-16T16:05:00Z",
-    "session_notes": "Session 62: Continued real-device 120 FPS diagnostics. Corrected the build/install target mistake: internal-hybrid uses libXlorie.so from com.runelitetablet base.apk, and the app-process X server extracts that same library to /data/data/com.termux/files/usr/tmp/termux-x11-com.runelitetablet-libs/arm64-v8a-libXlorie.so. Added native XlorieIdentity logs in lorie/activity.c and lorie/cmdentrypoint.c plus live DamageTraceV2 backend/function tracing in xserver/miext/damage/damage.c. Verified the real workload now emits DamageTraceV2 and is dominated by PutImage on WINDOW with backend=other from the extracted server libXlorie.so. Present remains inactive and sustained FPS is still ~30-33 average LorieNative. Next step is offset-map the hot PutImage/Composite function pointers back to the unstripped local libXlorie.so and instrument that exact implementation."
+    "last_updated": "2026-04-14T23:00:00Z",
+    "session_notes": "Session 63: Architecture review — evaluated language choice (Kotlin stays), ran 4 parallel research agents (coupling analysis, rendering pipeline audit, testability gaps, clean architecture best practices). Wrote comprehensive clean architecture refactor spec with 8 phases, ~115 checklist items. Hard constraints: 200 LoC max classes/methods, 50 LoC max bootstraps, real-component testing (no mocking frameworks). Spec at .claude/specs/2026-04-14-clean-architecture-refactor-spec.md. 120 FPS implementation now blocked on this refactor completing."
   },
   "current_phase": {
-    "phase_name": "Presentation Pipeline 120 FPS Optimization",
-    "phase_status": "runtime_path_proven_offset_mapping_next",
-    "phase_started": "2026-03-16",
-    "progress_percentage": 22
+    "phase_name": "Clean Architecture Refactor + Testing Pipeline",
+    "phase_status": "spec_written_ready_for_phase_1",
+    "phase_started": "2026-04-14",
+    "progress_percentage": 5
   },
   "release_cycle": {
     "last_release": null,
