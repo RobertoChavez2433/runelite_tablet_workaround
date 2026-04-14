@@ -24,6 +24,17 @@
 #include "glamor_transfer.h"
 #include "glamor_transform.h"
 
+static unsigned long gGlamorPutImageGlTraceCount;
+static unsigned long gGlamorPutImageBailTraceCount;
+
+#define GLAMOR_IMAGE_TRACE(...) ErrorF("GlamorTrace: " __VA_ARGS__)
+#define GLAMOR_IMAGE_TRACE_EVERY(counter, step, ...) \
+    do { \
+        (counter)++; \
+        if (((counter) <= 8) || (((counter) % (step)) == 0)) \
+            GLAMOR_IMAGE_TRACE(__VA_ARGS__); \
+    } while (0)
+
 /*
  * PutImage. Only does ZPixmap right now as other formats are quite a bit harder
  */
@@ -77,6 +88,14 @@ glamor_put_image_gl(DrawablePtr drawable, GCPtr gc, int depth, int x, int y,
     glamor_make_current(glamor_priv);
 
     glamor_upload_region(pixmap, &region, x, y, (uint8_t *) bits, byte_stride);
+    GLAMOR_IMAGE_TRACE_EVERY(
+        gGlamorPutImageGlTraceCount, 128,
+        "putImage gl count=%lu drawableType=%d drawableId=0x%lx geom=%dx%d size=%dx%d format=%d depth=%d\n",
+        gGlamorPutImageGlTraceCount,
+        drawable->type,
+        (unsigned long) drawable->id,
+        drawable->width, drawable->height,
+        w, h, format, depth);
 
     RegionUninit(&region);
     return TRUE;
@@ -88,6 +107,14 @@ static void
 glamor_put_image_bail(DrawablePtr drawable, GCPtr gc, int depth, int x, int y,
                       int w, int h, int leftPad, int format, char *bits)
 {
+    GLAMOR_IMAGE_TRACE_EVERY(
+        gGlamorPutImageBailTraceCount, 128,
+        "putImage bail count=%lu drawableType=%d drawableId=0x%lx geom=%dx%d size=%dx%d format=%d depth=%d\n",
+        gGlamorPutImageBailTraceCount,
+        drawable->type,
+        (unsigned long) drawable->id,
+        drawable->width, drawable->height,
+        w, h, format, depth);
     if (glamor_prepare_access_box(drawable, GLAMOR_ACCESS_RW, x, y, w, h))
         fbPutImage(drawable, gc, depth, x, y, w, h, leftPad, format, bits);
     glamor_finish_access(drawable);

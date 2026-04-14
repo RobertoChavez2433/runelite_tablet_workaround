@@ -15,6 +15,7 @@
 #include <sys/prctl.h>
 #include <sys/ioctl.h>
 #include <libgen.h>
+#include <dlfcn.h>
 #include <globals.h>
 #include <xkbsrv.h>
 #include <errno.h>
@@ -30,6 +31,7 @@
 static int argc = 0;
 static char** argv = NULL;
 __LIBC_HIDDEN__ volatile int conn_fd = -1; // The only variable shared with activity code.
+extern char* __progname;
 extern DeviceIntPtr lorieMouse, lorieTouch, lorieKeyboard, loriePen, lorieEraser;
 extern ScreenPtr pScreenPtr;
 extern int ucs2keysym(long ucs);
@@ -39,6 +41,42 @@ char *xtrans_unix_path_x11 = NULL;
 char *xtrans_unix_dir_x11 = NULL;
 
 struct xorg_list registeredBuffers;
+
+static void logRuntimeIdentity(const char *where, void *symbol) {
+    Dl_info info = {0};
+    char exe[512] = {0};
+    char cmdline[512] = {0};
+    const char *so = "<unknown>";
+    const char *prog = __progname ? __progname : "<null>";
+    ssize_t exeLen;
+    FILE *fp;
+    size_t cmdlineLen;
+
+    if (dladdr(symbol, &info) && info.dli_fname)
+        so = info.dli_fname;
+
+    exeLen = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+    if (exeLen > 0)
+        exe[exeLen] = '\0';
+    else
+        strcpy(exe, "<unavailable>");
+
+    fp = fopen("/proc/self/cmdline", "rb");
+    if (fp) {
+        cmdlineLen = fread(cmdline, 1, sizeof(cmdline) - 1, fp);
+        fclose(fp);
+        for (size_t i = 0; i < cmdlineLen; ++i) {
+            if (cmdline[i] == '\0')
+                cmdline[i] = ' ';
+        }
+        cmdline[cmdlineLen] = '\0';
+    } else {
+        strcpy(cmdline, "<unavailable>");
+    }
+
+    log(INFO, "XlorieIdentity: where=%s pid=%d prog=%s exe=%s so=%s cmdline=%s",
+        where, getpid(), prog, exe, so, cmdline);
+}
 
 static void* startServer(__unused void* cookie) {
     char* envp[] = { NULL };
@@ -73,6 +111,7 @@ JNIEXPORT jboolean JNICALL
 Java_com_termux_x11_CmdEntryPoint_start(JNIEnv *env, __unused jclass cls, jobjectArray args) {
     pthread_t t;
     JavaVM* vm = NULL;
+    logRuntimeIdentity("cmd.start", (void *) &Java_com_termux_x11_CmdEntryPoint_start);
     // execv's argv array is a bit incompatible with Java's String[], so we do some converting here...
     argc = (*env)->GetArrayLength(env, args) + 1; // Leading executable path
     argv = (char**) calloc(argc, sizeof(char*));
@@ -489,6 +528,7 @@ Java_com_termux_x11_CmdEntryPoint_getXConnection(JNIEnv *env, __unused jobject c
     jclass ParcelFileDescriptorClass = (*env)->FindClass(env, "android/os/ParcelFileDescriptor");
     jmethodID adoptFd = (*env)->GetStaticMethodID(env, ParcelFileDescriptorClass, "adoptFd", "(I)Landroid/os/ParcelFileDescriptor;");
     socketpair(AF_UNIX, SOCK_STREAM, 0, client);
+    logRuntimeIdentity("cmd.getXConnection", (void *) &Java_com_termux_x11_CmdEntryPoint_getXConnection);
     QueueWorkProc(addFd, NULL, (void*) (int64_t) client[1]);
     lorieWakeServer();
 

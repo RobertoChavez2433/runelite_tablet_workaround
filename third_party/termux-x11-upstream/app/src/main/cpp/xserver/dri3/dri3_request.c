@@ -28,6 +28,14 @@
 #include <protocol-versions.h>
 #include <drm_fourcc.h>
 
+#define DRI3_TRACE(...) ErrorF("DRI3Trace: " __VA_ARGS__)
+
+static Bool
+dri3_trace_enabled(unsigned long count)
+{
+    return count <= 20 || count % 100 == 0;
+}
+
 static Bool
 dri3_screen_can_one_point_two(ScreenPtr screen)
 {
@@ -45,6 +53,7 @@ dri3_screen_can_one_point_two(ScreenPtr screen)
 static int
 proc_dri3_query_version(ClientPtr client)
 {
+    static unsigned long query_version_count = 0;
     REQUEST(xDRI3QueryVersionReq);
     xDRI3QueryVersionReply rep = {
         .type = X_Reply,
@@ -82,6 +91,16 @@ proc_dri3_query_version(ClientPtr client)
          rep.minorVersion > stuff->minorVersion)) {
         rep.majorVersion = stuff->majorVersion;
         rep.minorVersion = stuff->minorVersion;
+    }
+
+    query_version_count++;
+    if (dri3_trace_enabled(query_version_count)) {
+        DRI3_TRACE("QueryVersion request=%lu.%lu reply=%lu.%lu count=%lu\n",
+                   (unsigned long) stuff->majorVersion,
+                   (unsigned long) stuff->minorVersion,
+                   (unsigned long) rep.majorVersion,
+                   (unsigned long) rep.minorVersion,
+                   query_version_count);
     }
 
     if (client->swapped) {
@@ -122,6 +141,7 @@ dri3_send_open_reply(ClientPtr client, int fd)
 static int
 proc_dri3_open(ClientPtr client)
 {
+    static unsigned long open_count = 0;
     REQUEST(xDRI3OpenReq);
     RRProviderPtr provider;
     DrawablePtr drawable;
@@ -150,6 +170,15 @@ proc_dri3_open(ClientPtr client)
     if (status != Success)
         return status;
 
+    open_count++;
+    if (dri3_trace_enabled(open_count)) {
+        DRI3_TRACE("Open drawable=0x%lx provider=0x%lx fd=%d count=%lu\n",
+                   (unsigned long) stuff->drawable,
+                   (unsigned long) stuff->provider,
+                   fd,
+                   open_count);
+    }
+
     if (client->ignoreCount == 0)
         return dri3_send_open_reply(client, fd);
 
@@ -159,6 +188,7 @@ proc_dri3_open(ClientPtr client)
 static int
 proc_dri3_pixmap_from_buffer(ClientPtr client)
 {
+    static unsigned long pixmap_from_buffer_count = 0;
     REQUEST(xDRI3PixmapFromBufferReq);
     int fd;
     DrawablePtr drawable;
@@ -211,6 +241,19 @@ proc_dri3_pixmap_from_buffer(ClientPtr client)
     if (rc != Success)
         return rc;
 
+    pixmap_from_buffer_count++;
+    if (dri3_trace_enabled(pixmap_from_buffer_count)) {
+        DRI3_TRACE("PixmapFromBuffer drawable=0x%lx pixmap=0x%lx size=%ux%u depth=%u bpp=%u stride=%u count=%lu\n",
+                   (unsigned long) stuff->drawable,
+                   (unsigned long) stuff->pixmap,
+                   stuff->width,
+                   stuff->height,
+                   stuff->depth,
+                   stuff->bpp,
+                   stuff->stride,
+                   pixmap_from_buffer_count);
+    }
+
     pixmap->drawable.id = stuff->pixmap;
 
     /* security creation/labeling check */
@@ -230,6 +273,7 @@ proc_dri3_pixmap_from_buffer(ClientPtr client)
 static int
 proc_dri3_buffer_from_pixmap(ClientPtr client)
 {
+    static unsigned long buffer_from_pixmap_count = 0;
     REQUEST(xDRI3BufferFromPixmapReq);
     xDRI3BufferFromPixmapReply rep = {
         .type = X_Reply,
@@ -257,6 +301,19 @@ proc_dri3_buffer_from_pixmap(ClientPtr client)
     fd = dri3_fd_from_pixmap(pixmap, &rep.stride, &rep.size);
     if (fd < 0)
         return BadPixmap;
+
+    buffer_from_pixmap_count++;
+    if (dri3_trace_enabled(buffer_from_pixmap_count)) {
+        DRI3_TRACE("BufferFromPixmap pixmap=0x%lx size=%ux%u depth=%u bpp=%u stride=%u fd=%d count=%lu\n",
+                   (unsigned long) stuff->pixmap,
+                   rep.width,
+                   rep.height,
+                   rep.depth,
+                   rep.bpp,
+                   rep.stride,
+                   fd,
+                   buffer_from_pixmap_count);
+    }
 
     if (client->swapped) {
         swaps(&rep.sequenceNumber);
@@ -345,6 +402,7 @@ proc_dri3_fd_from_fence(ClientPtr client)
 static int
 proc_dri3_get_supported_modifiers(ClientPtr client)
 {
+    static unsigned long get_supported_modifiers_count = 0;
     REQUEST(xDRI3GetSupportedModifiersReq);
     xDRI3GetSupportedModifiersReply rep = {
         .type = X_Reply,
@@ -370,6 +428,17 @@ proc_dri3_get_supported_modifiers(ClientPtr client)
 				 stuff->depth, stuff->bpp,
                                  &nwindowmodifiers, &window_modifiers,
                                  &nscreenmodifiers, &screen_modifiers);
+
+    get_supported_modifiers_count++;
+    if (dri3_trace_enabled(get_supported_modifiers_count)) {
+        DRI3_TRACE("GetSupportedModifiers window=0x%lx depth=%u bpp=%u windowMods=%lu screenMods=%lu count=%lu\n",
+                   (unsigned long) stuff->window,
+                   stuff->depth,
+                   stuff->bpp,
+                   (unsigned long) nwindowmodifiers,
+                   (unsigned long) nscreenmodifiers,
+                   get_supported_modifiers_count);
+    }
 
     rep.numWindowModifiers = nwindowmodifiers;
     rep.numScreenModifiers = nscreenmodifiers;
@@ -400,6 +469,7 @@ proc_dri3_get_supported_modifiers(ClientPtr client)
 static int
 proc_dri3_pixmap_from_buffers(ClientPtr client)
 {
+    static unsigned long pixmap_from_buffers_count = 0;
     REQUEST(xDRI3PixmapFromBuffersReq);
     int fds[4];
     CARD32 strides[4], offsets[4];
@@ -475,6 +545,20 @@ proc_dri3_pixmap_from_buffers(ClientPtr client)
     if (rc != Success)
         return rc;
 
+    pixmap_from_buffers_count++;
+    if (dri3_trace_enabled(pixmap_from_buffers_count)) {
+        DRI3_TRACE("PixmapFromBuffers window=0x%lx pixmap=0x%lx buffers=%u size=%ux%u depth=%u bpp=%u modifier=0x%llx count=%lu\n",
+                   (unsigned long) stuff->window,
+                   (unsigned long) stuff->pixmap,
+                   stuff->num_buffers,
+                   stuff->width,
+                   stuff->height,
+                   stuff->depth,
+                   stuff->bpp,
+                   (unsigned long long) stuff->modifier,
+                   pixmap_from_buffers_count);
+    }
+
     pixmap->drawable.id = stuff->pixmap;
 
     /* security creation/labeling check */
@@ -494,6 +578,7 @@ proc_dri3_pixmap_from_buffers(ClientPtr client)
 static int
 proc_dri3_buffers_from_pixmap(ClientPtr client)
 {
+    static unsigned long buffers_from_pixmap_count = 0;
     REQUEST(xDRI3BuffersFromPixmapReq);
     xDRI3BuffersFromPixmapReply rep = {
         .type = X_Reply,
@@ -518,6 +603,19 @@ proc_dri3_buffers_from_pixmap(ClientPtr client)
     num_fds = dri3_fds_from_pixmap(pixmap, fds, strides, offsets, &modifier);
     if (num_fds == 0)
         return BadPixmap;
+
+    buffers_from_pixmap_count++;
+    if (dri3_trace_enabled(buffers_from_pixmap_count)) {
+        DRI3_TRACE("BuffersFromPixmap pixmap=0x%lx numFds=%d size=%ux%u depth=%u bpp=%u modifier=0x%llx count=%lu\n",
+                   (unsigned long) stuff->pixmap,
+                   num_fds,
+                   pixmap->drawable.width,
+                   pixmap->drawable.height,
+                   pixmap->drawable.depth,
+                   pixmap->drawable.bitsPerPixel,
+                   (unsigned long long) modifier,
+                   buffers_from_pixmap_count);
+    }
 
     rep.nfd = num_fds;
     rep.length = bytes_to_int32(num_fds * 2 * sizeof(CARD32));

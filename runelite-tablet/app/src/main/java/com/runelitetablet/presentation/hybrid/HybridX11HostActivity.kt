@@ -1,9 +1,11 @@
 package com.runelitetablet.presentation.hybrid
 
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.os.Bundle
 import android.os.SystemClock
 import android.content.Intent
+import android.preference.PreferenceManager
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -27,6 +29,7 @@ class HybridX11HostActivity : ComponentActivity() {
     private lateinit var lorieView: LorieView
     private lateinit var rootView: FrameLayout
     private lateinit var inputController: HybridInputController
+    private lateinit var sharedPrefs: SharedPreferences
 
     private var attachJob: Job? = null
     private var lastConnectionRequestAtMs = 0L
@@ -35,6 +38,11 @@ class HybridX11HostActivity : ComponentActivity() {
     private var lastStatusMessage: String? = null
     private var lastHandledGeneration = 0
     private var pendingBridgeReconnect = false
+    private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, _ ->
+        if (::lorieView.isInitialized) {
+            lorieView.reloadPreferences(prefs)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,6 +71,12 @@ class HybridX11HostActivity : ComponentActivity() {
         lorieView = LorieView(this).apply {
             setBackgroundColor(Color.BLACK)
         }
+        @Suppress("DEPRECATION")
+        run {
+            sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this)
+        }
+        sharedPrefs.registerOnSharedPreferenceChangeListener(prefListener)
+        lorieView.reloadPreferences(sharedPrefs)
 
         rootView = FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
@@ -115,8 +129,8 @@ class HybridX11HostActivity : ComponentActivity() {
         )
         setContentView(rootView)
 
-        com.termux.x11.MainActivity.getInstance().setConnectionChangedListener {
-            handleConnectionStateChange("native callback")
+        com.termux.x11.MainActivity.getInstance().setConnectionChangedListener { connected ->
+            handleConnectionStateChange("native callback", connected)
         }
 
         lifecycleScope.launch {
@@ -174,6 +188,9 @@ class HybridX11HostActivity : ComponentActivity() {
 
     override fun onDestroy() {
         com.termux.x11.MainActivity.getInstance().setConnectionChangedListener(null)
+        if (::sharedPrefs.isInitialized) {
+            sharedPrefs.unregisterOnSharedPreferenceChangeListener(prefListener)
+        }
         super.onDestroy()
     }
 
@@ -242,6 +259,8 @@ class HybridX11HostActivity : ComponentActivity() {
             val detached = fd.detachFd()
             LorieView.connect(detached)
             lorieView.triggerCallback()
+            com.termux.x11.MainActivity.getInstance().clientConnectedStateChanged()
+            lorieView.reloadPreferences(sharedPrefs)
             xConnectionAttached = true
             pendingBridgeReconnect = false
             updateStatus("attached xConnection fd=$detached")
@@ -280,8 +299,8 @@ class HybridX11HostActivity : ComponentActivity() {
         AppLog.w("HYBRID_X11", "HybridX11HostActivity: $message")
     }
 
-    private fun handleConnectionStateChange(source: String) {
-        val connected = LorieView.connected()
+    private fun handleConnectionStateChange(source: String, connected: Boolean = LorieView.connected()) {
+        lorieView.onWindowFocusChanged(hasWindowFocus())
         if (connected) {
             xConnectionAttached = true
             updateStatus("$source connected=true")

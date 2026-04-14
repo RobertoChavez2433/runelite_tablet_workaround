@@ -3,6 +3,7 @@ package com.termux.x11
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Rect
 import android.graphics.Point
 import android.graphics.drawable.ColorDrawable
@@ -33,9 +34,14 @@ class LorieView : SurfaceView {
         context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
     }
     private val size = Point()
+    private val clipboardListener = ClipboardManager.OnPrimaryClipChangedListener {
+        handleClipboardChange()
+    }
 
     private var callback: Callback? = null
     private var lastClipboardText: String? = null
+    private var clipboardSyncEnabled = true
+    private var clipboardListenerRegistered = false
 
     private val surfaceCallback = object : SurfaceHolder.Callback {
         override fun surfaceCreated(holder: SurfaceHolder) {
@@ -97,6 +103,13 @@ class LorieView : SurfaceView {
         }
     }
 
+    fun reloadPreferences(prefs: SharedPreferences) {
+        clipboardSyncEnabled = prefs.getBoolean("clipboardEnable", true)
+        setClipboardSyncEnabled(clipboardSyncEnabled, clipboardSyncEnabled)
+        updateClipboardListener(hasWindowFocus())
+        AppLog.step("hybrid_x11", "Hybrid LorieView.reloadPreferences clipboardSync=$clipboardSyncEnabled")
+    }
+
     @Keep
     fun resetIme() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -118,6 +131,37 @@ class LorieView : SurfaceView {
         val text = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()
         if (!text.isNullOrEmpty() && text != lastClipboardText) {
             sendClipboardEvent(text.toByteArray(Charsets.UTF_8))
+        }
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        updateClipboardListener(hasWindowFocus)
+    }
+
+    override fun onDetachedFromWindow() {
+        updateClipboardListener(false)
+        super.onDetachedFromWindow()
+    }
+
+    private fun handleClipboardChange() {
+        if (clipboardSyncEnabled) {
+            requestClipboard()
+        }
+    }
+
+    private fun updateClipboardListener(hasWindowFocus: Boolean) {
+        val shouldListen = clipboardSyncEnabled && hasWindowFocus
+        if (shouldListen && !clipboardListenerRegistered) {
+            clipboard.addPrimaryClipChangedListener(clipboardListener)
+            clipboardListenerRegistered = true
+        } else if (!shouldListen && clipboardListenerRegistered) {
+            clipboard.removePrimaryClipChangedListener(clipboardListener)
+            clipboardListenerRegistered = false
+        }
+
+        if (shouldListen) {
+            handleClipboardChange()
         }
     }
 

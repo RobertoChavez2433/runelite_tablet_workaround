@@ -47,11 +47,46 @@
 
 #include "compint.h"
 
+static unsigned long gCompScreenUpdateTraceCount;
+static unsigned long gCompReportDamageTraceCount;
+
+#define COMP_ALLOC_TRACE(...) ErrorF("CompTrace: " __VA_ARGS__)
+#define COMP_ALLOC_TRACE_EVERY(counter, step, ...) \
+    do { \
+        (counter)++; \
+        if (((counter) <= 8) || (((counter) % (step)) == 0)) \
+            COMP_ALLOC_TRACE(__VA_ARGS__); \
+    } while (0)
+
+static void
+compTraceRegionSummary(const char *tag, RegionPtr pRegion, WindowPtr pWin)
+{
+    BoxPtr extents = RegionExtents(pRegion);
+
+    COMP_ALLOC_TRACE(
+        "%s win=0x%lx parent=0x%lx redirected=%d viewable=%d rects=%d box=%d,%d-%d,%d\n",
+        tag,
+        (unsigned long) pWin->drawable.id,
+        pWin->parent ? (unsigned long) pWin->parent->drawable.id : 0UL,
+        pWin->redirectDraw,
+        pWin->viewable,
+        RegionNumRects(pRegion),
+        extents->x1, extents->y1, extents->x2, extents->y2);
+}
+
 static Bool
 compScreenUpdate(ClientPtr pClient, void *closure)
 {
     ScreenPtr pScreen = closure;
     CompScreenPtr cs = GetCompScreen(pScreen);
+
+    COMP_ALLOC_TRACE_EVERY(
+        gCompScreenUpdateTraceCount, 32,
+        "screenUpdate count=%lu root=0x%lx damagedDescendants=%d pending=%d\n",
+        gCompScreenUpdateTraceCount,
+        (unsigned long) pScreen->root->drawable.id,
+        pScreen->root->damagedDescendants,
+        cs->pendingScreenUpdate);
 
     compCheckTree(pScreen);
     compPaintChildrenToWindow(pScreen->root);
@@ -84,6 +119,17 @@ compReportDamage(DamagePtr pDamage, RegionPtr pRegion, void *closure)
     if (!cs->pendingScreenUpdate) {
         QueueWorkProc(compScreenUpdate, serverClient, pScreen);
         cs->pendingScreenUpdate = TRUE;
+    }
+    COMP_ALLOC_TRACE_EVERY(
+        gCompReportDamageTraceCount, 256,
+        "reportDamage count=%lu pending=%d topLevel=%d rootParent=%d ",
+        gCompReportDamageTraceCount,
+        cs->pendingScreenUpdate,
+        pWin->parent && pWin->parent->parent == NULL,
+        pWin->parent == pScreen->root);
+    if ((gCompReportDamageTraceCount <= 8) ||
+        ((gCompReportDamageTraceCount % 256) == 0)) {
+        compTraceRegionSummary("reportDamageRegion", pRegion, pWin);
     }
     cw->damaged = TRUE;
 

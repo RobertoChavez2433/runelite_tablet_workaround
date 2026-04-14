@@ -35,6 +35,17 @@
 #include "dixfontstr.h"
 #include "exa.h"
 
+static unsigned long gExaPutImageTraceCount;
+static unsigned long gExaPutImageFallbackTraceCount;
+
+#define EXA_ACCEL_TRACE(...) ErrorF("ExaTrace: " __VA_ARGS__)
+#define EXA_ACCEL_TRACE_EVERY(counter, step, ...) \
+    do { \
+        (counter)++; \
+        if (((counter) <= 8) || (((counter) % (step)) == 0)) \
+            EXA_ACCEL_TRACE(__VA_ARGS__); \
+    } while (0)
+
 static void
 exaFillSpans(DrawablePtr pDrawable, GCPtr pGC, int n,
              DDXPointPtr ppt, int *pwidth, int fSorted)
@@ -220,8 +231,17 @@ exaDoPutImage(DrawablePtr pDrawable, GCPtr pGC, int depth, int x, int y,
         }
     }
 
-    if (ret)
+    if (ret) {
+        EXA_ACCEL_TRACE_EVERY(
+            gExaPutImageTraceCount, 128,
+            "putImage accel count=%lu drawableType=%d drawableId=0x%lx geom=%dx%d size=%dx%d format=%d depth=%d\n",
+            gExaPutImageTraceCount,
+            pDrawable->type,
+            (unsigned long) pDrawable->id,
+            pDrawable->width, pDrawable->height,
+            w, h, format, depth);
         exaMarkSync(pDrawable->pScreen);
+    }
 
     return ret;
 }
@@ -231,9 +251,18 @@ exaPutImage(DrawablePtr pDrawable, GCPtr pGC, int depth, int x, int y,
             int w, int h, int leftPad, int format, char *bits)
 {
     if (!exaDoPutImage(pDrawable, pGC, depth, x, y, w, h, format, bits,
-                       PixmapBytePad(w, pDrawable->depth)))
+                       PixmapBytePad(w, pDrawable->depth))) {
+        EXA_ACCEL_TRACE_EVERY(
+            gExaPutImageFallbackTraceCount, 128,
+            "putImage fallback count=%lu drawableType=%d drawableId=0x%lx geom=%dx%d size=%dx%d format=%d depth=%d\n",
+            gExaPutImageFallbackTraceCount,
+            pDrawable->type,
+            (unsigned long) pDrawable->id,
+            pDrawable->width, pDrawable->height,
+            w, h, format, depth);
         ExaCheckPutImage(pDrawable, pGC, depth, x, y, w, h, leftPad, format,
                          bits);
+    }
 }
 
 static Bool inline

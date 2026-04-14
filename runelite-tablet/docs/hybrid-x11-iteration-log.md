@@ -2912,3 +2912,823 @@ The branch now has all three ingredients needed for a real client-side experimen
 - a concrete client method target in the exact pulled RuneLite jar
 
 So the next meaningful step is no longer more launcher/path testing. It is building and injecting a patched GPU-plugin/client jar to test whether the interface upload path is a major part of the remaining cadence ceiling.
+
+### 2026-03-16 Checkpoint 1
+
+The branch then pivoted from the direct-JVM client patch lead back into the app-owned hybrid presentation path, using the approved presentation-pipeline plan as the next bounded implementation sequence.
+
+#### What changed
+
+Phase 1, the conservative part of Phase 2, and the planned hybrid lifecycle parity work were implemented and re-tested:
+
+- renderer capability diagnostics were added in `lorie/renderer.c`
+  - new `XlorieCaps` log lines now record:
+    - `eglInitialize`
+    - `AHardwareBuffer_allocate`
+    - `eglGetNativeClientBufferANDROID`
+    - `eglCreateImageKHR`
+    - `glReadPixels`
+    - final `legacy_drawing` / `flip` decision
+- the capability probe was fixed so it initializes EGL for itself before probing
+  - before that fix, the loader-side capability check could hit `EGL_NOT_INITIALIZED` and incorrectly fall into legacy drawing
+- the non-legacy RGBA/BGRA path was widened so `AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM` is accepted where needed
+  - `buffer.c`
+  - `buffer.h`
+  - `InitOutput.c`
+- the conservative pacing change from the plan was kept
+  - the post-swap tiny clear + fence wait block in `rendererRedrawLocked()` was removed
+- the aggressive pacing change from the plan was tried and then rejected
+  - removing `waitForNextFrame` and adding `eglPresentationTimeANDROID()` did not produce a stable better regime in the later controlled runs
+  - that work was reverted, so the branch currently keeps only Option A
+- hybrid host lifecycle parity with upstream was tightened
+  - `HybridX11HostActivity` now reloads preferences after connect, registers a preference listener, and mirrors `clientConnectedStateChanged()`
+  - `LorieView` now has a working `reloadPreferences()` path for clipboard sync state
+  - `MainActivity` now forwards connection state changes with an explicit `Boolean`
+
+#### Important testing correction
+
+Some of the first post-change comparisons were invalid and should not be used.
+
+I accidentally overlapped:
+
+- `./gradlew :app:installDebug`
+- the performance evidence capture
+
+That caused Android to kill `com.runelitetablet` during capture with an `installPackageLI` package replacement event. Those runs are not valid performance comparisons because the app was killed mid-window by the install itself.
+
+The valid procedure for the rest of this branch is:
+
+1. run `./gradlew :app:installDebug`
+2. wait for install to finish
+3. run the evidence harness separately
+
+#### Key validated evidence
+
+Clean sequential capture:
+
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-101001.summary.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-101001.logcat.txt`
+
+What the summary showed:
+
+- visible surface average: `43.93 FPS`
+- visible surface median: `50.57 FPS`
+- visible surface max: `120.01 FPS`
+- `LorieNative` average: `31.54 FPS`
+- `LorieNative` median: `37.3 FPS`
+- `LorieNative` last: `61.6 FPS`
+- `LorieNative` max: `61.6 FPS`
+- last renderer estimate: `58.6 FPS`
+- last renderer perf line:
+  - `frames=294 avg_lock_ms=0.002 avg_fence_ms=2.410 avg_swap_ms=0.557 avg_frame_ms=3.487 avg_inter_frame_ms=17.078 estimated_fps=58.6`
+- `present after-flips` stayed at `0.0 FPS`
+
+The filtered live logcat from the same valid run also showed the loader-side non-legacy path working again:
+
+- `XlorieCaps: eglInitialize major=1 minor=5`
+- `XlorieCaps: AHardwareBuffer_allocate format=AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM`
+- `XlorieCaps: eglCreateImageKHR ... eglError=0x3000`
+- `XlorieCaps: glReadPixels ... actual=0xAADDCCBB`
+- `XlorieCaps: decision ... legacy_drawing=0 flip=0`
+
+And the runtime path was again using shared AHardwareBuffer-backed buffers:
+
+- `Sent shared buffer ... type 3`
+- `Received shared buffer ... type 3`
+
+Later steady windows in the same capture reached the current best validated hybrid numbers:
+
+- `XloriePerf ... estimated_fps=61.4`
+- `LorieNative ... 291 frames in 5.0 seconds = 58.2 FPS`
+- `XloriePerf ... estimated_fps=58.6`
+- `LorieNative ... 308 frames in 5.0 seconds = 61.6 FPS`
+- `XloriePerf ... estimated_fps=66.9`
+- `LorieNative ... 324 frames in 5.0 seconds = 64.8 FPS`
+
+#### Interpretation
+
+This materially improved the branch state, but it did **not** reach the target regime.
+
+What is now proven again:
+
+- the loader-side capability probe can stay on `legacy_drawing=0`
+- the hybrid host is again receiving AHardwareBuffer-backed shared buffers
+- the app-owned host can still maintain repeated `120 Hz` layer votes
+- the tightened lifecycle parity changes do not obviously regress the better hybrid runs
+
+What is still not solved:
+
+- the validated renderer / `LorieNative` ceiling is still only around the high `50s` to low `60s`
+- `present after-flips` is still flat at `0`
+- the end of the run still shows a late disconnect / missing buffer sequence during shutdown
+
+The practical current conclusion is:
+
+- Phase 1 succeeded
+- the conservative Option A pacing change is worth keeping
+- the aggressive Option B pacing change is not justified by the evidence
+- the current remaining ceiling is deeper than host attach or basic AHB transport
+
+#### Updated blocker for the next phase
+
+The approved Phase 4 plan assumed we could implement a full AHardwareBuffer zero-copy VirGL bypass entirely inside this repo.
+
+The code review after this checkpoint does **not** support that assumption cleanly:
+
+- the repo controls:
+  - Xlorie activity-side renderer
+  - the embedded X server
+  - the Java binder handoff path
+- the repo does **not** contain the external `virgl_test_server_android` implementation that RuneLite is actually talking to
+
+So any real Phase 4 attempt now has to be phrased more carefully:
+
+- either route through the existing X server / DRI3 / Present / scanout hooks already present in the vendored tree
+- or add an out-of-band bridge between the app-owned renderer and the X server while leaving the VirGL server binary untouched
+
+That is the next implementation target from this checkpoint onward.
+
+### 2026-03-16 Checkpoint 2
+
+The next bounded follow-up stayed inside the vendored X server / Present path rather than attempting the large speculative AHB bridge immediately.
+
+#### What changed
+
+Two concrete diagnostics/fixes were added in `lorie/InitOutput.c`:
+
+- `loriePresentFlip()` was fixed so it no longer rejects fullscreen flips on non-square displays
+  - the old code compared:
+    - `pvfb->root.width != pixmap->drawable.width`
+    - `pvfb->root.width != pixmap->drawable.height`
+  - the second comparison was corrected to:
+    - `pvfb->root.height != pixmap->drawable.height`
+- lightweight Present counters and rejection logging were added
+  - `present flip attempts`
+  - `present flip accepted`
+  - `present flip rejected`
+  - rate-limited rejection reasons in `loriePresentFlip()`
+
+Because the logs still suggested the Present path might not even be getting negotiated, one more bounded experiment was added:
+
+- `lorieGetFormats()`
+  - now advertises `DRM_FORMAT_XRGB8888` and `DRM_FORMAT_ARGB8888`
+- `lorieGetModifiers()`
+  - now advertises:
+    - `DRM_FORMAT_MOD_INVALID`
+    - `RAW_MMAPPABLE_FD`
+    - `AHARDWAREBUFFER_SOCKET_FD`
+    - `AHARDWAREBUFFER_FLIPPED_SOCKET_FD`
+- `lorieGetDrawableModifiers()`
+  - now mirrors `lorieGetModifiers()`
+
+The point of that second patch was not “this is definitely the fix.” It was to test whether the real RuneLite workload was even querying the DRI3 modifier path at runtime.
+
+#### Controlled sequential validation
+
+All runs in this checkpoint followed the corrected procedure:
+
+1. `./gradlew :app:installDebug`
+2. wait for install completion
+3. run the evidence harness separately
+
+#### Validated capture after the Present flip bug fix
+
+Artifacts:
+
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-101920.summary.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-101920.logcat.txt`
+
+What it showed:
+
+- visible surface average: `44.17 FPS`
+- `LorieNative` average: `34.0 FPS`
+- `LorieNative` median: `47.4 FPS`
+- `LorieNative` max: `62.4 FPS`
+- last renderer estimate: `48.5 FPS`
+- Present counters:
+  - `present flip attempts in 5.0 seconds = 0.0 FPS`
+  - `present after-flips in 5.0 seconds = 0.0 FPS`
+
+This was the decisive result for that fix:
+
+- the non-square comparison bug was real
+- but it was **not** the active blocker in the RuneLite workload
+- `loriePresentFlip()` was never entered in this capture
+
+#### Validated capture after the DRI3 format/modifier advertisement patch
+
+Artifacts:
+
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-102259.summary.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-102259.logcat.txt`
+
+What it showed:
+
+- visible surface average: `39.92 FPS`
+- `LorieNative` average: `29.24 FPS`
+- `LorieNative` median: `42.1 FPS`
+- `LorieNative` max: `61.4 FPS`
+- last renderer estimate: `41.4 FPS`
+- Present counters still stayed flat:
+  - `present flip attempts in 5.0 seconds = 0.0 FPS`
+  - `present after-flips in 5.0 seconds = 0.0 FPS`
+
+The added DRI3 negotiation logs were also absent in the full capture log:
+
+- no `DRI3: advertising ... formats`
+- no `DRI3: advertising ... modifiers`
+
+That matters because it means this real workload did **not** call into the new DRI3 format/modifier query path during the capture window.
+
+#### Interpretation
+
+This tightened the branch diagnosis in a useful way.
+
+What is now ruled out more strongly:
+
+- the active blocker is not just the non-square Present flip check
+- the active blocker is not just “forgot to advertise modifiers” in the specific DRI3 query path tested here
+
+What is now more likely:
+
+- the current RuneLite + Mesa + VirGL workload is not entering the vendored X server Present flip path at all
+- the root-window AHardwareBuffer sharing path is still functioning
+- but the real cadence ceiling remains upstream of these particular Present hooks
+
+In practice, after this checkpoint, the branch still has:
+
+- repeated `120 Hz` layer votes
+- working non-legacy AHardwareBuffer transport
+- a renderer ceiling still broadly in the `~40-60 FPS` regime
+
+and still does **not** have:
+
+- any measured `present flip attempts`
+- any measured `present after-flips`
+- any evidence that the real workload is negotiating through the new DRI3 modifier query hooks
+
+#### Current conclusion
+
+The approved plan’s heavy Phase 4 AHB bridge is no longer the obvious next implementation.
+
+The current evidence says the more important missing piece is still:
+
+- understanding which exact client/server path RuneLite + Mesa + VirGL is actually using in steady state
+- and why that path never touches the vendored Present flip hooks we just instrumented
+
+So the branch remains short of the `120 FPS` goal, and the next useful work should be aimed at the real active render path rather than assuming the Present/AHB flip path is merely one bug away from engaging.
+
+### 2026-03-16 Checkpoint 3
+
+The next pass moved away from the Present/AHB hypothesis and instrumented the paths that the live workload actually appeared to touch.
+
+#### What changed
+
+Two bounded trace patches were added:
+
+- `third_party/termux-x11-upstream/app/src/main/cpp/xserver/miext/damage/damage.c`
+  - added rate-limited tracing for:
+    - `Composite`
+    - `Glyphs`
+    - `PutImage`
+    - `CopyArea`
+    - `PolyFillRect`
+  - each trace records:
+    - drawable type
+    - whether the drawable is the screen pixmap
+    - geometry
+    - damaged box
+- `third_party/termux-x11-upstream/app/src/main/cpp/xserver/hw/xfree86/dri2/dri2.c`
+  - added rate-limited tracing for:
+    - `CreateDrawable`
+    - `GetBuffers`
+    - `GetBuffersWithFormat`
+    - `SwapBuffers`
+    - `SwapInterval`
+    - `SwapComplete`
+
+The purpose was simple:
+
+- verify whether RuneLite was actually using DRI2 at all
+- identify which X server draw operations were dominating the steady-state frame loop
+
+#### Controlled sequential validation
+
+All validation in this checkpoint was again run sequentially:
+
+1. `./gradlew :app:assembleDebug`
+2. `./gradlew :app:installDebug`
+3. run one evidence capture at a time
+
+#### Validated default Java2D capture with Damage + DRI2 tracing
+
+Artifacts:
+
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-105048.summary.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-105048.logcat.txt`
+
+What it showed:
+
+- visible surface average: `42.56 FPS`
+- visible surface median: `47.395 FPS`
+- visible surface max: `118.06 FPS`
+- `LorieNative` average: `33.45 FPS`
+- `LorieNative` median: `46.5 FPS`
+- `LorieNative` max: `61.6 FPS`
+- last `LorieNative`: `55.4 FPS`
+- last renderer estimate: `58.3 FPS`
+- choreographer average: `79.425 FPS`
+- redraw wakeups average: `79.375 FPS`
+- damage-triggered redraws average: `25.0875 FPS`
+- Present after-flips average: `0 FPS`
+
+The decisive trace result in the log was:
+
+- no `DRI2Trace:` lines at all
+- `DRI3Trace:` still only showed `QueryVersion request=1.2 reply=1.2`
+- `DamageTrace:` fired heavily
+
+The dominant steady-state pattern was:
+
+- large numbers of `PutImage` operations on `drawableType=WINDOW`
+- some `Composite` operations on `drawableType=WINDOW`
+- only a rare `CopyArea` on `drawableType=PIXMAP screenPixmap=1`
+
+The `PutImage` calls were especially revealing because many were very large, thin horizontal strips across the main window, for example:
+
+- near-full-width boxes such as `0,66-2898,88`
+- counts climbing into the tens of thousands during a single capture
+
+That means the hot path seen by the X server is not “steady-state root pixmap flips.” It is repeated window writes, most heavily via `PutImage`.
+
+#### Validated Java2D OpenGL A/B capture
+
+Artifacts:
+
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-opengl-mesa-default-virglsrv-default-launch-launcher-clean-20260316-105328.summary.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-opengl-mesa-default-virglsrv-default-launch-launcher-clean-20260316-105328.logcat.txt`
+
+What it showed:
+
+- visible surface average: `42.18 FPS`
+- visible surface max: `120.01 FPS`
+- `LorieNative` average: `34.6 FPS`
+- `LorieNative` max: `62 FPS`
+- last `LorieNative`: `58.6 FPS`
+- last renderer estimate: `60.6 FPS`
+- damage-triggered redraws average: `25.9 FPS`
+- Present after-flips average: `0 FPS`
+
+The path signature did not change:
+
+- no `DRI2Trace:` activity
+- `DRI3Trace:` still limited to `QueryVersion`
+- `DamageTrace:` still dominated by `PutImage` on window drawables
+- Present counters still flat at zero
+
+So forcing the Java2D OpenGL profile did **not** move the workload onto DRI2 or Present, and it did not materially improve the renderer ceiling.
+
+#### Interpretation
+
+This checkpoint narrowed the branch diagnosis further.
+
+What is now ruled out more strongly:
+
+- DRI2 is not the active steady-state path for these captures
+- the Java2D `opengl` profile is not the missing switch that unlocks Present or DRI-backed swaps
+- the renderer ceiling is not explained by a dormant Present path that simply needs one small advertisement fix
+
+What is now more likely:
+
+- RuneLite is pushing most of its visible work through X11 window `PutImage` traffic, with some `Composite`
+- the important uninstrumented transition is where redirected window content is later composited or copied into the screen pixmap path consumed by Lorie
+- the next justified work is compositor/root-path tracing, not the heavy Phase 4 AHB bridge
+
+#### Current conclusion
+
+After this checkpoint, the branch still has not reached `120 FPS`.
+
+The most useful next step is to instrument the composite/root handoff that turns those repeated window `PutImage` updates into final screen content, then validate whether that handoff is where the remaining cadence ceiling is being introduced.
+
+### 2026-03-16 Checkpoint 4
+
+This checkpoint pushed the trace work deeper and also exposed one tooling issue on the Windows host that had to be fixed before continuing.
+
+#### Build environment note
+
+One `assembleDebug` run failed for a non-code reason:
+
+- `win_bison.exe` from the local `winget` shim could not find `data/m4sugar/m4sugar.m4`
+
+The fix was local environment wiring, not a source change:
+
+- create a symlink from:
+  - `C:\Users\rseba\AppData\Local\Microsoft\WinGet\Links\data`
+- to:
+  - `C:\Users\rseba\AppData\Local\Microsoft\WinGet\Packages\WinFlexBison.win_flex_bison_Microsoft.Winget.Source_8wekyb3d8bbwe\data`
+
+After that, native builds and installs resumed normally.
+
+#### What changed
+
+Several more rounds of instrumentation were added:
+
+- `composite/compalloc.c`
+  - trace `compScreenUpdate()`
+  - trace `compReportDamage()`
+- `composite/compwindow.c`
+  - trace root `compPaintChildrenToWindow()`
+  - trace `compWindowUpdateAutomatic()`
+- `render/picture.c`
+  - trace `CompositePicture()`
+- `exa/exa_render.c`
+  - trace `exaComposite()`
+- `exa/exa_accel.c`
+  - trace accelerated vs fallback `exaPutImage()`
+- `fb/fbimage.c`
+  - trace `fbPutImage()`
+- `glamor/glamor_image.c`
+  - trace `glamor_put_image()` and its bail path
+- `glamor/glamor_render.c`
+  - trace `glamor_composite()` and its fallback path
+- `miext/damage/damage.c`
+  - extend tracing attempts with backend-pointer logging for `PutImage` and `Composite`
+
+The goal was to stop guessing which backend was active and identify the real steady-state execution path.
+
+#### Controlled sequential validation
+
+Every run in this checkpoint was again performed sequentially:
+
+1. `./gradlew :app:assembleDebug`
+2. `./gradlew :app:installDebug`
+3. run one evidence harness capture
+
+#### Validated captures
+
+Artifacts:
+
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-110412.summary.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-110412.logcat.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-110943.summary.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-110943.logcat.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-111303.summary.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-111303.logcat.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-111850.summary.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-111850.logcat.txt`
+
+Representative results:
+
+- `110412`
+  - visible surface average: `41.67 FPS`
+  - `LorieNative` average: `31.33 FPS`
+  - `LorieNative` max: `66.2 FPS`
+  - last renderer estimate: `56.9 FPS`
+- `110943`
+  - visible surface average: `42.03 FPS`
+  - `LorieNative` average: `33.75 FPS`
+  - `LorieNative` max: `64.0 FPS`
+  - last renderer estimate: `58.3 FPS`
+- `111303`
+  - visible surface average: `40.37 FPS`
+  - `LorieNative` average: `30.45 FPS`
+  - `LorieNative` max: `67.4 FPS`
+  - last renderer estimate: `54.2 FPS`
+- `111850`
+  - visible surface average: `43.89 FPS`
+  - `LorieNative` average: `32.25 FPS`
+  - `LorieNative` max: `62.8 FPS`
+  - last renderer estimate: `58.8 FPS`
+
+Across all four runs:
+
+- Present stayed flat:
+  - `present flip attempts = 0 FPS`
+  - `present after-flips = 0 FPS`
+- the visible surface still occasionally peaked near `~118-120 FPS`
+- the sustained renderer cadence still stayed in the same rough band:
+  - `~30-34 FPS` average `LorieNative`
+  - `~54-59 FPS` renderer estimate at the end of active periods
+
+#### What the new tracing did and did not show
+
+The persistent positive signal remained unchanged:
+
+- `DamageTrace: PutImage` fired heavily on `drawableType=WINDOW`
+- `DamageTrace: Composite` fired on large window drawables
+- `DRI3Trace` still only showed `QueryVersion request=1.2`
+
+But the new backend traces were notable for what they **did not** show.
+
+Across the validated logs, there were no matching lines for:
+
+- `CompTrace:`
+- `RenderTrace:`
+- `ExaTrace:`
+- `FbTrace:`
+- `GlamorTrace:`
+
+That matters because the captures still clearly contained fresh `DamageTrace:` and `DRI3Trace:` lines from the same general logging mechanism. So the absence of the new trace families is itself evidence.
+
+What that appears to rule out, or at least weaken substantially:
+
+- the stock Composite automatic-update path is not obviously the active steady-state merge path
+- the workload is not obviously traversing the traced EXA helper entry points
+- the workload is not obviously traversing the traced `fbPutImage()` helper entry point
+- the workload is not obviously traversing the traced glamor helper entry points either
+
+The pointer-tagging follow-up in `damage.c` also failed to surface separate backend-identification lines in the capture logs, even though the primary `DamageTrace` counters continued to appear. So the current logging sink is still exposing the damage wrapper’s main trace lines more reliably than the auxiliary backend-tag lines.
+
+#### Interpretation
+
+This checkpoint did not unlock a performance gain, but it did sharpen the branch diagnosis again.
+
+What is now more likely:
+
+- the hot path is reaching the damage wrappers through already-installed GC / Picture function pointers
+- but the helper entry points that were instrumented next are not the reliable visibility boundary for this build
+- the repeated large-window `PutImage` traffic is still the strongest observed steady-state signal
+- the current ceiling still looks consistent with a window-upload path followed by some later compositor or presentation bottleneck that has not yet been isolated
+
+#### Current conclusion
+
+The branch still has not reached `120 FPS`.
+
+At the end of this checkpoint, the strongest evidence remains:
+
+- `120 Hz` layer votes are present
+- Present flips are still completely inactive
+- DRI2 remains absent
+- DRI3 still only reports `QueryVersion`
+- the real workload still looks dominated by repeated window `PutImage` traffic
+
+So the next justified step is not “finish the old Phase 4 bridge anyway.” The next justified step is to instrument the actual installed GC / Picture function-pointer targets more directly, or otherwise expose backend identity from inside the damage wrappers themselves, because the traced helper functions below them still are not showing up in the validated logs.
+
+### 2026-03-16 Checkpoint 5
+
+This checkpoint was meant to validate the follow-up backend tagging in `miext/damage/damage.c` before doing any more architectural work. The immediate question was simple: do the backend-tagged `damagePutImage()` / `damageComposite()` wrappers actually execute on-device?
+
+#### Changes tested
+
+- kept the prior backend/function-pointer tagging in `miext/damage/damage.c`
+- then made the tagged helpers emit a unique prefix:
+  - `DamageTraceV2:` for `damageTraceOpWithBackend()`
+  - `DamageTraceV2:` for `damageTraceOpWithFunction()`
+
+The point of the `V2` marker was to remove ambiguity. If the running binary executed those wrappers, the log had to change.
+
+#### Controlled sequential validation
+
+Both runs in this checkpoint were performed sequentially:
+
+1. `./gradlew :app:assembleDebug`
+2. `./gradlew :app:installDebug`
+3. one clean evidence capture
+
+Then the `DamageTrace` / `DRI3Trace` output was inspected directly in the produced logcat artifacts.
+
+#### Validated captures
+
+Artifacts:
+
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-113124.summary.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-113124.logcat.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-113505.summary.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-113505.logcat.txt`
+
+Representative results:
+
+- `113124`
+  - visible surface average: `43.58 FPS`
+  - `LorieNative` average: `32.66 FPS`
+  - `LorieNative` max: `63.0 FPS`
+  - last renderer estimate: `60.7 FPS`
+- `113505`
+  - visible surface average: `41.69 FPS`
+  - `LorieNative` average: `29.5 FPS`
+  - `LorieNative` max: `63.4 FPS`
+  - last renderer estimate: `43.4 FPS`
+
+Across both runs:
+
+- Present stayed inactive again:
+  - `present after-flips = 0 FPS`
+- layer votes still reached `120 Hz`
+- the steady state still looked like `~30-33 FPS` `LorieNative` with renderer estimates below the target
+
+#### Critical finding
+
+The build artifacts clearly contained the new strings:
+
+- `DamageTrace: ... backend=%s fn=%p`
+- `DamageTraceV2: ... backend=%s fn=%p`
+- `DamageTraceV2: ... fn=%p`
+
+But the runtime logs from both validated captures still showed only the old-style lines:
+
+- `DamageTrace: PutImage ...`
+- `DamageTrace: Composite ...`
+- `DRI3Trace: QueryVersion ...`
+
+There were **no** matches for:
+
+- `DamageTraceV2:`
+- `backend=`
+- `fn=`
+
+That makes this checkpoint more valuable than it looks. It means the running workload is still not exposing the backend-tagged wrappers at runtime even though the installed arm64 `libXlorie.so` contains those exact format strings.
+
+#### Interpretation
+
+This is now a gating branch-diagnosis issue, not just a missing micro-optimization.
+
+What the evidence supports:
+
+- the app on-device is still emitting the original `DamageTrace` path
+- the observed hot path continues to be heavy `PutImage` on `WINDOW`, plus some `Composite`
+- Present remains cold
+- DRI3 still only reaches `QueryVersion`
+
+What the evidence now weakens further:
+
+- that the newly patched wrapper body is the actual runtime visibility boundary
+- that more implementation time on the speculative AHB / Present bypass is justified before the live execution path is proven
+
+#### Current conclusion
+
+The branch still has not reached `120 FPS`.
+
+More importantly, the next highest-value step is now to prove binary/path identity directly:
+
+- confirm which native image is actually loaded by the running process
+- add an unmistakable startup sentinel at process/library initialization, not just inside the damage helper wrappers
+- if needed, log from the JNI / renderer entry boundary that is definitely active in the validated captures
+
+Until that is resolved, further Phase 4 implementation would be premature because the current tracing evidence says we still do not fully control or observe the active execution path.
+
+### 2026-03-16 Checkpoint 6
+
+This checkpoint corrected a testing mistake and finally turned the backend-tagging work into valid runtime evidence.
+
+#### What changed
+
+I added hard runtime identity sentinels to native entry points that must execute in every hybrid launch:
+
+- `lorie/activity.c`
+  - `activity.constructor`
+  - `activity.JNI_OnLoad`
+  - `activity.nativeInit`
+- `lorie/cmdentrypoint.c`
+  - `cmd.start`
+  - `cmd.getXConnection`
+
+Those logs report:
+
+- `pid`
+- `__progname`
+- `/proc/self/exe`
+- the actual loaded `.so` path via `dladdr`
+- the process `cmdline`
+
+After that, I also extended `DamageTraceV2` so `PutImage` and `Composite` include:
+
+- `backend=...`
+- `fn=%p`
+- `sym=...`
+- `so=...`
+
+#### Critical correction to the test loop
+
+The first identity run exposed the mistake immediately:
+
+- rebuilding `third_party/termux-x11-upstream :app` updates the donor APK
+- but the real `internal-hybrid` path under test was actually loading and extracting `libXlorie.so` from the `com.runelitetablet` APK
+
+Concretely:
+
+- the host UI process loaded:
+  - `.../com.runelitetablet.../base.apk!/lib/arm64-v8a/libXlorie.so`
+- the app-process X server loaded:
+  - `/data/data/com.termux/files/usr/tmp/termux-x11-com.runelitetablet-libs/arm64-v8a-libXlorie.so`
+
+So the previous rebuild/install loop against only the upstream donor APK was not updating the library that the validated hybrid path actually used.
+
+That is why the prior `DamageTraceV2` and `XlorieIdentity` strings were visible in local build artifacts but absent from runtime logs.
+
+#### Corrected sequential validation
+
+After identifying that mismatch, I switched the build/install target to the actual app under test:
+
+1. `cd runelite-tablet`
+2. `./gradlew :app:assembleDebug`
+3. `./gradlew :app:installDebug`
+4. run one evidence harness capture
+
+#### Validated captures
+
+Artifacts:
+
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-114835.summary.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-114835.logcat.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-115145.summary.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-115145.logcat.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-115428.summary.txt`
+- `perf-captures/internal-hybrid-runelite-defaultres-j2d-default-mesa-default-virglsrv-default-launch-launcher-clean-20260316-115428.logcat.txt`
+
+Representative results:
+
+- `114835`
+  - visible surface average: `41.11 FPS`
+  - `LorieNative` average: `33.38 FPS`
+  - `LorieNative` max: `63.8 FPS`
+  - last renderer estimate: `41.1 FPS`
+- `115145`
+  - visible surface average: `42.24 FPS`
+  - `LorieNative` average: `32.42 FPS`
+  - `LorieNative` max: `62.2 FPS`
+  - last renderer estimate: `49.1 FPS`
+- `115428`
+  - visible surface average: `40.56 FPS`
+  - `LorieNative` average: `30.64 FPS`
+  - `LorieNative` max: `70.6 FPS`
+  - last renderer estimate: `48.0 FPS`
+
+Across these corrected runs:
+
+- layer votes still reached `120 Hz`
+- Present still stayed inactive:
+  - `present after-flips = 0 FPS`
+- sustained renderer cadence remained far below target
+
+#### What the corrected runtime evidence now proves
+
+The identity logs finally closed the packaging/path question.
+
+For the UI process:
+
+- `XlorieIdentity: where=activity.nativeInit ... so=.../com.runelitetablet.../base.apk!/lib/arm64-v8a/libXlorie.so`
+
+For the app-process X server:
+
+- `XlorieIdentity: where=cmd.start ... so=/data/data/com.termux/files/usr/tmp/termux-x11-com.runelitetablet-libs/arm64-v8a-libXlorie.so`
+- `XlorieIdentity: where=cmd.getXConnection ... so=/data/data/com.termux/files/usr/tmp/termux-x11-com.runelitetablet-libs/arm64-v8a-libXlorie.so`
+
+And after rebuilding/installing `runelite-tablet`, the live traces changed exactly as expected:
+
+- `DamageTraceV2:` appeared
+- `backend=...` appeared
+- `fn=%p` appeared
+- `so=...` appeared
+
+That means the damage wrapper instrumentation is now unquestionably executing in the real workload.
+
+#### New backend finding
+
+The active steady-state path is now more specific than before:
+
+- `DamageTraceV2: PutImage ... backend=other ... so=/data/data/com.termux/files/usr/tmp/termux-x11-com.runelitetablet-libs/arm64-v8a-libXlorie.so`
+- `DamageTraceV2: Composite ... fn=... so=/data/data/com.termux/files/usr/tmp/termux-x11-com.runelitetablet-libs/arm64-v8a-libXlorie.so`
+
+What this means:
+
+- the hot `PutImage` path is not `fbPutImage`
+- it is not `miPutImage`
+- it is another GC-installed `PutImage` implementation inside the same extracted `libXlorie.so`
+- `Composite` is likewise hitting an internal function in that same server image
+
+The `dladdr` symbol names were still unresolved as `sym=unknown`, so the remaining missing piece is symbol offset mapping rather than path identity.
+
+#### Current conclusion
+
+This checkpoint materially improved the branch diagnosis even though FPS did not improve.
+
+What is now established:
+
+- the correct package to rebuild for hybrid testing is `runelite-tablet`, not just the donor upstream APK
+- both the host and the app-process X server are using the rebuilt `com.runelitetablet` native payload
+- the hot workload is still dominated by `PutImage` on `WINDOW`
+- that `PutImage` implementation is a non-`fb`, non-`mi` installed GC op inside the extracted X server image
+- Present remains completely inactive
+
+So the next justified step is now narrow and concrete:
+
+- log `dladdr` base addresses / symbol offsets for those function pointers
+- map the offsets back to the unstripped local `libXlorie.so`
+- then instrument or optimize that actual `PutImage` implementation directly
+
+#### Session handoff
+
+If resuming from this point, do not start with `third_party/termux-x11-upstream :app`.
+
+Start with:
+
+1. `cd runelite-tablet`
+2. `./gradlew :app:assembleDebug`
+3. `./gradlew :app:installDebug`
+4. `powershell -ExecutionPolicy Bypass -File scripts/hybrid-x11-runelite-evidence.ps1 -Variant internal-hybrid`
+
+Immediate next code task:
+
+- extend `DamageTraceV2` to log `dladdr` base addresses and compute `fn - dli_fbase` offsets for the hot `PutImage` and `Composite` pointers
+- map those offsets to the unstripped local `runelite-tablet/app/.cxx/.../arm64-v8a/libXlorie.so`
+- instrument the resolved implementation directly

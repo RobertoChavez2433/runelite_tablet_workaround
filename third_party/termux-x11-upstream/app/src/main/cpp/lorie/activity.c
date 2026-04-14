@@ -15,6 +15,7 @@
 #include <linux/in.h>
 #include <arpa/inet.h>
 #include <poll.h>
+#include <dlfcn.h>
 #include "lorie.h"
 
 #pragma clang diagnostic ignored "-Wunknown-pragmas"
@@ -23,6 +24,7 @@
 #define log(prio, ...) __android_log_print(ANDROID_LOG_ ## prio, "LorieNative", __VA_ARGS__)
 
 extern volatile int conn_fd; // The only variable from shared with X server code.
+extern char* __progname;
 
 static struct {
     jclass self;
@@ -42,6 +44,42 @@ static struct {
 
 static JNIEnv *guienv = NULL; // Must be used only in GUI thread.
 static jobject globalThiz = NULL;
+
+static void logRuntimeIdentity(const char *where, void *symbol) {
+    Dl_info info = {0};
+    char exe[512] = {0};
+    char cmdline[512] = {0};
+    const char *so = "<unknown>";
+    const char *prog = __progname ? __progname : "<null>";
+    ssize_t exeLen;
+    FILE *fp;
+    size_t cmdlineLen;
+
+    if (dladdr(symbol, &info) && info.dli_fname)
+        so = info.dli_fname;
+
+    exeLen = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+    if (exeLen > 0)
+        exe[exeLen] = '\0';
+    else
+        strcpy(exe, "<unavailable>");
+
+    fp = fopen("/proc/self/cmdline", "rb");
+    if (fp) {
+        cmdlineLen = fread(cmdline, 1, sizeof(cmdline) - 1, fp);
+        fclose(fp);
+        for (size_t i = 0; i < cmdlineLen; ++i) {
+            if (cmdline[i] == '\0')
+                cmdline[i] = ' ';
+        }
+        cmdline[cmdlineLen] = '\0';
+    } else {
+        strcpy(cmdline, "<unavailable>");
+    }
+
+    log(INFO, "XlorieIdentity: where=%s pid=%d prog=%s exe=%s so=%s cmdline=%s",
+        where, getpid(), prog, exe, so, cmdline);
+}
 
 static jclass FindClassOrDie(JNIEnv *env, const char* name) {
     jclass clazz = (*env)->FindClass(env, name);
@@ -107,6 +145,7 @@ static jboolean requestConnection(__unused JNIEnv *env, __unused jclass clazz) {
 static void connect_(__unused JNIEnv* env, __unused jobject cls, jint fd);
 static void nativeInit(JNIEnv *env, jobject thiz) {
     JavaVM* vm;
+    logRuntimeIdentity("activity.nativeInit", (void *) &nativeInit);
     if (!Charset.self) {
         // Init clipboard-related JNI stuff
         Charset.self = FindClassOrDie(env, "java/nio/charset/Charset");
@@ -403,6 +442,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, __unused void *reserved) {
             {"requestConnection", "()Z", (void *)&requestConnection},
     };
     (*vm)->AttachCurrentThread(vm, &env, NULL);
+    logRuntimeIdentity("activity.JNI_OnLoad", (void *) &JNI_OnLoad);
     jclass cls = (*env)->FindClass(env, "com/termux/x11/LorieView");
     (*env)->RegisterNatives(env, cls, methods, sizeof(methods)/sizeof(methods[0]));
 
@@ -431,9 +471,9 @@ static void* stderrToLogcatThread(__unused void* cookie) {
     return NULL;
 }
 
-extern char* __progname;
 __attribute__((constructor)) static void init(void) {
     pthread_t t;
+    logRuntimeIdentity("activity.constructor", (void *) &init);
     if (!strcmp(__progname, "com.termux.x11"))
         pthread_create(&t, NULL, stderrToLogcatThread, NULL);
 }

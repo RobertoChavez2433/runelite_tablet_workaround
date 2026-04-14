@@ -45,6 +45,16 @@
 #include "panoramiXsrv.h"
 #endif
 
+static unsigned long gRenderCompositeTraceCount;
+
+#define RENDER_TRACE(...) ErrorF("RenderTrace: " __VA_ARGS__)
+#define RENDER_TRACE_EVERY(counter, step, ...) \
+    do { \
+        (counter)++; \
+        if (((counter) <= 8) || (((counter) % (step)) == 0)) \
+            RENDER_TRACE(__VA_ARGS__); \
+    } while (0)
+
 DevPrivateKeyRec PictureScreenPrivateKeyRec;
 DevPrivateKeyRec PictureWindowPrivateKeyRec;
 static int PictureGeneration;
@@ -1544,6 +1554,19 @@ CompositePicture(CARD8 op,
     op = ReduceCompositeOp(op, pSrc, pMask, pDst, xSrc, ySrc, width, height);
     if (op == PictOpDst)
         return;
+
+    RENDER_TRACE_EVERY(
+        gRenderCompositeTraceCount, 64,
+        "CompositePicture count=%lu op=%u dstType=%d dstId=0x%lx geom=%dx%d srcDrawable=%d maskDrawable=%d size=%ux%u\n",
+        gRenderCompositeTraceCount,
+        op,
+        pDst->pDrawable ? pDst->pDrawable->type : -1,
+        pDst->pDrawable ? (unsigned long) pDst->pDrawable->id : 0UL,
+        pDst->pDrawable ? pDst->pDrawable->width : 0,
+        pDst->pDrawable ? pDst->pDrawable->height : 0,
+        pSrc && pSrc->pDrawable != NULL,
+        pMask && pMask->pDrawable != NULL,
+        width, height);
 
     (*ps->Composite) (op,
                       pSrc,

@@ -28,6 +28,8 @@
 #include <drm_fourcc.h>
 #include <unistd.h>
 
+#define DRI3_TRACE(...) ErrorF("DRI3Trace: " __VA_ARGS__)
+
 int
 dri3_open(ClientPtr client, ScreenPtr screen, RRProviderPtr provider, int *fd)
 {
@@ -152,6 +154,7 @@ dri3_fd_from_pixmap(PixmapPtr pixmap, CARD16 *stride, CARD32 *size)
 static int
 cache_formats_and_modifiers(ScreenPtr screen)
 {
+    static unsigned long cache_formats_count = 0;
     dri3_screen_priv_ptr        ds = dri3_screen_priv(screen);
     const dri3_screen_info_rec *info = ds->info;
     CARD32                      num_formats;
@@ -176,6 +179,12 @@ cache_formats_and_modifiers(ScreenPtr screen)
     if (!info->get_formats(screen, &num_formats, &formats))
         return BadAlloc;
 
+    cache_formats_count++;
+    DRI3_TRACE("cache_formats_and_modifiers screen=%p formats=%lu count=%lu\n",
+               screen,
+               (unsigned long) num_formats,
+               cache_formats_count);
+
     if (!num_formats) {
         ds->num_formats = 0;
         ds->formats_cached = TRUE;
@@ -197,6 +206,9 @@ cache_formats_and_modifiers(ScreenPtr screen)
         if (!num_modifiers)
             continue;
 
+        DRI3_TRACE("cache format=0x%08lx modifiers=%u\n",
+                   (unsigned long) formats[i],
+                   num_modifiers);
         iter->format = formats[i];
         iter->num_modifiers = num_modifiers;
         iter->modifiers = modifiers;
@@ -216,6 +228,7 @@ dri3_get_supported_modifiers(ScreenPtr screen, DrawablePtr drawable,
                              CARD32 *num_screen_modifiers,
                              CARD64 **screen_modifiers)
 {
+    static unsigned long get_supported_modifiers_count = 0;
     dri3_screen_priv_ptr        ds = dri3_screen_priv(screen);
     const dri3_screen_info_rec *info = ds->info;
     int                         i, j;
@@ -301,6 +314,17 @@ dri3_get_supported_modifiers(ScreenPtr screen, DrawablePtr drawable,
     *intersect_modifiers = intersect_mods;
     *screen_modifiers = screen_mods;
     free(drawable_mods);
+
+    get_supported_modifiers_count++;
+    DRI3_TRACE("dri3_get_supported_modifiers drawable=%p depth=%u bpp=%u format=0x%08lx intersect=%lu screenOnly=%lu drawableMods=%u count=%lu\n",
+               drawable,
+               depth,
+               bpp,
+               (unsigned long) format,
+               (unsigned long) *num_intersect_modifiers,
+               (unsigned long) *num_screen_modifiers,
+               num_drawable_mods,
+               get_supported_modifiers_count);
 
     return Success;
 }

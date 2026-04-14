@@ -39,7 +39,8 @@ int LorieBuffer_createRegion(char const* _Nonnull name, size_t size);
  *
  * @param width width of buffer.
  * @param height height of buffer.
- * @param format format of buffer. Accepts AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM or AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM
+ * @param format format of buffer. Accepts AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM,
+ * AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM, or AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM
  * @param type type of buffer. Accepts LORIEBUFFER_REGULAR or LORIEBUFFER_AHARDWAREBUFFER.
  * @return returns the buffer itself or NULL on failure.
  */
@@ -51,7 +52,8 @@ LorieBuffer* _Nullable LorieBuffer_allocate(int32_t width, int32_t height, int8_
  *
  * @param width width of buffer.
  * @param height height of buffer.
- * @param format format of buffer. Accepts AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM or AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM
+ * @param format format of buffer. Accepts AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM,
+ * AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM, or AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM
  * @param fd file descriptor of buffer.
  * @param size size of memory fragment.
  * @param offset offset inside memory fragment.

@@ -32,6 +32,16 @@
 
 #include "mipict.h"
 
+static unsigned long gExaCompositeTraceCount;
+
+#define EXA_RENDER_TRACE(...) ErrorF("ExaTrace: " __VA_ARGS__)
+#define EXA_RENDER_TRACE_EVERY(counter, step, ...) \
+    do { \
+        (counter)++; \
+        if (((counter) <= 8) || (((counter) % (step)) == 0)) \
+            EXA_RENDER_TRACE(__VA_ARGS__); \
+    } while (0)
+
 #if DEBUG_TRACE_FALL
 static void
 exaCompositeFallbackPictDesc(PicturePtr pict, char *string, int n)
@@ -880,6 +890,19 @@ exaComposite(CARD8 op,
     Bool saveSrcRepeat = pSrc->repeat;
     Bool saveMaskRepeat = pMask ? pMask->repeat : 0;
     RegionRec region;
+
+    EXA_RENDER_TRACE_EVERY(
+        gExaCompositeTraceCount, 64,
+        "composite count=%lu op=%u dstType=%d dstId=0x%lx geom=%dx%d srcDrawable=%d maskDrawable=%d size=%ux%u\n",
+        gExaCompositeTraceCount,
+        op,
+        pDst->pDrawable ? pDst->pDrawable->type : -1,
+        pDst->pDrawable ? (unsigned long) pDst->pDrawable->id : 0UL,
+        pDst->pDrawable ? pDst->pDrawable->width : 0,
+        pDst->pDrawable ? pDst->pDrawable->height : 0,
+        pSrc && pSrc->pDrawable != NULL,
+        pMask && pMask->pDrawable != NULL,
+        width, height);
 
     if (pExaScr->swappedOut)
         goto fallback;

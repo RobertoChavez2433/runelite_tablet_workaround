@@ -52,6 +52,20 @@ CARD8 dri2_minor;
 
 uint32_t prime_id_allocate_bitmask;
 
+#define DRI2_TRACE(...) ErrorF("DRI2Trace: " __VA_ARGS__)
+#define DRI2_TRACE_EVERY(counter, step, ...) do { \
+    unsigned _count = ++(counter); \
+    if (_count <= 4 || (_count % (step)) == 0) \
+        DRI2_TRACE(__VA_ARGS__); \
+} while (0)
+
+static unsigned gDri2CreateDrawableTraceCount;
+static unsigned gDri2GetBuffersTraceCount;
+static unsigned gDri2GetBuffersWithFormatTraceCount;
+static unsigned gDri2SwapBuffersTraceCount;
+static unsigned gDri2SwapIntervalTraceCount;
+static unsigned gDri2SwapCompleteTraceCount;
+
 static DevPrivateKeyRec dri2ScreenPrivateKeyRec;
 
 #define dri2ScreenPrivateKey (&dri2ScreenPrivateKeyRec)
@@ -372,6 +386,11 @@ DRI2CreateDrawable2(ClientPtr client, DrawablePtr pDraw, XID id,
         return BadAlloc;
 
     pPriv->prime_id = dri2_client->prime_id;
+
+    DRI2_TRACE_EVERY(gDri2CreateDrawableTraceCount, 16,
+                     "CreateDrawable drawable=%p type=%d size=%dx%d prime=%d id=0x%lx count=%u\n",
+                     pDraw, pDraw->type, pDraw->width, pDraw->height,
+                     pPriv->prime_id, (unsigned long) id, gDri2CreateDrawableTraceCount);
 
     dri2_id = FakeClientID(client->index);
     rc = DRI2AddDrawableRef(pPriv, id, dri2_id, invalidate, priv);
@@ -700,16 +719,32 @@ DRI2BufferPtr *
 DRI2GetBuffers(DrawablePtr pDraw, int *width, int *height,
                unsigned int *attachments, int count, int *out_count)
 {
-    return do_get_buffers(pDraw, width, height, attachments, count,
-                          out_count, FALSE);
+    DRI2BufferPtr *buffers;
+
+    buffers = do_get_buffers(pDraw, width, height, attachments, count,
+                             out_count, FALSE);
+    DRI2_TRACE_EVERY(gDri2GetBuffersTraceCount, 32,
+                     "GetBuffers drawable=%p type=%d size=%dx%d req=%d out=%d width=%d height=%d count=%u\n",
+                     pDraw, pDraw ? pDraw->type : 0, pDraw ? pDraw->width : 0,
+                     pDraw ? pDraw->height : 0, count, out_count ? *out_count : 0,
+                     width ? *width : 0, height ? *height : 0, gDri2GetBuffersTraceCount);
+    return buffers;
 }
 
 DRI2BufferPtr *
 DRI2GetBuffersWithFormat(DrawablePtr pDraw, int *width, int *height,
                          unsigned int *attachments, int count, int *out_count)
 {
-    return do_get_buffers(pDraw, width, height, attachments, count,
-                          out_count, TRUE);
+    DRI2BufferPtr *buffers;
+
+    buffers = do_get_buffers(pDraw, width, height, attachments, count,
+                             out_count, TRUE);
+    DRI2_TRACE_EVERY(gDri2GetBuffersWithFormatTraceCount, 32,
+                     "GetBuffersWithFormat drawable=%p type=%d size=%dx%d req=%d out=%d width=%d height=%d count=%u\n",
+                     pDraw, pDraw ? pDraw->type : 0, pDraw ? pDraw->width : 0,
+                     pDraw ? pDraw->height : 0, count, out_count ? *out_count : 0,
+                     width ? *width : 0, height ? *height : 0, gDri2GetBuffersWithFormatTraceCount);
+    return buffers;
 }
 
 static void
@@ -1070,6 +1105,13 @@ DRI2SwapComplete(ClientPtr client, DrawablePtr pDraw, int frame,
     pPriv->last_swap_msc = frame;
     pPriv->last_swap_ust = ust;
 
+    DRI2_TRACE_EVERY(gDri2SwapCompleteTraceCount, 32,
+                     "SwapComplete drawable=%p type=%d frame=%llu sbc=%llu swapsPending=%u count=%u\n",
+                     pDraw, pDraw ? pDraw->type : 0,
+                     (unsigned long long) frame,
+                     (unsigned long long) pPriv->swap_count,
+                     pPriv->swapsPending, gDri2SwapCompleteTraceCount);
+
     DRI2WakeClient(client, pDraw, frame, tv_sec, tv_usec);
 }
 
@@ -1131,6 +1173,15 @@ DRI2SwapBuffers(ClientPtr client, DrawablePtr pDraw, CARD64 target_msc,
                    "[DRI2] %s: drawable has no back or front?\n", __func__);
         return BadDrawable;
     }
+
+    DRI2_TRACE_EVERY(gDri2SwapBuffersTraceCount, 16,
+                     "SwapBuffers drawable=%p type=%d size=%dx%d interval=%d target=%llu divisor=%llu remainder=%llu pending=%u count=%u\n",
+                     pDraw, pDraw->type, pDraw->width, pDraw->height,
+                     pPriv->swap_interval,
+                     (unsigned long long) target_msc,
+                     (unsigned long long) divisor,
+                     (unsigned long long) remainder,
+                     pPriv->swapsPending, gDri2SwapBuffersTraceCount);
 
     /* Old DDX or no swap interval, just blit */
     if (!ds->ScheduleSwap || !pPriv->swap_interval || pPriv->prime_id) {
@@ -1212,6 +1263,10 @@ DRI2SwapInterval(DrawablePtr pDrawable, int interval)
 
     /* fixme: check against arbitrary max? */
     pPriv->swap_interval = interval;
+    DRI2_TRACE_EVERY(gDri2SwapIntervalTraceCount, 16,
+                     "SwapInterval drawable=%p type=%d size=%dx%d interval=%d count=%u\n",
+                     pDrawable, pDrawable->type, pDrawable->width, pDrawable->height,
+                     interval, gDri2SwapIntervalTraceCount);
 }
 
 int

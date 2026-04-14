@@ -1616,6 +1616,25 @@ glamor_composite(CARD8 op,
     BoxPtr extent;
     int nbox, ok = FALSE;
     int force_clip = 0;
+    static unsigned long glamorCompositeTraceCount;
+    static unsigned long glamorCompositeFallbackTraceCount;
+
+    do {
+        glamorCompositeTraceCount++;
+        if ((glamorCompositeTraceCount <= 8) ||
+            ((glamorCompositeTraceCount % 64) == 0)) {
+            ErrorF("GlamorTrace: composite count=%lu op=%u dstType=%d dstId=0x%lx geom=%dx%d srcDrawable=%d maskDrawable=%d size=%ux%u\n",
+                   glamorCompositeTraceCount,
+                   op,
+                   dest->pDrawable ? dest->pDrawable->type : -1,
+                   dest->pDrawable ? (unsigned long) dest->pDrawable->id : 0UL,
+                   dest->pDrawable ? dest->pDrawable->width : 0,
+                   dest->pDrawable ? dest->pDrawable->height : 0,
+                   source && source->pDrawable != NULL,
+                   mask && mask->pDrawable != NULL,
+                   width, height);
+        }
+    } while (0);
 
     if (source->pDrawable) {
         source_pixmap = glamor_get_drawable_pixmap(source->pDrawable);
@@ -1729,6 +1748,15 @@ glamor_composite(CARD8 op,
         return;
 
  fail:
+    glamorCompositeFallbackTraceCount++;
+    if ((glamorCompositeFallbackTraceCount <= 8) ||
+        ((glamorCompositeFallbackTraceCount % 64) == 0)) {
+        ErrorF("GlamorTrace: composite fallback count=%lu op=%u dstId=0x%lx size=%ux%u\n",
+               glamorCompositeFallbackTraceCount,
+               op,
+               dest->pDrawable ? (unsigned long) dest->pDrawable->id : 0UL,
+               width, height);
+    }
 
     glamor_fallback
         ("from picts %p:%p %dx%d / %p:%p %d x %d (%c,%c)  to pict %p:%p %dx%d (%c)\n",

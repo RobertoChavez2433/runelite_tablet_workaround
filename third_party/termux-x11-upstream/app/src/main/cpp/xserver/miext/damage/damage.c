@@ -40,6 +40,10 @@
 #include    "gcstruct.h"
 #include    "damage.h"
 #include    "damagestr.h"
+#include    <dlfcn.h>
+
+void fbPutImage(DrawablePtr pDrawable, GCPtr pGC, int depth, int x, int y,
+                int w, int h, int leftPad, int format, char *pImage);
 
 #define wrap(priv, real, mem, func) {\
     priv->mem = real->mem; \
@@ -63,6 +67,143 @@
 #else
 #define DAMAGE_DEBUG(x)
 #endif
+
+static unsigned gDamageTraceCompositeCount;
+static unsigned gDamageTraceGlyphsCount;
+static unsigned gDamageTracePutImageCount;
+static unsigned gDamageTraceCopyAreaCount;
+static unsigned gDamageTracePolyFillRectCount;
+
+static const char *
+damagePutImageBackendName(GCOps *ops)
+{
+    if (!ops || !ops->PutImage)
+        return "null";
+    if (ops->PutImage == fbPutImage)
+        return "fbPutImage";
+    if (ops->PutImage == miPutImage)
+        return "miPutImage";
+    return "other";
+}
+
+static const char *
+damageDrawableTypeName(DrawablePtr pDrawable)
+{
+    switch (pDrawable ? pDrawable->type : 0) {
+    case DRAWABLE_WINDOW:
+        return "WINDOW";
+    case DRAWABLE_PIXMAP:
+        return "PIXMAP";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+static const char *
+damageFunctionSymbolName(void *fn)
+{
+    Dl_info info = {0};
+
+    if (!fn)
+        return "null";
+
+    if (dladdr(fn, &info) && info.dli_sname)
+        return info.dli_sname;
+
+    return "unknown";
+}
+
+static const char *
+damageFunctionLibraryName(void *fn)
+{
+    Dl_info info = {0};
+
+    if (!fn)
+        return "null";
+
+    if (dladdr(fn, &info) && info.dli_fname)
+        return info.dli_fname;
+
+    return "unknown";
+}
+
+static void
+damageTraceOp(const char *op, DrawablePtr pDrawable, const BoxRec *box,
+              unsigned *counter)
+{
+    unsigned count;
+    PixmapPtr screenPixmap;
+    Bool isScreenPixmap = FALSE;
+
+    if (!pDrawable || !box || !counter)
+        return;
+
+    count = ++(*counter);
+    if (count > 4 && (count % 64) != 0)
+        return;
+
+    screenPixmap = pDrawable->pScreen ? pDrawable->pScreen->GetScreenPixmap(pDrawable->pScreen) : NULL;
+    if (pDrawable->type == DRAWABLE_PIXMAP && screenPixmap)
+        isScreenPixmap = ((PixmapPtr) pDrawable) == screenPixmap;
+
+    ErrorF("DamageTrace: %s count=%u drawableType=%s screenPixmap=%d drawable=%p geom=%dx%d box=%d,%d-%d,%d\n",
+           op, count, damageDrawableTypeName(pDrawable), isScreenPixmap ? 1 : 0,
+           pDrawable, pDrawable->width, pDrawable->height,
+           box->x1, box->y1, box->x2, box->y2);
+}
+
+static void
+damageTraceOpWithBackend(const char *op, DrawablePtr pDrawable, const BoxRec *box,
+                         unsigned *counter, const char *backend, void *fn)
+{
+    unsigned count;
+    PixmapPtr screenPixmap;
+    Bool isScreenPixmap = FALSE;
+
+    if (!pDrawable || !box || !counter)
+        return;
+
+    count = ++(*counter);
+    if (count > 4 && (count % 64) != 0)
+        return;
+
+    screenPixmap = pDrawable->pScreen ? pDrawable->pScreen->GetScreenPixmap(pDrawable->pScreen) : NULL;
+    if (pDrawable->type == DRAWABLE_PIXMAP && screenPixmap)
+        isScreenPixmap = ((PixmapPtr) pDrawable) == screenPixmap;
+
+    ErrorF("DamageTraceV2: %s count=%u drawableType=%s screenPixmap=%d drawable=%p geom=%dx%d box=%d,%d-%d,%d backend=%s fn=%p sym=%s so=%s\n",
+           op, count, damageDrawableTypeName(pDrawable), isScreenPixmap ? 1 : 0,
+           pDrawable, pDrawable->width, pDrawable->height,
+           box->x1, box->y1, box->x2, box->y2,
+           backend ? backend : "null", fn,
+           damageFunctionSymbolName(fn), damageFunctionLibraryName(fn));
+}
+
+static void
+damageTraceOpWithFunction(const char *op, DrawablePtr pDrawable, const BoxRec *box,
+                          unsigned *counter, void *fn)
+{
+    unsigned count;
+    PixmapPtr screenPixmap;
+    Bool isScreenPixmap = FALSE;
+
+    if (!pDrawable || !box || !counter)
+        return;
+
+    count = ++(*counter);
+    if (count > 4 && (count % 64) != 0)
+        return;
+
+    screenPixmap = pDrawable->pScreen ? pDrawable->pScreen->GetScreenPixmap(pDrawable->pScreen) : NULL;
+    if (pDrawable->type == DRAWABLE_PIXMAP && screenPixmap)
+        isScreenPixmap = ((PixmapPtr) pDrawable) == screenPixmap;
+
+    ErrorF("DamageTraceV2: %s count=%u drawableType=%s screenPixmap=%d drawable=%p geom=%dx%d box=%d,%d-%d,%d fn=%p sym=%s so=%s\n",
+           op, count, damageDrawableTypeName(pDrawable), isScreenPixmap ? 1 : 0,
+           pDrawable, pDrawable->width, pDrawable->height,
+           box->x1, box->y1, box->x2, box->y2, fn,
+           damageFunctionSymbolName(fn), damageFunctionLibraryName(fn));
+}
 
 #define getPixmapDamageRef(pPixmap) ((DamagePtr *) \
     dixLookupPrivateAddr(&(pPixmap)->devPrivates, damagePixPrivateKey))
@@ -497,8 +638,12 @@ damageComposite(CARD8 op,
         box.x2 = box.x1 + width;
         box.y2 = box.y1 + height;
         TRIM_PICTURE_BOX(box, pDst);
-        if (BOX_NOT_EMPTY(box))
+        if (BOX_NOT_EMPTY(box)) {
+            damageTraceOpWithFunction("Composite", pDst->pDrawable, &box,
+                                      &gDamageTraceCompositeCount,
+                                      pScrPriv->Composite);
             damageDamageBox(pDst->pDrawable, &box, pDst->subWindowMode);
+        }
     }
     /*
      * Validating a source picture bound to a window may trigger other
@@ -572,8 +717,10 @@ damageGlyphs(CARD8 op,
             listTmp++;
         }
         TRIM_PICTURE_BOX(box, pDst);
-        if (BOX_NOT_EMPTY(box))
+        if (BOX_NOT_EMPTY(box)) {
+            damageTraceOp("Glyphs", pDst->pDrawable, &box, &gDamageTraceGlyphsCount);
             damageDamageBox(pDst->pDrawable, &box, pDst->subWindowMode);
+        }
     }
     unwrap(pScrPriv, ps, Glyphs);
     (*ps->Glyphs) (op, pSrc, pDst, maskFormat, xSrc, ySrc, nlist, list, glyphs);
@@ -740,8 +887,13 @@ damagePutImage(DrawablePtr pDrawable,
         box.y2 = box.y1 + h;
 
         TRIM_BOX(box, pGC);
-        if (BOX_NOT_EMPTY(box))
+        if (BOX_NOT_EMPTY(box)) {
+            damageTraceOpWithBackend("PutImage", pDrawable, &box,
+                                     &gDamageTracePutImageCount,
+                                     damagePutImageBackendName((GCOps *) pGC->ops),
+                                     pGC->ops ? pGC->ops->PutImage : NULL);
             damageDamageBox(pDrawable, &box, pGC->subWindowMode);
+        }
     }
     (*pGC->ops->PutImage) (pDrawable, pGC, depth, x, y, w, h,
                            leftPad, format, pImage);
@@ -768,8 +920,10 @@ damageCopyArea(DrawablePtr pSrc,
         box.y2 = box.y1 + height;
 
         TRIM_BOX(box, pGC);
-        if (BOX_NOT_EMPTY(box))
+        if (BOX_NOT_EMPTY(box)) {
+            damageTraceOp("CopyArea", pDst, &box, &gDamageTraceCopyAreaCount);
             damageDamageBox(pDst, &box, pGC->subWindowMode);
+        }
     }
 
     ret = (*pGC->ops->CopyArea) (pSrc, pDst,
@@ -938,8 +1092,10 @@ damagePolylines(DrawablePtr pDrawable,
         }
 
         TRIM_AND_TRANSLATE_BOX(box, pDrawable, pGC);
-        if (BOX_NOT_EMPTY(box))
+        if (BOX_NOT_EMPTY(box)) {
+            damageTraceOp("PolyFillRect", pDrawable, &box, &gDamageTracePolyFillRectCount);
             damageDamageBox(pDrawable, &box, pGC->subWindowMode);
+        }
     }
     (*pGC->ops->Polylines) (pDrawable, pGC, mode, npt, ppt);
     damageRegionProcessPending(pDrawable);

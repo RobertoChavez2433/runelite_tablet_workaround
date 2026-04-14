@@ -28,6 +28,16 @@
 
 #include "fb.h"
 
+static unsigned long gFbPutImageTraceCount;
+
+#define FB_TRACE(...) ErrorF("FbTrace: " __VA_ARGS__)
+#define FB_TRACE_EVERY(counter, step, ...) \
+    do { \
+        (counter)++; \
+        if (((counter) <= 8) || (((counter) % (step)) == 0)) \
+            FB_TRACE(__VA_ARGS__); \
+    } while (0)
+
 void
 fbPutImage(DrawablePtr pDrawable,
            GCPtr pGC,
@@ -38,6 +48,15 @@ fbPutImage(DrawablePtr pDrawable,
     unsigned long i;
     FbStride srcStride;
     FbStip *src = (FbStip *) pImage;
+
+    FB_TRACE_EVERY(
+        gFbPutImageTraceCount, 128,
+        "putImage count=%lu drawableType=%d drawableId=0x%lx geom=%dx%d size=%dx%d format=%d depth=%d\n",
+        gFbPutImageTraceCount,
+        pDrawable->type,
+        (unsigned long) pDrawable->id,
+        pDrawable->width, pDrawable->height,
+        w, h, format, depth);
 
     x += pDrawable->x;
     y += pDrawable->y;

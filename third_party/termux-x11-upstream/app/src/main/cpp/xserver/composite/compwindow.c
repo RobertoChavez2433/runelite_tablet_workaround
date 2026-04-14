@@ -51,6 +51,17 @@
 #include "panoramiXsrv.h"
 #endif
 
+static unsigned long gCompPaintChildrenTraceCount;
+static unsigned long gCompWindowUpdateAutomaticTraceCount;
+
+#define COMP_WINDOW_TRACE(...) ErrorF("CompTrace: " __VA_ARGS__)
+#define COMP_WINDOW_TRACE_EVERY(counter, step, ...) \
+    do { \
+        (counter)++; \
+        if (((counter) <= 8) || (((counter) % (step)) == 0)) \
+            COMP_WINDOW_TRACE(__VA_ARGS__); \
+    } while (0)
+
 #ifdef COMPOSITE_DEBUG
 static int
 compCheckWindow(WindowPtr pWin, void *data)
@@ -690,6 +701,19 @@ compWindowUpdateAutomatic(WindowPtr pWin)
                                            &subwindowMode,
                                            serverClient,
                                            &error);
+    BoxPtr extents = RegionExtents(pRegion);
+
+    COMP_WINDOW_TRACE_EVERY(
+        gCompWindowUpdateAutomaticTraceCount, 64,
+        "windowUpdateAutomatic count=%lu win=0x%lx parent=0x%lx rootParent=%d rects=%d box=%d,%d-%d,%d pixmap=%dx%d screen=%d,%d\n",
+        gCompWindowUpdateAutomaticTraceCount,
+        (unsigned long) pWin->drawable.id,
+        pParent ? (unsigned long) pParent->drawable.id : 0UL,
+        pParent == pScreen->root,
+        RegionNumRects(pRegion),
+        extents->x1, extents->y1, extents->x2, extents->y2,
+        pSrcPixmap->drawable.width, pSrcPixmap->drawable.height,
+        pSrcPixmap->screen_x, pSrcPixmap->screen_y);
 
     /*
      * First move the region from window to screen coordinates
@@ -751,6 +775,16 @@ compPaintChildrenToWindow(WindowPtr pWin)
 
     if (!pWin->damagedDescendants)
         return;
+
+    if (pWin->parent == NULL) {
+        COMP_WINDOW_TRACE_EVERY(
+            gCompPaintChildrenTraceCount, 32,
+            "paintChildren root count=%lu root=0x%lx firstChild=0x%lx lastChild=0x%lx\n",
+            gCompPaintChildrenTraceCount,
+            (unsigned long) pWin->drawable.id,
+            pWin->firstChild ? (unsigned long) pWin->firstChild->drawable.id : 0UL,
+            pWin->lastChild ? (unsigned long) pWin->lastChild->drawable.id : 0UL);
+    }
 
     for (pChild = pWin->lastChild; pChild; pChild = pChild->prevSib)
         compPaintWindowToParent(pChild);

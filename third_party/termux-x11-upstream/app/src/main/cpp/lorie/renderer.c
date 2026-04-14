@@ -24,6 +24,7 @@
 
 #define log(...) __android_log_print(ANDROID_LOG_DEBUG, "gles-renderer", __VA_ARGS__)
 #define loge(...) __android_log_print(ANDROID_LOG_ERROR, "gles-renderer", __VA_ARGS__)
+#define capslog(...) __android_log_print(ANDROID_LOG_INFO, "XlorieCaps", __VA_ARGS__)
 
 static GLuint createProgram(const char* p_vertex_source, const char* p_fragment_source);
 
@@ -62,6 +63,19 @@ static int printEglError(char* msg, int line) {
 
 static inline __always_inline void vprintEglError(char* msg, int line) {
     printEglError(msg, line);
+}
+
+static const char* capsFormatName(uint32_t format) {
+    switch (format) {
+        case AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM:
+            return "AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM";
+        case AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM:
+            return "AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM";
+        case AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM:
+            return "AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM";
+        default:
+            return "UNKNOWN";
+    }
 }
 
 static void checkGlError(int line) {
@@ -350,30 +364,52 @@ void rendererInit(JNIEnv* env) {
 void rendererTestCapabilities(int* legacy_drawing, uint8_t* flip) {
     // Some devices do not support sampling from HAL_PIXEL_FORMAT_BGRA_8888, here we are checking it.
     const EGLint imageAttributes[] = {EGL_IMAGE_PRESERVED_KHR, EGL_TRUE, EGL_NONE};
+    EGLint major = 0, minor = 0;
     EGLint numConfigs;
     EGLClientBuffer clientBuffer;
     EGLImageKHR img;
     AHardwareBuffer *new = NULL;
     int status;
+    uint32_t probeFormat = AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM;
+    bool usingRgbaFallback = false;
     AHardwareBuffer_Desc d0 = {
             .width = 64,
             .height = 64,
             .layers = 1,
             .usage = AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN | AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN,
-            .format = AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM
+            .format = probeFormat
     };
+
+    *legacy_drawing = 0;
+    *flip = 0;
 
     if (egl_display == EGL_NO_DISPLAY) {
         egl_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
         if (egl_display == EGL_NO_DISPLAY)
             return vprintEglError("Got no EGL display", __LINE__);
     }
+    if (eglInitialize(egl_display, &major, &minor) != EGL_TRUE) {
+        *legacy_drawing = 1;
+        capslog("eglInitialize failed legacy_drawing=%d flip=%u", *legacy_drawing, *flip);
+        return vprintEglError("Unable to initialize EGL for capability probe", __LINE__);
+    }
+    capslog("eglInitialize major=%d minor=%d", major, minor);
 
+retry_probe:
+    d0.format = probeFormat;
     status = AHardwareBuffer_allocate(&d0, &new);
+    capslog(
+            "AHardwareBuffer_allocate format=%s(%u) status=%d buffer=%p",
+            capsFormatName(d0.format),
+            d0.format,
+            status,
+            new
+    );
     if (status != 0 || new == NULL) {
         loge("Failed to allocate native buffer (%p, error %d)", new, status);
         loge("Forcing legacy drawing");
         *legacy_drawing = 1;
+        capslog("decision format=%s(%u) legacy_drawing=%d flip=%u", capsFormatName(d0.format), d0.format, *legacy_drawing, *flip);
         return;
     }
 
@@ -386,27 +422,57 @@ void rendererTestCapabilities(int* legacy_drawing, uint8_t* flip) {
         loge("Forcing legacy drawing");
         *legacy_drawing = 1;
         AHardwareBuffer_release(new);
+        capslog("decision format=%s(%u) legacy_drawing=%d flip=%u", capsFormatName(d0.format), d0.format, *legacy_drawing, *flip);
         return;
     }
 
     clientBuffer = eglGetNativeClientBufferANDROID(new);
+    capslog(
+            "eglGetNativeClientBufferANDROID format=%s(%u) clientBuffer=%p",
+            capsFormatName(d0.format),
+            d0.format,
+            clientBuffer
+    );
     if (!clientBuffer) {
         *legacy_drawing = 1;
         AHardwareBuffer_release(new);
+        capslog("eglGetNativeClientBufferANDROID failed format=%s(%u)", capsFormatName(d0.format), d0.format);
+        capslog("decision format=%s(%u) legacy_drawing=%d flip=%u", capsFormatName(d0.format), d0.format, *legacy_drawing, *flip);
         return vprintEglError("Failed to obtain EGLClientBuffer from AHardwareBuffer, forcing legacy drawing", __LINE__);
     }
 
     if (!(img = eglCreateImageKHR(egl_display, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, clientBuffer, imageAttributes))) {
-        if (eglGetError() == EGL_BAD_PARAMETER) {
-            loge("Sampling from HAL_PIXEL_FORMAT_BGRA_8888 is not supported, forcing AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM");
+        EGLint imageError = eglGetError();
+        capslog(
+                "eglCreateImageKHR format=%s(%u) image=%p eglError=0x%04X",
+                capsFormatName(d0.format),
+                d0.format,
+                img,
+                imageError
+        );
+        if (imageError == EGL_BAD_PARAMETER && !usingRgbaFallback) {
+            loge("Sampling from HAL_PIXEL_FORMAT_BGRA_8888 is not supported, retrying with AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM");
             *flip = 1;
+            usingRgbaFallback = true;
+            probeFormat = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
+            AHardwareBuffer_release(new);
+            new = NULL;
+            goto retry_probe;
         } else {
-            loge("Failed to obtain EGLImageKHR from EGLClientBuffer");
+            loge("Failed to obtain EGLImageKHR from EGLClientBuffer (eglError=0x%04X)", imageError);
             loge("Forcing legacy drawing");
             *legacy_drawing = 1;
         }
         AHardwareBuffer_release(new);
+        capslog("decision format=%s(%u) legacy_drawing=%d flip=%u", capsFormatName(d0.format), d0.format, *legacy_drawing, *flip);
     } else {
+        capslog(
+                "eglCreateImageKHR format=%s(%u) image=%p eglError=0x%04X",
+                capsFormatName(d0.format),
+                d0.format,
+                img,
+                EGL_SUCCESS
+        );
         // For some reason all devices I checked had no GL_EXT_texture_format_BGRA8888 support, but some of them still provided BGRA extension.
         // EGL does not provide functions to query texture format in runtime.
         // Workarounds are less performant but at least they let us use Termux:X11 on devices with missing BGRA support.
@@ -442,6 +508,13 @@ void rendererTestCapabilities(int* legacy_drawing, uint8_t* flip) {
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0); checkGlError();
         uint32_t pixel[64*64];
         glReadPixels(0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, &pixel); checkGlError();
+        capslog(
+                "glReadPixels format=%s(%u) usingRgbaFallback=%d actual=0x%08X expectedDirect=0xAADDCCBB expectedFlip=0xAABBCCDD",
+                capsFormatName(d0.format),
+                d0.format,
+                usingRgbaFallback ? 1 : 0,
+                pixel[0]
+        );
         if (pixel[0] == 0xAABBCCDD) {
             log("Xlorie: GLES draws pixels unchanged, probably system does not support AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM. Forcing bgra.\n");
             *flip = 1;
@@ -454,6 +527,7 @@ void rendererTestCapabilities(int* legacy_drawing, uint8_t* flip) {
         eglDestroyImageKHR(egl_display, img);
         eglDestroySurface(egl_display, checksfc);
         AHardwareBuffer_release(new);
+        capslog("decision format=%s(%u) legacy_drawing=%d flip=%u", capsFormatName(d0.format), d0.format, *legacy_drawing, *flip);
     }
 }
 
@@ -666,16 +740,6 @@ void rendererRedrawLocked(bool* waitingForBuffers) {
     if (eglSwapBuffers(egl_display, sfc) != EGL_TRUE)
         printEglError("Failed to swap buffers", __LINE__);
     swapNs = rendererNowNs() - swapStartNs;
-
-    // Perform a little drawing operation to make sure the next buffer is ready on the next invocation of drawing
-    glEnable(GL_SCISSOR_TEST);
-    glScissor(0, 0, 1, 1);
-    glClearColor(0, 0, 0, 0);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glDisable(GL_SCISSOR_TEST);
-    fence = eglCreateSyncKHR(egl_display, EGL_SYNC_FENCE_KHR, NULL);
-    eglClientWaitSyncKHR(egl_display, fence, 0, EGL_FOREVER);
-    eglDestroySyncKHR(egl_display, fence);
 
     state->renderedFrames++;
     frameEndNs = rendererNowNs();

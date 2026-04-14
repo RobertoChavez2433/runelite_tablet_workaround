@@ -14,19 +14,20 @@ class MainActivity private constructor() {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     @Volatile
-    private var connectionChangedListener: (() -> Unit)? = null
+    private var connectionChangedListener: ((Boolean) -> Unit)? = null
 
-    fun setConnectionChangedListener(listener: (() -> Unit)?) {
+    fun setConnectionChangedListener(listener: ((Boolean) -> Unit)?) {
         connectionChangedListener = listener
     }
 
     fun clientConnectedStateChanged() {
-        AppLog.step("hybrid_x11", "Xlorie MainActivity shim: clientConnectedStateChanged")
+        val connected = LorieView.connected()
+        AppLog.step("hybrid_x11", "Xlorie MainActivity shim: clientConnectedStateChanged connected=$connected")
         connectionChangedListener?.let { listener ->
             if (Looper.myLooper() == Looper.getMainLooper()) {
-                listener()
+                listener(connected)
             } else {
-                mainHandler.post(listener)
+                mainHandler.post { listener(connected) }
             }
         }
     }

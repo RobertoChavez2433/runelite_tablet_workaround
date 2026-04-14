@@ -98,6 +98,9 @@ static volatile uint32_t gChoreographerCallbacks = 0;
 static volatile uint32_t gRedrawWakeups = 0;
 static volatile uint32_t gDamageRequests = 0;
 static volatile uint32_t gPresentAfterFlips = 0;
+static volatile uint32_t gPresentFlipAttempts = 0;
+static volatile uint32_t gPresentFlipAccepted = 0;
+static volatile uint32_t gPresentFlipRejected = 0;
 
 typedef struct {
     LorieBuffer *buffer;
@@ -108,6 +111,37 @@ typedef struct {
 
 #define LORIE_PIXMAP_PRIV_FROM_PIXMAP(pixmap) (pixmap ? ((LoriePixmapPriv*) exaGetPixmapDriverPrivate(pixmap)) : NULL)
 #define LORIE_BUFFER_FROM_PIXMAP(pixmap) (pixmap ? ((LoriePixmapPriv*) exaGetPixmapDriverPrivate(pixmap))->buffer : NULL)
+
+static const char* lorieBufferTypeName(int8_t type) {
+    switch (type) {
+        case LORIEBUFFER_REGULAR:
+            return "REGULAR";
+        case LORIEBUFFER_FD:
+            return "FD";
+        case LORIEBUFFER_AHARDWAREBUFFER:
+            return "AHARDWAREBUFFER";
+        default:
+            return "UNKNOWN";
+    }
+}
+
+static void lorieLogPixmapState(const char* where, PixmapPtr pixmap, LoriePixmapPriv* priv) {
+    const LorieBuffer_Desc *desc = (priv && priv->buffer) ? LorieBuffer_description(priv->buffer) : NULL;
+    log(INFO,
+        "PixmapTrace: %s pixmap=%p drawable=%dx%d hasPriv=%d hasBuffer=%d type=%s format=%d imported=%d flipped=%d mem=%d id=%llu",
+        where,
+        pixmap,
+        pixmap ? pixmap->drawable.width : 0,
+        pixmap ? pixmap->drawable.height : 0,
+        priv ? 1 : 0,
+        desc ? 1 : 0,
+        desc ? lorieBufferTypeName(desc->type) : "NONE",
+        desc ? desc->format : -1,
+        priv && priv->imported ? 1 : 0,
+        priv && priv->flipped ? 1 : 0,
+        priv && priv->mem ? 1 : 0,
+        desc ? (unsigned long long) desc->id : 0ULL);
+}
 
 void OsVendorInit(void) {
     pthread_mutexattr_t mutex_attr;
@@ -458,9 +492,16 @@ static CARD32 lorieFramecounter(unused OsTimerPtr timer, unused CARD32 time, unu
     uint32_t redrawWakeups = __sync_lock_test_and_set(&gRedrawWakeups, 0);
     uint32_t damageRequests = __sync_lock_test_and_set(&gDamageRequests, 0);
     uint32_t presentAfterFlips = __sync_lock_test_and_set(&gPresentAfterFlips, 0);
+    uint32_t presentFlipAttempts = __sync_lock_test_and_set(&gPresentFlipAttempts, 0);
+    uint32_t presentFlipAccepted = __sync_lock_test_and_set(&gPresentFlipAccepted, 0);
+    uint32_t presentFlipRejected = __sync_lock_test_and_set(&gPresentFlipRejected, 0);
     log(INFO, "choreographer callbacks in 5.0 seconds = %.1f FPS", ((float) choreographerCallbacks) / 5.0f);
     log(INFO, "redraw wakeups in 5.0 seconds = %.1f FPS", ((float) redrawWakeups) / 5.0f);
     log(INFO, "damage-triggered redraws in 5.0 seconds = %.1f FPS", ((float) damageRequests) / 5.0f);
+    log(INFO, "present flip attempts in 5.0 seconds = %.1f FPS (accepted %.1f, rejected %.1f)",
+        ((float) presentFlipAttempts) / 5.0f,
+        ((float) presentFlipAccepted) / 5.0f,
+        ((float) presentFlipRejected) / 5.0f);
     log(INFO, "present after-flips in 5.0 seconds = %.1f FPS", ((float) presentAfterFlips) / 5.0f);
     if (pvfb->state->renderedFrames)
         log(INFO, "%d frames in 5.0 seconds = %.1f FPS",
@@ -499,6 +540,8 @@ void lorieSetWindowPixmap(WindowPtr pWindow, PixmapPtr newPixmap) {
     if (isRoot) {
         old = LORIE_PIXMAP_PRIV_FROM_PIXMAP(oldPixmap);
         new = LORIE_PIXMAP_PRIV_FROM_PIXMAP(newPixmap);
+        lorieLogPixmapState("SetWindowPixmap old-root", oldPixmap, old);
+        lorieLogPixmapState("SetWindowPixmap new-root", newPixmap, new);
         if (old && old->buffer && old->locked) {
             LorieBuffer_unlock(old->buffer);
             old->locked = NULL;
@@ -795,18 +838,48 @@ static void loriePerformVblanks(void) {
 
 Bool loriePresentFlip(__unused RRCrtcPtr crtc, __unused uint64_t event_id, __unused uint64_t target_msc, PixmapPtr pixmap, __unused Bool sync_flip) {
     LoriePixmapPriv* priv = (LoriePixmapPriv*) exaGetPixmapDriverPrivate(pixmap);
-    if (!priv || !priv->buffer || priv->mem || pvfb->root.width != pixmap->drawable.width || pvfb->root.width != pixmap->drawable.height)
+    __sync_fetch_and_add(&gPresentFlipAttempts, 1);
+
+    if (!priv || !priv->buffer || priv->mem ||
+        pvfb->root.width != pixmap->drawable.width ||
+        pvfb->root.height != pixmap->drawable.height) {
+        uint32_t rejected = __sync_add_and_fetch(&gPresentFlipRejected, 1);
+        if (rejected <= 5 || rejected % 120 == 0) {
+            log(INFO,
+                "PresentFlip rejected reason=%s root=%ux%u pixmap=%dx%d hasPriv=%d hasBuffer=%d hasMem=%d",
+                !priv ? "missing_priv" :
+                !priv->buffer ? "missing_buffer" :
+                priv->mem ? "backed_by_mem" :
+                pvfb->root.width != pixmap->drawable.width ? "width_mismatch" : "height_mismatch",
+                pvfb->root.width,
+                pvfb->root.height,
+                pixmap ? pixmap->drawable.width : 0,
+                pixmap ? pixmap->drawable.height : 0,
+                priv ? 1 : 0,
+                (priv && priv->buffer) ? 1 : 0,
+                (priv && priv->mem) ? 1 : 0);
+        }
         return FALSE;
+    }
 
     const LorieBuffer_Desc *desc = LorieBuffer_description(priv->buffer);
     char *forceFlip = getenv("TERMUX_X11_FORCE_FLIP");
-    if (desc->type == LORIEBUFFER_FD && priv->imported && !(forceFlip && strcmp(forceFlip, "1") == 0))
+    if (desc->type == LORIEBUFFER_FD && priv->imported && !(forceFlip && strcmp(forceFlip, "1") == 0)) {
+        uint32_t rejected = __sync_add_and_fetch(&gPresentFlipRejected, 1);
+        if (rejected <= 5 || rejected % 120 == 0) {
+            log(INFO,
+                "PresentFlip rejected reason=imported_fd_without_force type=%d imported=%d id=%llu",
+                desc->type,
+                priv->imported ? 1 : 0,
+                (unsigned long long) desc->id);
+        }
         return FALSE; // For some reason it does not work fine with turnip.
+    }
 
     if (desc->type == LORIEBUFFER_REGULAR) {
         // Regular buffers can not be shared to activity, we must explicitly convert LorieBuffer to FD or AHardwareBuffer
         int8_t type = pvfb->root.legacyDrawing ? LORIEBUFFER_FD : LORIEBUFFER_AHARDWAREBUFFER;
-        int8_t format = pvfb->root.flip ? AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM : AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM;
+        int8_t format = pvfb->root.flip ? AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM : AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM;
         LorieBuffer_convert(priv->buffer, type, format);
         if (desc->type != LORIEBUFFER_REGULAR) {
             // LorieBuffer_convert does not report status but it does not let the type change in the case of error.
@@ -815,10 +888,20 @@ Bool loriePresentFlip(__unused RRCrtcPtr crtc, __unused uint64_t event_id, __unu
         }
     }
 
-    if (desc->type != LORIEBUFFER_FD && desc->type != LORIEBUFFER_AHARDWAREBUFFER)
+    if (desc->type != LORIEBUFFER_FD && desc->type != LORIEBUFFER_AHARDWAREBUFFER) {
+        uint32_t rejected = __sync_add_and_fetch(&gPresentFlipRejected, 1);
+        if (rejected <= 5 || rejected % 120 == 0) {
+            log(INFO,
+                "PresentFlip rejected reason=unsupported_buffer_type type=%d imported=%d id=%llu",
+                desc->type,
+                priv->imported ? 1 : 0,
+                (unsigned long long) desc->id);
+        }
         return FALSE;
+    }
 
     lorieRegisterBuffer(priv->buffer);
+    __sync_fetch_and_add(&gPresentFlipAccepted, 1);
     return TRUE;
 }
 
@@ -867,9 +950,10 @@ void *lorieCreatePixmap(__unused ScreenPtr pScreen, int width, int height, __unu
         return priv;
 
     uint8_t type = usage_hint != CREATE_PIXMAP_USAGE_LORIEBUFFER_BACKED ? LORIEBUFFER_REGULAR : pvfb->root.legacyDrawing ? LORIEBUFFER_FD : LORIEBUFFER_AHARDWAREBUFFER;
-    uint8_t format = pvfb->root.flip ? AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM : AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM;
+    uint8_t format = pvfb->root.flip ? AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM : AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM;
     priv->buffer = LorieBuffer_allocate(width, height, format, type);
     *new_fb_pitch = LorieBuffer_description(priv->buffer)->stride * 4;
+    lorieLogPixmapState("CreatePixmap", NULL, priv);
 
     LorieBuffer_lock(priv->buffer, &priv->locked);
     if (!priv->buffer) {
@@ -1002,15 +1086,52 @@ static PixmapPtr loriePixmapFromFds(ScreenPtr screen, CARD8 num_fds, const int *
 }
 
 static int lorieGetFormats(__unused ScreenPtr screen, CARD32 *num_formats, CARD32 **formats) {
-    *num_formats = 0;
-    *formats = NULL;
+    CARD32 *supportedFormats = calloc(2, sizeof(CARD32));
+    if (!supportedFormats) {
+        *num_formats = 0;
+        *formats = NULL;
+        return FALSE;
+    }
+
+    supportedFormats[0] = DRM_FORMAT_XRGB8888;
+    supportedFormats[1] = DRM_FORMAT_ARGB8888;
+    *num_formats = 2;
+    *formats = supportedFormats;
+    log(INFO, "DRI3: advertising %lu formats", (unsigned long) *num_formats);
     return TRUE;
 }
 
-static int lorieGetModifiers(__unused ScreenPtr screen, __unused uint32_t format, uint32_t *num_modifiers, uint64_t **modifiers) {
-    *num_modifiers = 0;
-    *modifiers = NULL;
+static int lorieGetModifiers(__unused ScreenPtr screen, uint32_t format, uint32_t *num_modifiers, uint64_t **modifiers) {
+    const CARD64 AHARDWAREBUFFER_SOCKET_FD = 1255;
+    const CARD64 AHARDWAREBUFFER_FLIPPED_SOCKET_FD = 1256;
+    const CARD64 RAW_MMAPPABLE_FD = 1274;
+    uint64_t *supportedModifiers;
+
+    if (format != DRM_FORMAT_XRGB8888 && format != DRM_FORMAT_ARGB8888) {
+        *num_modifiers = 0;
+        *modifiers = NULL;
+        return TRUE;
+    }
+
+    supportedModifiers = calloc(4, sizeof(uint64_t));
+    if (!supportedModifiers) {
+        *num_modifiers = 0;
+        *modifiers = NULL;
+        return FALSE;
+    }
+
+    supportedModifiers[0] = DRM_FORMAT_MOD_INVALID;
+    supportedModifiers[1] = RAW_MMAPPABLE_FD;
+    supportedModifiers[2] = AHARDWAREBUFFER_SOCKET_FD;
+    supportedModifiers[3] = AHARDWAREBUFFER_FLIPPED_SOCKET_FD;
+    *num_modifiers = 4;
+    *modifiers = supportedModifiers;
+    log(INFO, "DRI3: advertising %u modifiers for format=0x%08X", *num_modifiers, format);
     return TRUE;
+}
+
+static int lorieGetDrawableModifiers(__unused DrawablePtr draw, uint32_t format, uint32_t *num_modifiers, uint64_t **modifiers) {
+    return lorieGetModifiers(NULL, format, num_modifiers, modifiers);
 }
 
 static dri3_screen_info_rec lorieDri3Info = {
@@ -1019,7 +1140,7 @@ static dri3_screen_info_rec lorieDri3Info = {
         .pixmap_from_fds = loriePixmapFromFds,
         .get_formats = lorieGetFormats,
         .get_modifiers = lorieGetModifiers,
-        .get_drawable_modifiers = FalseNoop
+        .get_drawable_modifiers = lorieGetDrawableModifiers
 };
 
 static GLboolean drawableSwapBuffers(unused ClientPtr client, unused __GLXdrawable * drawable) { return TRUE; }
