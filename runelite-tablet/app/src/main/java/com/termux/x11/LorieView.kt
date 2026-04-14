@@ -43,25 +43,36 @@ class LorieView : SurfaceView {
     private var clipboardSyncEnabled = true
     private var clipboardListenerRegistered = false
 
+    private var surfaceCreatedAtMs = 0L
     private val surfaceCallback = object : SurfaceHolder.Callback {
         override fun surfaceCreated(holder: SurfaceHolder) {
             holder.setFormat(BGRA_8888)
-            AppLog.lifecycle("Hybrid LorieView.surfaceCreated")
+            surfaceCreatedAtMs = System.currentTimeMillis()
+            val frame = holder.surfaceFrame
+            AppLog.surface("created", frame.width(), frame.height(), "BGRA_8888",
+                "holder=$holder requestedFormat=BGRA_8888($BGRA_8888) — format matters for Xlorie legacy drawing path")
         }
 
         override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+            val startNs = System.nanoTime()
             surfaceChanged(holder.surface)
+            val jniLatencyMs = (System.nanoTime() - startNs) / 1_000_000
             size.set(measuredWidth, measuredHeight)
-            AppLog.step(
-                "hybrid_x11",
-                "Hybrid LorieView.surfaceChanged holder=${width}x$height measured=${size.x}x${size.y} format=$format"
-            )
+            val formatName = if (format == BGRA_8888) "BGRA_8888" else "format=$format"
+            if (size.x != width || size.y != height) {
+                AppLog.w("SURFACE", "surfaceChanged: measured=${size.x}x${size.y} != holder=${width}x$height — rotation race?")
+            }
+            val actualFormat = try { holder.surface?.let { "actualFormat=${format}" } ?: "surface=null" } catch (_: Exception) { "actualFormat=unknown" }
+            AppLog.surface("changed", width, height, formatName,
+                "measured=${size.x}x${size.y} jniLatency=${jniLatencyMs}ms $actualFormat requestedFormat=BGRA_8888($BGRA_8888) — format mismatch blocks Xlorie legacy drawing")
+            AppLog.ipc("send", "jni_surfaceChanged", jniLatencyMs, "surface=${holder.surface != null}")
             callback?.changed(size.x, size.y, size.x, size.y)
         }
 
         override fun surfaceDestroyed(holder: SurfaceHolder) {
+            val lifetimeMs = if (surfaceCreatedAtMs > 0) System.currentTimeMillis() - surfaceCreatedAtMs else 0
             surfaceChanged(null)
-            AppLog.lifecycle("Hybrid LorieView.surfaceDestroyed")
+            AppLog.surface("destroyed", 0, 0, "", "lifetime=${lifetimeMs}ms")
             callback?.changed(0, 0, 0, 0)
         }
     }
@@ -98,7 +109,10 @@ class LorieView : SurfaceView {
         }
 
         val frame: Rect = holder.surfaceFrame
+        val postTimeNs = System.nanoTime()
         post {
+            val execDelayMs = (System.nanoTime() - postTimeNs) / 1_000_000
+            if (execDelayMs > 16) AppLog.w("SURFACE", "triggerCallback: post delayed ${execDelayMs}ms (UI thread saturated?)")
             surfaceCallback.surfaceChanged(holder, BGRA_8888, frame.width(), frame.height())
         }
     }

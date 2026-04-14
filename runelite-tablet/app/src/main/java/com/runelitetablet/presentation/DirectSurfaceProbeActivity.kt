@@ -137,17 +137,22 @@ private class DirectSurfaceProbeView(
             framesThisWindow = 0
         }
 
-        Choreographer.getInstance().postFrameCallback(this)
+        try {
+            Choreographer.getInstance().postFrameCallback(this)
+        } catch (e: Exception) {
+            AppLog.e("FRAME", "DirectSurfaceProbe: Choreographer re-registration FAILED — frame loop dead", e)
+        }
     }
 
     private fun drawFrame(frameTimeNanos: Long) {
         val canvas = try {
             holder.lockHardwareCanvas()
-        } catch (_: IllegalStateException) {
+        } catch (e: IllegalStateException) {
+            AppLog.w("SURFACE", "DirectSurfaceProbe: lockHardwareCanvas failed (${e.message}), falling back to lockCanvas — GPU acceleration may be unavailable")
             holder.lockCanvas()
         }
 
-        canvas ?: return
+        canvas ?: run { AppLog.w("SURFACE", "DirectSurfaceProbe: lockCanvas returned null"); return }
         try {
             render(canvas, frameTimeNanos / 1_000_000_000f)
         } finally {
@@ -194,8 +199,17 @@ private class DirectSurfaceProbeView(
 
     private fun requestSurfaceRefreshRate(surface: Surface) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            surface.setFrameRate(TARGET_REFRESH_HZ, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
-            AppLog.step("surface", "DirectSurfaceProbeView: requested ${TARGET_REFRESH_HZ.toInt()} Hz on Surface")
+            try {
+                surface.setFrameRate(TARGET_REFRESH_HZ, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+                AppLog.i("SURFACE", "DirectSurfaceProbeView: setFrameRate(${TARGET_REFRESH_HZ.toInt()} Hz) " +
+                    "accepted by Surface (no exception — actual rate depends on device compositor)")
+            } catch (e: IllegalArgumentException) {
+                AppLog.w("SURFACE", "DirectSurfaceProbeView: setFrameRate(${TARGET_REFRESH_HZ.toInt()} Hz) " +
+                    "rejected — ${e.message}")
+            }
+        } else {
+            AppLog.w("SURFACE", "DirectSurfaceProbeView: setFrameRate unavailable " +
+                "(API ${Build.VERSION.SDK_INT} < ${Build.VERSION_CODES.R})")
         }
     }
 }

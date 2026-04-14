@@ -27,11 +27,26 @@ object HybridX11Bridge {
     @Volatile
     private var service: ICmdEntryInterface? = null
 
+    // Broadcast rate tracking
+    @Volatile private var rateWindowStart = 0L
+    @Volatile private var rateWindowCount = 0
+
     private val _state = MutableStateFlow(HybridX11BridgeState())
     val state: StateFlow<HybridX11BridgeState> = _state.asStateFlow()
 
     fun attach(newService: ICmdEntryInterface) {
+        val now = System.currentTimeMillis()
+        rateWindowCount++
+        val elapsed = now - rateWindowStart
+        if (elapsed >= 1_000L) {
+            val rate = rateWindowCount * 1000.0 / elapsed
+            AppLog.d("HYBRID_X11", "HybridX11Bridge: broadcast rate=%.1f/s (count=%d window=%dms)".format(rate, rateWindowCount, elapsed))
+            rateWindowStart = now
+            rateWindowCount = 0
+        }
+
         val binder = newService.asBinder()
+        AppLog.ipc("receive", "binder", 0, "HybridX11Bridge.attach hash=${binder.hashCode()} alive=${binder.isBinderAlive}")
         if (!binder.isBinderAlive) {
             AppLog.w("HYBRID_X11", "HybridX11Bridge: ignoring dead binder attach")
             return
@@ -53,14 +68,17 @@ object HybridX11Bridge {
             )
         }
 
+        val attachTimeMs = System.currentTimeMillis()
         try {
             binder.linkToDeath(
                 {
-                    AppLog.w("HYBRID_X11", "HybridX11Bridge: remote binder died")
+                    val lifetimeMs = System.currentTimeMillis() - attachTimeMs
+                    AppLog.w("HYBRID_X11", "HybridX11Bridge: remote binder died (lifetime=${lifetimeMs}ms)")
                     clear("binder_died")
                 },
                 0
             )
+            AppLog.d("HYBRID_X11", "HybridX11Bridge: linkToDeath registered")
         } catch (e: Exception) {
             AppLog.w("HYBRID_X11", "HybridX11Bridge: linkToDeath failed: ${e.message}")
         }
@@ -77,6 +95,8 @@ object HybridX11Bridge {
     fun currentService(): ICmdEntryInterface? = service
 
     fun clear(reason: String) {
+        val wasAlive = service?.asBinder()?.isBinderAlive == true
+        AppLog.d("HYBRID_X11", "HybridX11Bridge.clear: reason=$reason wasAlive=$wasAlive generation=${_state.value.generation}")
         synchronized(lock) {
             service = null
             _state.value = _state.value.copy(

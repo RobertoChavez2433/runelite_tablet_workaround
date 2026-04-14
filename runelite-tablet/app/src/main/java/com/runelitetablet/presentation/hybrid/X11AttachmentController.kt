@@ -37,8 +37,11 @@ class X11AttachmentController(
 
     fun startAttachLoop(scope: CoroutineScope) {
         attachJob?.cancel()
+        var attempt = 0
         attachJob = scope.launch {
             while (isActive) {
+                attempt++
+                logger?.thread("scope", Thread.currentThread().name, "attachLoop", "retry attempt=$attempt")
                 tryAttach()
                 delay(ATTACH_INTERVAL_MS)
             }
@@ -46,6 +49,7 @@ class X11AttachmentController(
     }
 
     fun cancelAttachLoop() {
+        logger?.d("HYBRID_X11", "X11AttachmentController: attach loop cancelled")
         attachJob?.cancel()
     }
 
@@ -70,6 +74,7 @@ class X11AttachmentController(
 
     fun tryAttach() {
         val forceReconnect = pendingBridgeReconnect
+        logger?.d("HYBRID_X11", "tryAttach: forceReconnect=$forceReconnect logcatAttached=$logcatAttached xConnectionAttached=$xConnectionAttached")
         if (!forceReconnect && connector.isConnected()) {
             if (!xConnectionAttached) {
                 xConnectionAttached = true
@@ -105,8 +110,11 @@ class X11AttachmentController(
         }
 
         try {
+            val attachStartNs = System.nanoTime()
             val attached = connector.attachXConnection()
+            val attachLatencyMs = (System.nanoTime() - attachStartNs) / 1_000_000
             if (!attached) {
+                logger?.d("HYBRID_X11", "tryAttach: xConnection not ready latency=${attachLatencyMs}ms")
                 maybeRequestConnection()
                 onStatusUpdate("binder alive, waiting for xConnection fd")
                 return
@@ -114,6 +122,7 @@ class X11AttachmentController(
 
             xConnectionAttached = true
             pendingBridgeReconnect = false
+            logger?.i("HYBRID_X11", "tryAttach: xConnection attached latency=${attachLatencyMs}ms")
             onStatusUpdate("attached xConnection")
             onStatusVisible(false)
             attachJob?.cancel()

@@ -38,6 +38,13 @@ class TermuxX11StartReceiver : BroadcastReceiver() {
 
         val currentBinder = HybridX11Bridge.currentService()?.asBinder()
         if (currentBinder != null && currentBinder == binder && currentBinder.isBinderAlive) {
+            AppLog.d("HYBRID_X11", "TermuxX11StartReceiver: duplicate binder, skipping")
+            return
+        }
+
+        // Race check: binder may have died between line 30 check and here
+        if (!binder.isBinderAlive) {
+            AppLog.w("HYBRID_X11", "TermuxX11StartReceiver: binder died between checks (race)")
             return
         }
 
