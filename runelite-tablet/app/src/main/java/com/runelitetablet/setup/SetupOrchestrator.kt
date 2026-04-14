@@ -10,6 +10,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.runelitetablet.domain.logging.CorrelationId
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -52,21 +53,27 @@ class SetupOrchestrator(
     }
 
     suspend fun runSetup() {
+        val corrId = CorrelationId.generate("setup")
+        logger?.state("SetupOrchestrator.runSetup: starting orchestration", correlationId = corrId)
+        val startMs = System.currentTimeMillis()
         cleaner.cleanup()
-        if (!stateStore.isVersionCurrent()) stateStore.clearAll()
+        if (!stateStore.isVersionCurrent()) { logger?.state("SetupOrchestrator: version mismatch, clearing state", correlationId = corrId); stateStore.clearAll() }
         evaluateCompletedSteps()
-        reconcileWithMarkers()
-        runSetupFrom(0)
+        reconcileWithMarkers(corrId)
+        runSetupFrom(0, corrId)
+        logger?.state("SetupOrchestrator.runSetup: complete duration=${System.currentTimeMillis() - startMs}ms", correlationId = corrId)
     }
 
     suspend fun retryCurrentStep() {
         if (failedStepIndex < 0) return
+        val corrId = CorrelationId.generate("setup-retry")
+        logger?.state("SetupOrchestrator.retryCurrentStep: retrying index=$failedStepIndex", correlationId = corrId)
         val index = failedStepIndex
         _currentStep.value = _steps.value[index].step
         updateStepStatus(index, StepStatus.InProgress)
         _currentOutput.value = null; failedStepIndex = -1
         try {
-            if (executeStep(_steps.value[index].step)) { updateStepStatus(index, StepStatus.Completed); runSetupFrom(index + 1) }
+            if (executeStep(_steps.value[index].step, corrId)) { updateStepStatus(index, StepStatus.Completed); runSetupFrom(index + 1, corrId) }
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) {
             updateStepStatus(index, StepStatus.Failed(e.message ?: "Unknown error"))
@@ -74,17 +81,23 @@ class SetupOrchestrator(
         }
     }
 
-    private suspend fun runSetupFrom(startIndex: Int) {
+    private suspend fun runSetupFrom(startIndex: Int, correlationId: String? = null) {
         for (index in startIndex until _steps.value.size) {
             val stepState = _steps.value[index]
-            if (stepState.status is StepStatus.Completed) continue
+            if (stepState.status is StepStatus.Completed) { logger?.d("SETUP", "runSetupFrom: skipping ${stepState.step} (completed)", correlationId = correlationId); continue }
+            logger?.state("SetupOrchestrator: step ${stepState.step} index=$index starting", correlationId = correlationId)
             _currentStep.value = stepState.step
             updateStepStatus(index, StepStatus.InProgress); _currentOutput.value = null
+            val stepStartMs = System.currentTimeMillis()
             try {
-                if (executeStep(stepState.step)) updateStepStatus(index, StepStatus.Completed)
-                else { failedStepIndex = index; return }
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) {
+                if (executeStep(stepState.step, correlationId)) {
+                    logger?.state("SetupOrchestrator: step ${stepState.step} completed duration=${System.currentTimeMillis() - stepStartMs}ms", correlationId = correlationId)
+                    updateStepStatus(index, StepStatus.Completed)
+                } else { failedStepIndex = index; return }
+            } catch (e: CancellationException) {
+                logger?.w("SETUP", "SetupOrchestrator: step ${stepState.step} cancelled", correlationId = correlationId); throw e
+            } catch (e: Exception) {
+                logger?.e("SETUP", "SetupOrchestrator: step ${stepState.step} failed: ${e.message}", e, correlationId = correlationId)
                 updateStepStatus(index, StepStatus.Failed(e.message ?: "Unknown error"))
                 _currentOutput.value = e.message; failedStepIndex = index; return
             }
@@ -98,17 +111,17 @@ class SetupOrchestrator(
         override fun launchIntent(intent: android.content.Intent) { actions?.launchIntent(intent) }
     }
 
-    private suspend fun executeStep(step: SetupStep): Boolean = when (step) {
-        SetupStep.InstallTermux -> stepRunner.installPackage(GitHubRepo.TERMUX, { packageChecker.isTermuxInstalled() }, stepCallbacks)
-        SetupStep.InstallTermuxX11 -> stepRunner.installPackage(GitHubRepo.TERMUX_X11, { packageChecker.isTermuxX11Installed() }, stepCallbacks)
+    private suspend fun executeStep(step: SetupStep, correlationId: String? = null): Boolean = when (step) {
+        SetupStep.InstallTermux -> stepRunner.installPackage(GitHubRepo.TERMUX, { packageChecker.isTermuxInstalled() }, stepCallbacks, correlationId = correlationId)
+        SetupStep.InstallTermuxX11 -> stepRunner.installPackage(GitHubRepo.TERMUX_X11, { packageChecker.isTermuxX11Installed() }, stepCallbacks, correlationId = correlationId)
         SetupStep.EnablePermissions -> handlePermissionsStep()
-        SetupStep.InstallProot -> stepRunner.executeModularScript("install-proot.sh", "step-proot", stepCallbacks)
-        SetupStep.InstallJava -> stepRunner.executeModularScript("install-java.sh", "step-java", stepCallbacks)
-        SetupStep.DownloadRuneLite -> stepRunner.executeModularScript("download-runelite.sh", "step-runelite", stepCallbacks)
-        SetupStep.InstallGpuDrivers -> stepRunner.executeGpuStep(stepCallbacks)
+        SetupStep.InstallProot -> stepRunner.executeModularScript("install-proot.sh", "step-proot", stepCallbacks, correlationId = correlationId)
+        SetupStep.InstallJava -> stepRunner.executeModularScript("install-java.sh", "step-java", stepCallbacks, correlationId = correlationId)
+        SetupStep.DownloadRuneLite -> stepRunner.executeModularScript("download-runelite.sh", "step-runelite", stepCallbacks, correlationId = correlationId)
+        SetupStep.InstallGpuDrivers -> stepRunner.executeGpuStep(stepCallbacks, correlationId = correlationId)
         SetupStep.VerifySetup -> {
             _currentOutput.value = "Verifying setup..."
-            val result = verifier.verify(); _currentOutput.value = result.output
+            val result = verifier.verify(correlationId = correlationId); _currentOutput.value = result.output
             if (!result.success) updateCurrentStepStatus(StepStatus.Failed("Verification failed: ${result.failures.joinToString(", ")}"))
             result.success
         }
@@ -165,8 +178,8 @@ class SetupOrchestrator(
         }}}
     }
 
-    private suspend fun reconcileWithMarkers() {
-        val result = reconciler.reconcile() ?: return
+    private suspend fun reconcileWithMarkers(correlationId: String? = null) {
+        val result = reconciler.reconcile(correlationId = correlationId) ?: return
         if (result.versionMismatch) {
             stateStore.clearAll()
             _steps.update { it.map { s -> if (MarkerReconciler.MODULAR_STEPS.containsKey(s.step)) s.copy(status = StepStatus.Pending) else s } }

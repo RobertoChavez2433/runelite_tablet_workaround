@@ -22,10 +22,11 @@ class MarkerReconciler(
         val versionMismatch: Boolean
     )
 
-    suspend fun reconcile(): ReconcileResult? {
+    suspend fun reconcile(correlationId: String? = null): ReconcileResult? {
+        logger?.state("MarkerReconciler.reconcile: starting", correlationId = correlationId)
         val deployed = scriptDeployer.deployScripts()
         if (!deployed) {
-            logger?.w("STEP", "reconcile: script deployment failed, keeping cached state")
+            logger?.w("STEP", "reconcile: script deployment failed, keeping cached state", correlationId = correlationId)
             return null
         }
 
@@ -37,18 +38,22 @@ class MarkerReconciler(
             )
 
             if (!result.isSuccess) {
-                logger?.w("STEP", "reconcile: check-markers.sh returned non-zero (${result.exitCode})")
+                logger?.w("STEP", "reconcile: check-markers.sh returned non-zero (${result.exitCode})", correlationId = correlationId)
                 return null
             }
 
-            parseOutput(result.stdout ?: "")
+            val rawOutput = result.stdout ?: ""
+            logger?.state("MarkerReconciler: raw output=$rawOutput", correlationId = correlationId)
+            parseOutput(rawOutput).also {
+                logger?.state("MarkerReconciler: present=${it.presentKeys} absent=${it.absentKeys} versionMismatch=${it.versionMismatch}", correlationId = correlationId)
+            }
         } catch (e: TimeoutCancellationException) {
-            logger?.w("STEP", "reconcile: timeout after ${MARKER_CHECK_TIMEOUT_MS}ms")
+            logger?.w("STEP", "reconcile: timeout after ${MARKER_CHECK_TIMEOUT_MS}ms", correlationId = correlationId)
             null
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            logger?.w("STEP", "reconcile: exception (${e.message})")
+            logger?.w("STEP", "reconcile: exception (${e.message})", correlationId = correlationId)
             null
         }
     }

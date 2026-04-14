@@ -29,8 +29,12 @@ class SetupStepRunner(
         fun launchIntent(intent: android.content.Intent)
     }
 
-    suspend fun executeModularScript(scriptName: String, markerKey: String, callbacks: Callbacks): Boolean {
+    suspend fun executeModularScript(scriptName: String, markerKey: String, callbacks: Callbacks, correlationId: String? = null): Boolean {
+        val commandPath = scriptDeployer.getScriptPath(scriptName)
+        logger?.step(markerKey, "executeModularScript: $scriptName starting commandPath=$commandPath args=0", correlationId = correlationId)
+        val startNs = System.nanoTime()
         if (!scriptDeployer.deployScripts() || !scriptDeployer.deployConfigs()) {
+            logger?.e("STEP", "executeModularScript: $scriptName deploy failed", correlationId = correlationId)
             callbacks.updateOutput("Failed to deploy scripts to Termux")
             return false
         }
@@ -46,17 +50,19 @@ class SetupStepRunner(
         val completionMarker = "=== ${scriptName.removeSuffix(".sh")} complete ==="
         val scriptCompleted = result.stdout?.contains(completionMarker) == true
 
+        val durationMs = (System.nanoTime() - startNs) / 1_000_000
         if (result.isSuccess || scriptCompleted) {
+            logger?.step(markerKey, "executeModularScript: $scriptName completed exitCode=${result.exitCode} duration=${durationMs}ms stdout=${result.stdout?.take(500)}", correlationId = correlationId)
             callbacks.updateOutput(result.stdout?.let { if (it.length > 2000) it.takeLast(2000) else it })
             if (!result.isSuccess) {
-                logger?.w("STEP", "executeModularScript: non-zero exit (${result.exitCode}) for $scriptName but completed")
+                logger?.w("STEP", "executeModularScript: non-zero exit (${result.exitCode}) for $scriptName but completed", correlationId = correlationId)
             }
             stateStore.markCompleted(markerKey)
             stateStore.setStoredVersion(SetupStateStore.CURRENT_SCRIPT_VERSION)
             return true
         } else {
             val errorOutput = result.stderr ?: result.error ?: "Unknown error"
-            logger?.e("STEP", "executeModularScript: $scriptName failed exitCode=${result.exitCode}")
+            logger?.e("STEP", "executeModularScript: $scriptName failed exitCode=${result.exitCode} duration=${durationMs}ms stderr=${errorOutput.take(500)}", correlationId = correlationId)
             callbacks.updateOutput(errorOutput)
             return false
         }
@@ -65,9 +71,11 @@ class SetupStepRunner(
     suspend fun installPackage(
         repo: GitHubRepo,
         isInstalled: () -> Boolean,
-        callbacks: Callbacks
+        callbacks: Callbacks,
+        correlationId: String? = null
     ): Boolean {
-        if (isInstalled()) return true
+        if (isInstalled()) { logger?.install("installPackage: ${repo.name} already installed", correlationId = correlationId); return true }
+        logger?.install("installPackage: ${repo.name} starting download", correlationId = correlationId)
 
         callbacks.updateOutput("Downloading ${repo.name}...")
         var lastEmittedPercent = -1
@@ -108,11 +116,11 @@ class SetupStepRunner(
         }
     }
 
-    suspend fun executeGpuStep(callbacks: Callbacks): Boolean {
+    suspend fun executeGpuStep(callbacks: Callbacks, correlationId: String? = null): Boolean {
         if (stateStore.isCompleted("step-gpu")) return true
 
         if (!scriptDeployer.deployScripts()) {
-            logger?.w("STEP", "executeGpuStep: script deployment failed, skipping")
+            logger?.w("STEP", "executeGpuStep: script deployment failed, skipping", correlationId = correlationId)
             return true
         }
 
@@ -131,7 +139,7 @@ class SetupStepRunner(
             return true
         } else {
             val errorOutput = result.stderr ?: result.error ?: "Unknown error"
-            logger?.w("STEP", "executeGpuStep: GPU setup failed (non-blocking): $errorOutput")
+            logger?.w("STEP", "executeGpuStep: GPU setup failed (non-blocking): $errorOutput", correlationId = correlationId)
             callbacks.updateOutput("GPU driver installation failed (software rendering will be used). Error: $errorOutput")
             stateStore.markCompleted("step-gpu")
             return true

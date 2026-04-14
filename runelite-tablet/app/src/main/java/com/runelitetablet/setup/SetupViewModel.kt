@@ -71,12 +71,15 @@ class SetupViewModel(
 
     fun startSetup() {
         if (!setupStarted.compareAndSet(false, true)) return
+        logger?.state("SetupViewModel.startSetup: launching setup coroutine")
         viewModelScope.launch {
             orchestrator.runSetup()
             val allDone = orchestrator.steps.value.all { it.status is StepStatus.Completed }
             if (allDone) {
                 val hasCreds = withContext(ioDispatcher) { credentialStore.hasCredentials() }
-                _currentScreen.value = if (hasCreds) AppScreen.Launch else AppScreen.Login
+                val nextScreen = if (hasCreds) AppScreen.Launch else AppScreen.Login
+                logger?.state("SetupViewModel: setup complete, navigating to $nextScreen hasCreds=$hasCreds")
+                _currentScreen.value = nextScreen
             }
         }
     }
@@ -105,6 +108,7 @@ class SetupViewModel(
     fun navigateBackToLaunch() { _currentScreen.value = AppScreen.Launch }
 
     fun resetSetup() {
+        logger?.state("SetupViewModel.resetSetup: clearing all state")
         viewModelScope.launch {
             stateStore.clearAll()
             scriptDeployer.invalidateDeployCache()
@@ -127,6 +131,7 @@ class SetupViewModel(
             "termux-reload-settings && echo Done && am start -n ${context.packageName}/.MainActivity"
 
     fun copyConfigAndOpenTermux() {
+        logger?.ui("SetupViewModel.copyConfigAndOpenTermux: copying config to clipboard and launching Termux")
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Termux Config", termuxConfigCommand))
         _commandCopied.value = true
@@ -145,11 +150,13 @@ class SetupViewModel(
     }
 
     fun requestBatteryOptimization() {
+        logger?.ui("SetupViewModel.requestBatteryOptimization: requesting battery exemptions")
         orchestrator.requestBatteryOptimization()
         orchestrator.requestOwnBatteryOptimization()
     }
 
     fun openDirectSurfaceProbe() {
+        logger?.ui("SetupViewModel.openDirectSurfaceProbe: launching surface probe activity")
         val intent = PresentationBackends.directSurfaceProbe.createLaunchIntent(context)
         if (intent != null) orchestrator.actions?.launchIntent(intent)
     }

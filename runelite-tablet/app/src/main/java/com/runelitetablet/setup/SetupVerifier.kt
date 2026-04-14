@@ -9,7 +9,9 @@ import com.runelitetablet.domain.logging.Logger
  */
 class SetupVerifier(private val commandRunner: CommandRunner, private val logger: Logger? = null) {
 
-    suspend fun verify(): VerifyResult {
+    suspend fun verify(correlationId: String? = null): VerifyResult {
+        logger?.verify("SetupVerifier: starting verification", correlationId = correlationId)
+        val startMs = System.currentTimeMillis()
         val checks = listOf(
             "[ -d \"\$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu\" ] && echo 'PASS: proot' || echo 'FAIL: proot'",
             "proot-distro login ubuntu -- which java < /dev/null && echo 'PASS: java' || echo 'FAIL: java'",
@@ -25,14 +27,19 @@ class SetupVerifier(private val commandRunner: CommandRunner, private val logger
         )
 
         val output = result.stdout ?: ""
+        val durationMs = System.currentTimeMillis() - startMs
+        val versions = output.lines().filter { it.startsWith("PASS") || it.contains("version") || it.contains("java") }.joinToString("; ")
+        logger?.verify("SetupVerifier: raw output=$output exitCode=${result.exitCode} duration=${durationMs}ms versions=[$versions]", correlationId = correlationId)
         if (output.contains("FAIL")) {
             val failures = output.lines().filter { it.startsWith("FAIL") }
+            logger?.e("VERIFY", "SetupVerifier: FAILED checks=${failures.joinToString()}", correlationId = correlationId)
             return VerifyResult(false, output, failures)
         }
 
         if (result.exitCode != 0) {
-            logger?.w("STEP", "verify: non-zero exit (${result.exitCode}) but all checks passed")
+            logger?.w("STEP", "verify: non-zero exit (${result.exitCode}) but all checks passed", correlationId = correlationId)
         }
+        logger?.verify("SetupVerifier: all checks passed duration=${durationMs}ms", correlationId = correlationId)
         return VerifyResult(true, output, emptyList())
     }
 

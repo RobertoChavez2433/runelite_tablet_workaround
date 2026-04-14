@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.runelitetablet.RuneLiteTabletApp
+import com.runelitetablet.logging.AppLog
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -14,6 +15,7 @@ class SetupViewModelFactory(activity: Activity) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        AppLog.lifecycle("SetupViewModelFactory.create: building ViewModel with dependencies")
         val orchestrator = container.setup.orchestrator
         val credentialStore = container.auth.credentialStore
         val logger = container.core.logger
