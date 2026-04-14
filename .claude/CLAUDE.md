@@ -42,3 +42,11 @@ Source root: `runelite-tablet/app/src/main/java/com/runelitetablet/`
 - Feature docs: `docs/features/`
 - State: `autoload/_state.md` (hot), `state/*.json` (cold)
 - Plans: `plans/`, Specs: `specs/`, Tailor: `tailor/`
+
+## Personality Rules
+
+- If you don't know something, say so, don't hallucinate API's pretending to know.
+- Be brutally honest, no filler language.
+- Cite references like file paths, code snippets, or websites.
+- Always verify your work with on device testing.
+- Never say you're finished until a piece of work has been verified. 
