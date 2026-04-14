@@ -6,6 +6,11 @@ Session history archive. See `.claude/autoload/_state.md` for current state (las
 
 ## March 2026
 
+### Session 61 (2026-03-16)
+**Work**: Deep presentation pipeline analysis. Identified VirGL readback bottleneck, Xlorie RGBA format issue, waitForNextFrame 2-vsync cap.
+**Decisions**: 4-phase approach for 120fps. Blocked on architecture refactor.
+**Next**: Begin Phase 1 implementation (blocked on refactor — unblocked by Session 64).
+
 ### Session 59 (2026-03-15)
 **Work**: Added native renderer timing and X11-side cadence counters, extended the real RuneLite evidence harness, forced RuneLite GPU settings (`unlockFps=true`, `fpsTarget=120`, `vsyncMode=OFF`), and captured internal-hybrid default-res, half-res, and `--scale 1` evidence runs. Also wired the combined probe harness so it can drive `internal-hybrid` synthetic controls, then captured the first fullscreen `glxgears` control attempt and invalidated it after confirming install and probe overlapped and Android force-stopped the app during install.
 **Decisions**: The Android-present step is no longer the main suspect; the remaining ceiling is upstream of it. Future synthetic `internal-hybrid` control runs must be strictly sequential after deploy.

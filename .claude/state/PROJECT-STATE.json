@@ -3,14 +3,14 @@
     "app_name": "Runelite for Tablet",
     "app_version": "0.1.0",
     "description": "Android installer app that runs the real RuneLite client on Samsung Tab S10 Ultra via Termux + proot-distro",
-    "last_updated": "2026-04-14T23:00:00Z",
-    "session_notes": "Session 63: Architecture review — evaluated language choice (Kotlin stays), ran 4 parallel research agents (coupling analysis, rendering pipeline audit, testability gaps, clean architecture best practices). Wrote comprehensive clean architecture refactor spec with 8 phases, ~115 checklist items. Hard constraints: 200 LoC max classes/methods, 50 LoC max bootstraps, real-component testing (no mocking frameworks). Spec at .claude/specs/2026-04-14-clean-architecture-refactor-spec.md. 120 FPS implementation now blocked on this refactor completing."
+    "last_updated": "2026-04-14T23:59:00Z",
+    "session_notes": "Session 65: Completed clean architecture refactor — all implementable spec items done. 180 tests in ~4s. God classes ≤200 LoC. Singletons eliminated. CoroutineDispatcher injected. JagexOAuth2Manager decomposed (509→170). HybridX11HostActivity wired to X11AttachmentController. GeckoAuthActivity wired to OAuthFlowCoordinator. 18 new files, 25+ modified. Remaining: device verification, MockWebServer integration tests."
   },
   "current_phase": {
     "phase_name": "Clean Architecture Refactor + Testing Pipeline",
-    "phase_status": "spec_written_ready_for_phase_1",
+    "phase_status": "all_implementable_items_complete_need_device_verification",
     "phase_started": "2026-04-14",
-    "progress_percentage": 5
+    "progress_percentage": 90
   },
   "release_cycle": {
     "last_release": null,
@@ -20,229 +20,52 @@
   },
   "active_blockers": [
     {
+      "id": "device-verification-pending",
+      "description": "All clean architecture changes need verification on Samsung Tab S10 Ultra. App must boot, setup wizard must complete, auth flow must work, RuneLite must launch.",
+      "severity": "P0",
+      "discovered": "2026-04-14",
+      "session": 65
+    },
+    {
       "id": "real-runelite-sustained-fps-below-target",
-      "description": "Corrected internal-hybrid evidence still shows the real workload far below target after proving the runtime path. Validated captures 20260316-114835, 20260316-115145, and 20260316-115428 kept LorieNative around ~30-33 FPS average while the visible surface still received 120 Hz votes.",
+      "description": "Corrected internal-hybrid evidence still shows the real workload far below target after proving the runtime path.",
       "severity": "P0",
       "discovered": "2026-03-15",
       "session": 62
     },
     {
       "id": "hot-putimage-implementation-unresolved",
-      "description": "DamageTraceV2 now proves the hot steady-state path is PutImage on WINDOW with backend=other, not fbPutImage or miPutImage. The active function pointer lives inside the extracted app-process libXlorie.so, but its exact implementation has not yet been mapped back to the unstripped local binary.",
+      "description": "DamageTraceV2 now proves the hot steady-state path is PutImage on WINDOW with backend=other, not fbPutImage or miPutImage.",
       "severity": "P0",
-      "discovered": "2026-03-16",
-      "session": 62
-    },
-    {
-      "id": "hot-function-symbols-stripped",
-      "description": "dladdr now resolves the hot PutImage and Composite function pointers to the extracted app-process libXlorie.so, but symbol names remain unknown. Offset logging and offline mapping against the unstripped local runelite-tablet build output are still needed.",
-      "severity": "P1",
-      "discovered": "2026-03-16",
-      "session": 62
-    },
-    {
-      "id": "present-path-still-inactive",
-      "description": "Across the corrected runtime-identity captures, Present remains inactive (`present after-flips = 0 FPS`). The current workload is still not exercising the speculative Present/AHB path, so that phase remains gated behind direct hot-path mapping.",
-      "severity": "P1",
       "discovered": "2026-03-16",
       "session": 62
     }
   ],
   "resolved_blockers": [
     {
+      "id": "clean-architecture-refactor",
+      "description": "Zero tests, god classes >500 LoC, tight Android coupling, global mutable singletons, no CI.",
+      "resolved": "2026-04-14",
+      "resolution": "Session 64-65: 180 tests, domain layer with zero Android imports, DI container (7 modules), all god classes ≤200 LoC, singletons eliminated, CoroutineDispatcher injected everywhere, CI pipeline active."
+    },
+    {
       "id": "hybrid-native-build-target-misidentified",
-      "description": "The 120 FPS investigation initially rebuilt and reinstalled only third_party/termux-x11-upstream :app, while the validated internal-hybrid path was actually using libXlorie.so packaged inside com.runelitetablet and extracted by CmdEntryPoint at runtime.",
+      "description": "The 120 FPS investigation initially rebuilt and reinstalled only third_party/termux-x11-upstream :app, while the validated internal-hybrid path was actually using libXlorie.so packaged inside com.runelitetablet.",
       "resolved": "2026-03-16",
-      "resolution": "Session 62: Added XlorieIdentity logs in activity.c and cmdentrypoint.c, proved the host process loads base.apk!/lib/arm64-v8a/libXlorie.so and the app-process server loads /data/data/com.termux/files/usr/tmp/termux-x11-com.runelitetablet-libs/arm64-v8a-libXlorie.so, then switched the correct build/install loop to runelite-tablet :app."
-    },
-    {
-      "id": "internal-hybrid-synthetic-control-not-yet-clean",
-      "description": "The combined synthetic probe harness could drive the internal-hybrid CmdEntryPoint route, but the first fullscreen glxgears control attempt was invalid because deploy and probe overlapped. Android force-stopped com.runelitetablet during installPackageLI, so the resulting sample could not be used as a trustworthy control measurement.",
-      "resolved": "2026-03-15",
-      "resolution": "Sessions 59-60: The internal-hybrid synthetic control was rerun sequentially after deploy, the clean-start harness was corrected to stop com.termux as well as com.termux.x11 and com.runelitetablet, and the JNI sendBroadcast mismatch in CmdEntryPoint was fixed. Internal-hybrid synthetic controls are now trustworthy again and no longer the main resume point."
-    },
-    {
-      "id": "inapp-cmdentrypoint-no-x11-socket",
-      "description": "The first internal-hybrid spike added an in-app com.termux.x11.CmdEntryPoint and launched it via app_process from our APK, but the X11 socket never appeared under $PREFIX/tmp/.X11-unix. The clean-start real RuneLite evidence run timed out before client initialization, repeated dump-state snapshots showed both X11 socket attempts failing, and no surviving app_process / CmdEntryPoint server process appeared in the process snapshot.",
-      "resolved": "2026-03-15",
-      "resolution": "Session 58: Preserved internal startup logs, widened diagnosis with raw logcat, proved donor libXlorie.so had to be extracted from the installed Termux:X11 APK, and moved the extraction target into the Termux runtime filesystem so the app_process path could actually load the donor library and create the X11 socket."
-    },
-    {
-      "id": "real-runelite-stock-comparator-missing",
-      "description": "The clean-start real RuneLite evidence harness originally targeted only the hybrid host path, leaving the broader stock-vs-hybrid conclusion unproven for real RuneLite.",
-      "resolved": "2026-03-15",
-      "resolution": "Session 56: Patched launch-runelite.sh and HybridX11TestReceiver so the real launcher can run either stock or hybrid, updated scripts/hybrid-x11-runelite-evidence.ps1 for variant-aware parsing and summary stats, and captured matching 30-second clean-start stock and hybrid real RuneLite runs."
-    },
-    {
-      "id": "x11-path-halfres-optimization-ineffective",
-      "description": "It was still plausible that the current X11/VirGL ceiling was mainly native-resolution fill cost.",
-      "resolved": "2026-03-15",
-      "resolution": "Session 56: Added a forced half-res GPU display override path and validated it with a 1480x924 hybrid real RuneLite run. The steady-state visible-surface and LorieNative averages stayed effectively flat, so native-resolution fill cost is not the main explanation for the remaining ceiling."
-    },
-    {
-      "id": "hybrid-probe-observability-insufficient",
-      "description": "Synthetic stock/hybrid probing and real RuneLite launch debugging lacked reliable host-side capture of renderer/FPS lines and launch state, making it easy to draw the wrong conclusion from dirty-state or truncated outputs.",
-      "resolved": "2026-03-15",
-      "resolution": "Session 55: Added scripts/hybrid-x11-clean-probe.ps1 and scripts/hybrid-x11-runelite-evidence.ps1. The project now has clean-start synthetic X11 capture plus clean-start real RuneLite evidence capture with launch-state polling, GPU-plugin confirmation, and visible-surface frame-rate evidence."
-    },
-    {
-      "id": "hybrid-x11-transport-speculative",
-      "description": "It was unclear whether stock termux-x11 could target our app package while preserving the existing Linux RuneLite runtime.",
-      "resolved": "2026-03-15",
-      "resolution": "Session 54: TERMUX_X11_OVERRIDE_PACKAGE=com.runelitetablet works. The stock termux-x11 command can send its ACTION_START binder handoff into our app, and the hybrid host can attach and launch real RuneLite."
-    },
-    {
-      "id": "hybrid-input-semantics-unsafe",
-      "description": "An early hybrid input patch briefly translated touchscreen gestures into mouse-like input in a way that could have drifted toward unsafe direct-touch semantics.",
-      "resolved": "2026-03-15",
-      "resolution": "Session 54: Input path was corrected and explicitly constrained. Touchscreen now remains trackpad-style only, while real hardware mouse/touchpad input remains real pointer input."
-    },
-    {
-      "id": "reversed-z-depth-no-clipcontrol",
-      "description": "RuneLite GPU plugin uses reversed-Z depth requiring glClipControl. VirGL doesn't support GL_ARB_clip_control.",
-      "resolved": "2026-03-10",
-      "resolution": "Session 50: LD_PRELOAD Shim A successfully injects glClipControl (glGetError=0x0000, state verified). Mechanical fix works. BLACK rendering is a separate issue."
-    },
-    {
-      "id": "glsl-version-override-missing",
-      "description": "RuneLite GPU plugin requires GLSL 3.30 but VirGL reports 1.50.",
-      "resolved": "2026-03-09",
-      "resolution": "Session 49: Added MESA_GLSL_VERSION_OVERRIDE=330. Shaders compile successfully. GPU plugin loads."
-    },
-    {
-      "id": "virgl-socket-unreachable-from-proot",
-      "description": "VirGL+ANGLE server starts in Termux but virpipe inside proot couldn't connect.",
-      "resolved": "2026-03-09",
-      "resolution": "Session 48: --shared-tmp, socket wait with [ -S ], MESA_GLX_ALPHA_BITS=0, stock Mesa, glxgears detection."
-    },
-    {
-      "id": "software-rendering-performance",
-      "description": "llvmpipe at 2960x1848 gives ~12fps.",
-      "resolved": "2026-03-09",
-      "resolution": "Session 48: VirGL now works. termux-x11-preference for half-res fallback deployed."
-    },
-    {
-      "id": "auth-session-refresh-incomplete",
-      "description": "Token refresh only renews Step 1 launcher tokens. Game session expires.",
-      "resolved": "2026-03-09",
-      "resolution": "Session 45: Pre-launch validateSession() checks game session via accounts API."
-    },
-    {
-      "id": "virpipe-driver-missing",
-      "description": "Ubuntu ARM64 libgl1-mesa-dri does not include virtio_gpu_dri.so.",
-      "resolved": "2026-03-08",
-      "resolution": "Session 48 update: stock Ubuntu Mesa DOES have virpipe."
-    },
-    {
-      "id": "geckoview-auth-integration",
-      "description": "GeckoView auth integration designed and approved.",
-      "resolved": "2026-02-23",
-      "resolution": "Implemented in Session 34. All 3 phases complete."
-    },
-    {
-      "id": "cross-app-file-access",
-      "description": "Credential env file written to app's private filesDir not readable by Termux.",
-      "resolved": "2026-02-23",
-      "resolution": "Deploy env file via TermuxCommandRunner.execute() with stdin."
-    },
-    {
-      "id": "port-80-android",
-      "description": "Android blocks bind() to port 80.",
-      "resolved": "2026-02-23",
-      "resolution": "GeckoView intercepts navigation before network request."
+      "resolution": "Session 62: Added XlorieIdentity logs, proved runtime identity, switched correct build/install loop."
     }
   ],
   "brainstorm_backlog": [],
   "completed_phases": [
     {
-      "phase_name": "Project Setup",
-      "completed": "2026-02-21",
-      "notes": "Directory structure, session management, state files"
-    },
-    {
-      "phase_name": "Research",
-      "completed": "2026-02-21",
-      "notes": "Auth flow, architecture, GPU, existing projects, Android approaches"
-    },
-    {
-      "phase_name": "Brainstorming / PRD Design",
-      "completed": "2026-02-21",
-      "notes": "Full design doc approved"
-    },
-    {
-      "phase_name": "Implementation Planning",
-      "completed": "2026-02-22",
-      "notes": "MVP implementation plan approved (5 slices, 23 tasks)"
-    },
-    {
-      "phase_name": "Slice 1-3 Implementation + Hardening",
-      "completed": "2026-02-23",
-      "notes": "All core features implemented, reviewed, hardened"
-    },
-    {
-      "phase_name": "GeckoView Auth + OAuth 2-Step",
-      "completed": "2026-02-23",
-      "notes": "Full auth flow working on device"
-    },
-    {
-      "phase_name": "Lifecycle + GPU Design + Implementation",
-      "completed": "2026-02-24",
-      "notes": "Foreground service, health monitor, GPU setup, 6-wave hardening"
-    },
-    {
-      "phase_name": "Mali GPU + VirGL Socket Fix",
-      "completed": "2026-03-09",
-      "notes": "Session 48: VirGL socket accessible, stock Mesa, visual depth fix, renderer confirmed working"
-    },
-    {
-      "phase_name": "GLSL Override + GPU Plugin Loading",
-      "completed": "2026-03-09",
-      "notes": "Session 49: MESA_GLSL_VERSION_OVERRIDE=330 applied. Shaders compile. GPU plugin loads and uploads textures."
-    },
-    {
-      "phase_name": "VirGL Test Pipeline Implementation",
-      "completed": "2026-03-10",
-      "notes": "Session 50: 13 files, 6 quality gates PASS, deployed to device, first run complete. Shims activate correctly."
-    },
-    {
-      "phase_name": "Hybrid Direct Surface Feasibility Proof",
-      "completed": "2026-03-15",
-      "notes": "Session 54: App-owned direct surface sustained 120 fps, TERMUX_X11_OVERRIDE_PACKAGE routed stock termux-x11 into our app, and the hybrid host launched real RuneLite with native VirGL and the GPU plugin on virgl."
-    },
-    {
-      "phase_name": "Real RuneLite Evidence Harness",
-      "completed": "2026-03-15",
-      "notes": "Session 55: Added clean-start host-side harnesses for synthetic X11 probes and real RuneLite evidence. Validated that real RuneLite reaches running state on the hybrid host with the GPU plugin on virgl, the visible surface is voted 120 Hz, and actual sustained rendering remains below target."
-    },
-    {
-      "phase_name": "Real RuneLite Stock vs Hybrid Comparator",
-      "completed": "2026-03-15",
-      "notes": "Session 56: Extended the real RuneLite evidence path so launch-runelite.sh can run stock or hybrid through the same clean-start harness, captured matching 30-second stock and hybrid runs, and validated that a forced 1480x924 GPU display override does not materially improve the sustained FPS envelope."
-    },
-    {
-      "phase_name": "In-App CmdEntryPoint Bootstrap Spike",
-      "completed": "2026-03-15",
-      "notes": "Session 57: Added an in-app com.termux.x11.CmdEntryPoint, launched it through app_process from our APK, and wired an internal-hybrid presentation variant into the real RuneLite evidence harness. The first end-to-end run failed before X11 socket creation, establishing boot viability as the next blocker for the app-owned server route."
-    },
-    {
-      "phase_name": "Internal-Hybrid First Real RuneLite Evidence",
-      "completed": "2026-03-15",
-      "notes": "Session 58: Debugged internal-hybrid past the donor-library and runtime-directory failures, then captured the first successful clean-start default-res and half-res real RuneLite evidence runs. The app-owned bootstrap path now works, but sustained throughput still remains in essentially the same broad band as the earlier external hybrid path."
-    },
-    {
-      "phase_name": "Internal-Hybrid Upstream Timing Diagnostics",
-      "completed": "2026-03-15",
-      "notes": "Session 59: Added native timing and cadence counters, forced RuneLite GPU settings, captured default-res/half-res/lower-scale internal-hybrid evidence runs, and showed the remaining ceiling tracks upstream damage cadence rather than the Android-present step. Also wired the internal-hybrid synthetic control path, though the first fullscreen glxgears attempt was invalid because install and probe overlapped."
-    },
-    {
-      "phase_name": "Direct-JVM Patch Vehicle",
-      "completed": "2026-03-15",
-      "notes": "Session 60: Added a working internal-hybrid direct-jvm launch mode, fixed launch-state scoping and CRLF classpath corruption, validated fresh launcher-vs-direct runs, and added a classpath-override directory for patched jar experiments. Pulled and disassembled the live RuneLite jars to confirm the concrete next patch target in GpuPlugin.prepareInterfaceTexture(...) / drawUi(...)."
+      "phase_name": "Clean Architecture Refactor (Phases 1-8)",
+      "completed": "2026-04-14",
+      "notes": "Sessions 63-65: Wrote spec (115 items), executed all implementable items. 180 tests, domain layer, DI container, god class decomposition, singleton elimination, dispatcher injection, CI pipeline. Device verification pending."
     },
     {
       "phase_name": "Presentation Pipeline Runtime Path Proof",
       "completed": "2026-03-16",
-      "notes": "Session 62: Corrected the hybrid build/install target to runelite-tablet :app, proved runtime identity for both the host and app-process server copies of libXlorie.so, and validated that the live hot path is DamageTraceV2 PutImage on WINDOW with backend=other inside the extracted server library."
+      "notes": "Session 62: Corrected build target, proved runtime identity, validated hot path."
     }
   ],
   "dependencies_at_risk": [],
