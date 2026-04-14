@@ -2,13 +2,14 @@
 name: end-session
 description: End session with auto-archiving
 user-invocable: true
+disable-model-invocation: true
 ---
 
 # End Session
 
 Complete session with proper handoff and auto-archiving.
 
-**CRITICAL**: NO git commands anywhere in this skill. All analysis comes from conversation context.
+**CRITICAL**: NO git commands anywhere in this skill.
 
 ## Actions
 
@@ -25,98 +26,49 @@ Do NOT run git commands. Use only what you observed during the session.
 ### 2. Update _state.md
 **File**: `.claude/autoload/_state.md`
 
-Update the full state file:
-1. Increment session number in header
-2. Update "Current Phase" and "Status" sections
-3. Write "What Was Done This Session" with numbered items
-4. Write "What Needs to Happen Next Session" with top 1-3 priorities
-5. Update "Blockers" section (add new, remove resolved)
-6. Add compressed session entry to "Recent Sessions":
+Write compressed session summary (max 5 lines):
 ```markdown
 ### Session N (YYYY-MM-DD)
 **Work**: Brief 1-line summary
 **Decisions**: Key decisions made
 **Next**: Top 1-3 priorities
 ```
-7. Update "Active Plans" section if plans were created or completed
 
-If >5 sessions exist in "Recent Sessions", run rotation:
-1. Take oldest session entry
+If >5 sessions exist, run rotation:
+1. Take oldest session
 2. Append to `.claude/logs/state-archive.md` under appropriate month header
 3. Remove from _state.md
 
 ### 3. Update Per-Feature Defects
 **Directory**: `.claude/defects/`
 
-For defects discovered during this session:
-1. Determine the affected package (auth, shell, setup, security, termux, installer, ui)
-2. Write defect to `defects/_defects-{package}.md` at the **top** of "Active Patterns" section
-3. Use standardized format:
+For each defect discovered this session:
+1. Determine affected package
+2. Write to `defects/_defects-{package}.md` at the top
+3. Use format:
 ```markdown
 ### [CATEGORY] YYYY-MM-DD: Brief Title
 **Pattern**: What to avoid (1 line)
 **Prevention**: How to avoid (1-2 lines)
 **Ref**: @path/to/file (optional)
 ```
-4. If >5 defects in a single file, move oldest to `.claude/logs/defects-archive.md`
-
-### Package-to-File Mapping
-| Package | Defect File |
-|---------|-------------|
-| Auth (OAuth, credentials, GeckoView) | `defects/_defects-auth.md` |
-| Shell (scripts, proot, bash) | `defects/_defects-shell.md` |
-| Setup (orchestrator, ViewModel, state) | `defects/_defects-setup.md` |
-| Security (injection, escaping, IPC) | `defects/_defects-security.md` |
-| Termux (RUN_COMMAND, results, IPC) | `defects/_defects-termux.md` |
-| Installer (PackageInstaller, APK) | `defects/_defects-installer.md` |
-| UI (Compose, theme, rendering) | `defects/_defects-ui.md` |
-
-### Defect Categories (for [CATEGORY] tag)
-| Category | Use For |
-|----------|---------|
-| [COROUTINE] | CancellationException, dispatcher, timeout, structured concurrency |
-| [ANDROID] | Activity lifecycle, ViewModel, permissions, config changes |
-| [COMPOSE] | Recomposition, state, side effects |
-| [TERMUX] | RUN_COMMAND intent, result service, permissions |
-| [INSTALLER] | PackageInstaller sessions, signing, downloads |
-| [SHELL] | Script errors, proot compatibility, idempotency |
-| [SECURITY] | Intent validation, credential handling, permissions |
+4. If >5 defects in a file, move oldest to `.claude/logs/defects-archive.md`
 
 ### 4. Update JSON State Files
 
-**PROJECT-STATE.json** (`state/PROJECT-STATE.json`):
-- Update `metadata.session_notes` with brief session summary
-- Update `metadata.last_updated` timestamp
-- Update `active_blockers` if blockers were resolved or discovered
-- Update `current_phase` if phase status changed
-- Update `release_cycle` dates if milestones were hit
-- Do NOT duplicate session narrative here (that belongs in _state.md)
-
-**FEATURE-MATRIX.json** (`state/FEATURE-MATRIX.json`) — only if features were added/changed:
-- Add new features to the `features` array
-- Update `status` if feature status changed
-- Update `summary` counts
-
-**feature-{name}.json** (`state/feature-{name}.json`) — only for features touched this session:
-- Update `status` if feature status changed
-- Update `metrics.last_updated` timestamp
-- Update `constraints_summary` if constraints were added/changed
-- Update `current_phase` if feature has active development phase
-- Create the file if a new feature was worked on for the first time
+**PROJECT-STATE.json** — update session notes, blockers, timestamps.
+**feature-{name}.json** — only for features touched this session.
 
 ### 5. Display Summary
 Present:
-- Session summary (what was accomplished)
+- Session summary
 - Features touched
 - Defects logged (if any)
 - Next priorities
 - Reminder: Run `/resume-session` to start next session
 
----
-
 ## Rules
-- **NO git commands** — not `git status`, not `git diff`, not `git add`, not `git commit`
+- **NO git commands** — not `git status`, not `git diff`, not any git operation
 - All analysis from conversation context only
 - Zero user input required
-- Defects go to per-feature files in `defects/_defects-{package}.md`
 - Max 5 active defects per file — oldest rotates to archive

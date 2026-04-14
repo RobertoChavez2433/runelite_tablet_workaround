@@ -1,62 +1,99 @@
 ---
 name: systematic-debugging
-description: "Root cause analysis framework. Prevents shotgun debugging by requiring investigation before fixes."
+description: "Interactive root-cause-first debugging for issues that need evidence, instrumentation, and a clear stop-before-fixing gate."
 user-invocable: true
+disable-model-invocation: true
 ---
 
-# /systematic-debugging — Root Cause Analysis
+# Systematic Debugging
 
-<IRON-LAW>
-NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST.
-</IRON-LAW>
+Debug with the user, not around the user. This skill is for evidence-driven
+root cause analysis, especially when async behavior, IPC timing, proot quirks,
+or shell script failures matter.
 
-## Four Phases
+## Iron Law
 
-### Phase 1: Root Cause Investigation
+No fixes before root cause. No code without explicit user approval.
 
-1. **Read the error** — exact message, stack trace, logs
-2. **Reproduce** — confirm it happens consistently and identify trigger conditions
-3. **Isolate** — narrow to specific file, function, line
-4. **Timeline** — when did it start? What changed?
+## Mode Choice
 
-### Phase 2: Pattern Analysis
+Ask once at the start:
 
-1. **Find working example** — is there similar code that works?
-2. **Compare differences** — what's different between working and broken?
-3. **Check timing** — race condition? Ordering dependency?
-4. **Validate assumptions** — are inputs what you expect?
+```text
+Quick mode or Deep mode?
+```
 
-### Phase 3: Hypothesis Testing
+- `Quick`: direct investigation with targeted reads and logs
+- `Deep`: adds a read-only `debug-research-agent` in parallel
 
-- **ONE hypothesis per test** — never test multiple theories at once
-- **Revert failed changes** — don't accumulate speculative fixes
-- **Log results** — what was tested, what was observed, what was learned
+## Workflow
 
-### Phase 4: Implementation
+### 1. Triage
 
-1. **Targeted fix** — minimal change that addresses root cause
-2. **Verify** — confirm the original error is gone
-3. **Check regressions** — did the fix break anything else?
-4. **Log to `_defects.md`** — add pattern for future prevention
+- confirm the bug statement and repro steps
+- check whether this looks like a known issue pattern
+- identify the smallest likely code path
+- decide whether logs, manual repro, or targeted reads are needed
+
+Then present the triage summary before moving on.
+
+### 2. Coverage And Instrumentation
+
+- inspect existing logs on the suspected path
+- identify blind spots
+- add temporary hypothesis markers only where evidence is missing
+- suggest permanent logging only when a real long-term coverage gap exists
+
+Never log secrets, tokens, or raw credentials.
+
+### 3. Reproduce
+
+- prefer the simplest path that gives clear evidence
+- capture only the evidence needed to isolate the failure point
+
+### 4. Evidence Analysis
+
+- compare expected vs actual behavior
+- identify the first missing, wrong, or failing boundary
+- compare against a similar working path when useful
+- read background research findings only if they sharpen the diagnosis
+
+### 5. Root Cause Report
+
+Present:
+
+- bug summary
+- key evidence
+- most upstream root cause
+- proposed fix approach
+- likely files to change
+- risk level
+
+Then stop and wait for the user to choose:
+
+- `approved`
+- `investigate more`
+- `wrong direction`
+- `defer`
+
+## If The User Approves A Fix
+
+After approval:
+
+1. implement the approved fix
+2. verify the fix addresses the root cause
+3. check for regressions
+4. remove all temporary hypothesis markers
+5. keep only logging that fills a real permanent gap
 
 ## Stop Conditions
 
-- 3+ failed fix attempts -> likely architectural, step back
-- Fix requires changing 5+ files -> scope too broad, reassess
-- Can't explain root cause -> go back to Phase 1
-- "Fix" just suppresses symptoms -> haven't found root cause
+Stop and reassess if:
 
-## Rationalization Prevention
-
-| If You Think... | Stop And... |
-|-----------------|-------------|
-| "Let me just try this quick fix" | Form a hypothesis first |
-| "I'll add a retry and see if it helps" | Find the root cause |
-| "It works when I test manually" | Reproduce in failing environment |
-| "I've been on this too long, just ship it" | Take a break, come back fresh |
-| "The error is in Termux, not our code" | Verify with isolated test |
-
-See `references/pressure-tests.md` for more rationalization traps.
+- 3 hypotheses fail
+- the issue expands beyond 5 files without a clear upstream cause
+- the proposed fix only suppresses symptoms
+- you still cannot explain why the bug exists
 
 ## Project-Specific Debug Checklist
 
@@ -66,19 +103,17 @@ See `references/pressure-tests.md` for more rationalization traps.
 | APK install fails silently | PackageInstaller session error | InstallResultReceiver status? Signing? |
 | Coroutine keeps running | CancellationException swallowed | Generic catch without re-throw? |
 | Shell script fails partway | Missing set -e or unquoted var | Error handling, variable expansion |
-| X11 display not connecting | Termux:X11 not started | sleep 2 enough? DISPLAY=:0? |
+| X11 display not connecting | Termux:X11 not started | sleep enough? DISPLAY=:0? |
 | Compose UI not updating | StateFlow issue | collectAsState()? value assignment? |
 | Termux permission denied | RUN_COMMAND not granted | allow-external-apps set? |
-| APK download 404 | GitHub API change | Release API response? Regex? |
 
-## Defect Categories
+## Deep Mode
 
-Use these when logging to `.claude/autoload/_defects.md`:
+When using Deep mode, launch `debug-research-agent` in the background at
+session start with the bug description and suspected paths. Read its output
+once during evidence analysis. Do not re-launch after it completes.
 
-- `[COROUTINE]` — CancellationException, dispatcher, timeout, structured concurrency
-- `[ANDROID]` — Activity lifecycle, ViewModel, permissions, config changes
-- `[COMPOSE]` — Recomposition, state, side effects
-- `[TERMUX]` — RUN_COMMAND intent, result service, permissions
-- `[INSTALLER]` — PackageInstaller sessions, signing, downloads
-- `[SHELL]` — Script errors, proot compatibility, idempotency
-- `[SECURITY]` — Intent validation, credential handling, permissions
+## Output Shape
+
+Keep status updates short. Root-cause reports should be structured, but not
+longer than needed to justify the next decision.

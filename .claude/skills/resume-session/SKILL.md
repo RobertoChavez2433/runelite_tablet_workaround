@@ -14,13 +14,11 @@ Fast context load. No questions — just read state and display summary.
 ## Actions
 
 ### Step 1: Read HOT Context (2 files only)
-1. `.claude/memory/MEMORY.md` — Key learnings and patterns
-2. `.claude/autoload/_state.md` — Current state
+1. `.claude/memory/MEMORY.md` - Key learnings and patterns
+2. `.claude/autoload/_state.md` - Current state
 
 **DO NOT READ** (lazy load only when needed):
-- `.claude/defects/_defects-*.md` — Demand-loaded by agents when working on specific packages
 - `.claude/logs/state-archive.md`
-- `.claude/logs/defects-archive.md`
 - Any rules, docs, constraints, or state JSON files
 
 ### Step 2: Display Summary
@@ -31,7 +29,6 @@ Print this compact format:
 **Phase**: [From _state.md]
 **Status**: [From _state.md]
 **Last Session**: [1-line summary from most recent session entry]
-**Active Defects**: [count] ([categories])
 
 **Next Tasks**:
 1. [From _state.md "What Needs to Happen Next"]
@@ -46,38 +43,13 @@ That's it. No questions. No context loading. The user's first message IS the int
 ### Step 3: Return Control
 
 Wait for the user to say what they want. Their message determines what happens next:
-- If they name a feature -> load feature-specific context on demand
+- If they name a feature -> agents load feature-specific context via their own frontmatter
 - If they ask about status -> read `state/PROJECT-STATE.json` or `state/FEATURE-MATRIX.json`
-- If they want to debug -> load defects and constraints as needed
+- If they want to debug -> agents load constraints as needed
 
 **Do NOT pre-load any feature context, rules, constraints, or docs.**
-
-## Agent & Skill Reference
-
-| Domain | Use |
-|--------|-----|
-| New feature / behavior change | `/brainstorming` -> `/adversarial-review` (optional) -> `/writing-plans` -> `/implement` |
-| Bug / unexpected behavior | `/systematic-debugging` |
-| Code quality concern | `code-review-agent` (Opus) |
-| Performance concern | `performance-agent` (Opus) |
-| Security or credential concern | `security-review-agent` (Opus) |
-| Spec/plan quality check | `/adversarial-review` |
-| .claude/ health check | `/audit-config` |
-| Termux/shell work | `termux-shell-agent` |
-| Auth/OAuth work | `auth-agent` |
-
-## Context Loading Reference (for when work begins, not this skill)
-
-When work begins on a feature, load context on demand:
-- **State**: `state/feature-{name}.json`, `state/PROJECT-STATE.json`
-- **Defects**: `defects/_defects-{package}.md` for the relevant package
-- **Constraints**: `architecture-decisions/{package}-constraints.md`
-- **Rules**: `rules/{rule}.md` (auto-loaded by path triggers)
-- **Feature docs**: `docs/features/feature-{package}-overview.md`
-- **Plans**: `plans/` for active plans
-- **Architecture**: `docs/architecture.md`
 
 ## Rules
 - **NO git commands** — not `git status`, not `git log`, not any git operation
 - **NO questions** — display summary and wait
-- **NO pre-loading** — load context only when the user gives direction
+- **NO pre-loading** — agents handle their own context
