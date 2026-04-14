@@ -1,109 +1,159 @@
 ---
 name: brainstorming
-description: "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
+description: "Use for large, ambiguous, or cross-cutting work that needs intent, scope, and success criteria locked before planning. Produces an approved spec for tailor and writing-plans."
+user-invocable: true
+disable-model-invocation: true
 ---
 
-# Brainstorming Ideas Into Designs
+# Brainstorming
 
-<IRON-LAW>
-ONE QUESTION AT A TIME. PREFER MULTIPLE CHOICE.
-</IRON-LAW>
+Turn an idea into an approved spec at `.claude/specs/YYYY-MM-DD-<slug>-spec.md`.
+This skill locks user intent first. Tailor maps the codebase later, and
+writing-plans turns the approved spec into execution steps.
 
-## Overview
+## When To Use
 
-Help turn ideas into fully formed designs and specs through natural collaborative dialogue.
+Use this skill when the change is:
 
-Start by understanding the current project context, then ask questions one at a time to refine the idea. Once you understand what you're building, present the design and get user approval.
+- large or cross-cutting
+- ambiguous or under-specified
+- product-shaping
+- risky enough that success criteria must be locked before planning
 
-<HARD-GATE>
-Do NOT invoke any implementation skill, write any code, scaffold any project, or take any implementation action until you have presented a design and the user has approved it. This applies to EVERY project regardless of perceived simplicity.
-</HARD-GATE>
+Skip it for small, clear, low-risk changes when the user already gave a direct,
+implementation-ready request.
 
-## Three Phases
+## Hard Gate
 
-### Phase 1: Understanding
-- Check project context (files, docs, recent state)
-- Ask clarifying questions **one at a time**
-- Focus on: purpose, constraints, success criteria
-- Use multiple choice from `references/question-patterns.md` when possible
+For work that does need brainstorming, do not plan or implement until the spec
+is written, self-reviewed, and explicitly approved by the user.
 
-### Phase 2: Exploring
-- Propose 2-3 approaches with trade-offs
-- Lead with your recommended option and explain why
-- Present options conversationally
+## Reference Files
 
-### Phase 3: Presenting
-- Present the design in sections (see `references/design-sections.md`)
-- Scale each section to its complexity: a few sentences if straightforward, up to 200-300 words if nuanced
-- Ask after each section whether it looks right so far
-- Cover: architecture, components, data flow, error handling, testing
+Load only the file needed for the current step.
 
-## Anti-Patterns
+- `references/intent-capture-gates.md`
+- `references/work-types.md`
+- `references/spec-output.md`
 
-| Anti-Pattern | Why It's Bad | Do This Instead |
-|-------------|-------------|-----------------|
-| Question dump | Overwhelms user, gets shallow answers | One question per message |
-| Open-ended only | Harder to answer, slower | Multiple choice when possible |
-| Assume requirements | Wrong assumptions waste work | Ask, verify, confirm |
-| Skip to solution | Misses constraints, wrong approach | Understand before proposing |
-| Over-design | Complexity for complexity's sake | YAGNI ruthlessly |
+## Workflow
 
-## Context Loading
+1. Run a small Phase 0 exploration.
+2. Classify the work type.
+3. Ask intent questions until the Intent gate is ready.
+4. Ask scope questions until the Scope gate is ready.
+5. Ask vision questions until the Vision gate is ready.
+6. Present 2 to 3 options with a recommendation.
+7. Draft the spec.
+8. Run self-review.
+9. Present the saved spec for user approval.
 
-During Phase 1 (Understanding), load relevant context for affected packages:
-- Read per-feature defect files: `defects/_defects-{package}.md`
-- Read constraint files: `architecture-decisions/{package}-constraints.md`
-- Read feature docs: `docs/features/feature-{package}-overview.md`
+## Phase 0
 
-## Checklist
+Do this before asking the first question.
 
-You MUST create a task for each of these items and complete them in order:
+- Use CodeMunch instead of broad repo browsing.
+- Keep it to a focused baseline pass.
+- Read only enough to understand the surface, dependencies, and likely work
+  type.
+- Always read `.claude/CLAUDE.md` if the work looks cross-cutting.
+- Use the type-specific exploration picks from `references/work-types.md`
+  after the initial classification.
 
-1. **Explore project context** — check files, docs, recent state; load per-feature defects and constraints for affected packages
-2. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
-3. **Propose 2-3 approaches** — with trade-offs and your recommendation
-4. **Present design** — in sections scaled to complexity, get user approval after each section; include "Affected Packages" and "Constraint References" sections
-5. **Write spec** — save to `.claude/specs/YYYY-MM-DD-<topic>-spec.md`
+## Classification Mini-Gate
 
-## Process Flow
+After baseline exploration:
 
-```dot
-digraph brainstorming {
-    "Explore project context" [shape=box];
-    "Ask clarifying questions" [shape=box];
-    "Propose 2-3 approaches" [shape=box];
-    "Present design sections" [shape=box];
-    "User approves design?" [shape=diamond];
-    "Write design doc" [shape=doublecircle];
+1. Propose the work type with a short rationale.
+2. Wait for one of:
+   - `confirmed`
+   - `actually: <type>`
+   - `unclear: <reason>`
+3. Only then continue into deeper questioning.
 
-    "Explore project context" -> "Ask clarifying questions";
-    "Ask clarifying questions" -> "Propose 2-3 approaches";
-    "Propose 2-3 approaches" -> "Present design sections";
-    "Present design sections" -> "User approves design?";
-    "User approves design?" -> "Present design sections" [label="no, revise"];
-    "User approves design?" -> "Write design doc" [label="yes"];
-}
+## Gate Pattern
+
+Intent, Scope, and Vision all use the same loop.
+
+1. Ask one grounded question at a time until the checklist is satisfied.
+2. Fire the gate with:
+
+```markdown
+## <Gate> Gate
+
+**Confirmed:**
+- ...
+
+**Still unclear:**
+- ...
+
+**Reply:** `confirmed` / `fix: <what>` / `reopen: <bullet>`
 ```
 
-**The terminal state is the approved spec.** Do NOT invoke any implementation skill or write any code during brainstorming.
+3. After confirmation, run the adversarial pass:
 
-## Handoff Options
+```markdown
+## Adversarial Check — <Gate>
 
-After the spec is written, present these options to the user:
-1. `/adversarial-review` — Optional review of the spec for gaps, security issues, constraint violations
-2. `/writing-plans` — Convert the approved spec into a phased implementation plan
-3. Both — Run adversarial review first, address findings, then write plan
+1. ...
+2. ...
 
-## References
+**Reply:** `no concerns` / `fix: <what>` / `reopen: <bullet>`
+```
 
-- `references/question-patterns.md` — Multiple choice templates for scope, priority, constraint, trade-off questions
-- `references/design-sections.md` — Android/Kotlin section templates
+4. Only advance when the adversarial pass is clean.
 
-## Key Principles
+## Snap-Back Rule
 
-- **One question at a time** — Don't overwhelm with multiple questions
-- **Multiple choice preferred** — Easier to answer than open-ended when possible
-- **YAGNI ruthlessly** — Remove unnecessary features from all designs
-- **Explore alternatives** — Always propose 2-3 approaches before settling
-- **Incremental validation** — Present design, get approval before moving on
-- **Be flexible** — Go back and clarify when something doesn't make sense
+If a later answer reopens an earlier gate:
+
+1. announce the snap-back in its own message
+2. restate what changed
+3. reopen the affected gate
+4. rerun its adversarial pass
+5. then resume forward progression
+
+Snap-backs are never silent.
+
+## Options Phase
+
+After Intent, Scope, and Vision are locked:
+
+- present 2 to 3 options
+- lead with a recommendation
+- keep each option to a short name, one-line rationale, pros, and cons
+
+Use the option families from `references/work-types.md`.
+
+## Draft And Review
+
+1. Write the spec with `references/spec-output.md`.
+2. Copy locked gate content directly into Intent, Scope, and Vision.
+3. Run the self-review checks from `references/spec-output.md`.
+4. Present self-review findings with these verbs:
+   - `approve: ...`
+   - `reject: ...`
+   - `skip: ...`
+   - `edit <n>: <text>`
+   - `add: <finding>`
+5. Apply approved edits.
+6. Present the saved path for fresh-eye review.
+7. User review verbs are:
+   - `approved`
+   - `fix: <what>`
+   - `reopen: <gate>`
+
+## Terminal State
+
+On approval, end with exactly:
+
+> Spec approved and saved at `.claude/specs/YYYY-MM-DD-<slug>-spec.md`. Next step: run `/tailor` to map the codebase against this spec before `/writing-plans`.
+
+## Iron Laws
+
+1. One question per message.
+2. Multiple choice preferred.
+3. No fishing questions.
+4. Gates fire from checklist completeness, not question count.
+5. Snap-backs are always announced.
+6. This skill writes the spec but never commits it.
