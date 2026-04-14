@@ -81,7 +81,8 @@ static const char* capsFormatName(uint32_t format) {
 static void checkGlError(int line) {
     GLenum error;
     char *desc = NULL;
-    for (error = glGetError(); error; error = glGetError()) {
+    int errorCount = 0;
+    while ((error = glGetError()) != GL_NO_ERROR) {
         switch (error) {
 #define E(code) case code: desc = (char*)#code; break
             E(GL_INVALID_ENUM);
@@ -93,11 +94,12 @@ static void checkGlError(int line) {
             E(GL_INVALID_FRAMEBUFFER_OPERATION);
             E(GL_CONTEXT_LOST_KHR);
             default:
-                continue;
+                desc = "UNKNOWN";
+                break;
 #undef E
         }
-        log("Xlorie: GLES %d ERROR: %s.\n", line, desc);
-        return;
+        loge("Xlorie: GLES %d ERROR[%d]: %s (0x%04X).\n", line, errorCount, desc, error);
+        errorCount++;
     }
 }
 
@@ -196,7 +198,7 @@ static void rendererLogPerfSample(uint64_t frameStartNs, uint64_t lockNs, uint64
         rendererPerfStats.maxInterFrameNs = max(rendererPerfStats.maxInterFrameNs, interFrameNs);
     }
 
-    if ((frameStartNs - rendererPerfStats.windowStartNs) < 5000000000ULL)
+    if ((frameStartNs - rendererPerfStats.windowStartNs) < 1000000000ULL)
         return;
 
     double frameCount = (double) rendererPerfStats.frameCount;
@@ -323,11 +325,15 @@ int rendererInitThread(JavaVM *vm) {
 
     g_texture_program = createProgram(vertexShaderSrc, fragmentShaderSrc);
     if (!g_texture_program)
-        log("Xlorie: GLESv2: Unable to create shader program.\n");
+        loge("Xlorie: GLESv2: Unable to create shader program.\n");
+    else
+        log("rendererInit: shader program created id=%u", g_texture_program);
 
     g_texture_program_bgra = createProgram(vertexShaderSrc, fragmentShaderBgraSrc);
     if (!g_texture_program_bgra)
-        log("Xlorie: GLESv2: Unable to create bgra shader program.\n");
+        loge("Xlorie: GLESv2: Unable to create bgra shader program.\n");
+    else
+        log("rendererInit: bgra shader program created id=%u", g_texture_program_bgra);
 
     gv_pos = (GLuint) glGetAttribLocation(g_texture_program, "position");
     gv_coords = (GLuint) glGetAttribLocation(g_texture_program, "texCoords");
@@ -337,6 +343,11 @@ int rendererInitThread(JavaVM *vm) {
 
     glActiveTexture(GL_TEXTURE0);
     glGenTextures(1, &cursor.id);
+
+    log("rendererInit: display=%p context=%p shaders=%d/%d programs=%u/%u cursor=%u",
+        egl_display, ctx,
+        g_texture_program ? 1 : 0, g_texture_program_bgra ? 1 : 0,
+        g_texture_program, g_texture_program_bgra, cursor.id);
 
     rendererThread();
     return 1;
@@ -834,21 +845,29 @@ __noreturn static void* rendererThread(void) {
 
 static GLuint loadShader(GLenum shaderType, const char* pSource) {
     GLint compiled = 0, infoLen = 0;
+    const char* typeName = (shaderType == GL_VERTEX_SHADER) ? "VERTEX" : "FRAGMENT";
     GLuint shader = glCreateShader(shaderType);
-    if (!shader)
+    if (!shader) {
+        loge("loadShader: glCreateShader(%s) returned 0", typeName);
         return 0;
+    }
 
     glShaderSource(shader, 1, &pSource, NULL);
     glCompileShader(shader);
     glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
-    if (compiled)
+    __android_log_print(ANDROID_LOG_DEBUG, "LorieNative", "shader: type=%s status=%d", typeName, compiled);
+    if (compiled) {
+        log("loadShader: %s shader compiled id=%u status=OK", typeName, shader);
         return shader;
+    }
 
     glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLen);
     if (infoLen) {
         char buf[infoLen];
         glGetShaderInfoLog(shader, infoLen, NULL, buf);
-        log("renderer: Could not compile shader %d:\n%s\n", shaderType, buf);
+        loge("loadShader: %s shader compile FAILED id=%u log='%s'", typeName, shader, buf);
+    } else {
+        loge("loadShader: %s shader compile FAILED id=%u (no log)", typeName, shader);
     }
     glDeleteShader(shader);
 

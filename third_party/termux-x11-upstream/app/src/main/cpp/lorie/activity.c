@@ -26,6 +26,9 @@
 extern volatile int conn_fd; // The only variable from shared with X server code.
 extern char* __progname;
 
+static volatile int32_t buffer_alloc_count = 0;
+static volatile int32_t buffer_free_count = 0;
+
 static struct {
     jclass self;
     jmethodID getInstance, clientConnectedStateChanged, resetIme;
@@ -114,9 +117,11 @@ static jboolean requestConnection(__unused JNIEnv *env, __unused jclass clazz) {
     // We do not want to block GUI thread for a long time so we will set timeout to 20 msec.
     struct sockaddr_in server = { .sin_family = AF_INET, .sin_port = htons(PORT), .sin_addr.s_addr = inet_addr("127.0.0.1") };
     int so_error, sock = socket(AF_INET, SOCK_STREAM, 0);
+    log(DEBUG, "requestConnection: socket created fd=%d (errno=%s)", sock, sock < 0 ? strerror(errno) : "ok");
     check(sock < 0, "Could not create socket: %s", strerror(errno));
     check(fcntl(sock, F_SETFL, O_NONBLOCK) < 0, "failed to set socket non-block: %s", strerror(errno));
     int r = connect(sock, (struct sockaddr *)&server, sizeof(server));
+    log(DEBUG, "requestConnection: connect attempt fd=%d result=%d errno=%s", sock, r, r < 0 ? strerror(errno) : "ok");
     check(r < 0 && errno != EINPROGRESS, "failed to connect socket: %s", strerror(errno));
     if (r < 0 && errno == EINPROGRESS) {
         // Connection is in progress; use poll to wait for it
@@ -127,17 +132,25 @@ static jboolean requestConnection(__unused JNIEnv *env, __unused jclass clazz) {
         check(r < 0, "poll failed: %s", strerror(errno));
         socklen_t len = sizeof(so_error);
         check(getsockopt(sock, SOL_SOCKET, SO_ERROR, &so_error, &len) < 0, "getsockopt failed: %s", strerror(errno));
-        if (so_error == ECONNREFUSED) goto end; // Regular situation which happens often if server is not started. No need to spam logcat with this.
+        if (so_error == ECONNREFUSED) {
+            log(DEBUG, "requestConnection: connection refused fd=%d — X11 server not yet listening", sock);
+            goto end;
+        }
         check(so_error != 0, "Connection failed: %s", strerror(so_error));
 
         check(write(sock, MAGIC, sizeof(MAGIC)) < 0, "failed to send message: %s", strerror(errno));
         sent = JNI_TRUE;
+        log(DEBUG, "requestConnection: connected fd=%d MAGIC sent", sock);
         goto end;
     }
 
     check(1, "something went wrong: %s, %s", strerror(errno), strerror(r));
 
-    end: if (sock >= 0) close(sock);
+    end:
+    if (sock >= 0) {
+        log(DEBUG, "requestConnection: closing socket fd=%d sent=%d", sock, sent);
+        close(sock);
+    }
     return sent;
 #undef errorReturn
 }
@@ -147,22 +160,27 @@ static void nativeInit(JNIEnv *env, jobject thiz) {
     JavaVM* vm;
     logRuntimeIdentity("activity.nativeInit", (void *) &nativeInit);
     if (!Charset.self) {
+        log(INFO, "nativeInit: initializing JNI class/method lookups");
         // Init clipboard-related JNI stuff
         Charset.self = FindClassOrDie(env, "java/nio/charset/Charset");
         Charset.forName = FindMethodOrDie(env, Charset.self, "forName", "(Ljava/lang/String;)Ljava/nio/charset/Charset;", JNI_TRUE);
         Charset.decode = FindMethodOrDie(env, Charset.self, "decode", "(Ljava/nio/ByteBuffer;)Ljava/nio/CharBuffer;", JNI_FALSE);
+        log(DEBUG, "nativeInit: Charset class+methods OK");
 
         CharBuffer.self = FindClassOrDie(env,  "java/nio/CharBuffer");
         CharBuffer.toString = FindMethodOrDie(env, CharBuffer.self, "toString", "()Ljava/lang/String;", JNI_FALSE);
+        log(DEBUG, "nativeInit: CharBuffer class+methods OK");
 
         MainActivity.self = FindClassOrDie(env,  "com/termux/x11/MainActivity");
         MainActivity.getInstance = FindMethodOrDie(env, MainActivity.self, "getInstance", "()Lcom/termux/x11/MainActivity;", JNI_TRUE);
         MainActivity.clientConnectedStateChanged = FindMethodOrDie(env, MainActivity.self, "clientConnectedStateChanged", "()V", JNI_FALSE);
         MainActivity.resetIme = FindMethodOrDie(env, (*env)->GetObjectClass(env, thiz), "resetIme", "()V", JNI_FALSE);
+        log(INFO, "nativeInit: all 16 JNI methods registered successfully");
     }
 
     (*env)->GetJavaVM(env, &vm);
-    (*vm)->AttachCurrentThread(vm, &guienv, NULL);
+    int attachResult = (*vm)->AttachCurrentThread(vm, &guienv, NULL);
+    log(INFO, "nativeInit: AttachCurrentThread result=%d env=%p", attachResult, guienv);
     globalThiz = (*guienv)->NewGlobalRef(env, thiz);
     connect_(NULL, NULL, -1);
 }
@@ -172,16 +190,26 @@ static int xcallback(int fd, int events, __unused void* data) {
     jobject thiz = globalThiz;
 
     if (events & (ALOOPER_EVENT_ERROR | ALOOPER_EVENT_HANGUP)) {
+        log(WARN, "xcallback: fd=%d events=0x%x ERROR=%d HANGUP=%d — X11 connection dead",
+            fd, events,
+            (events & ALOOPER_EVENT_ERROR) ? 1 : 0,
+            (events & ALOOPER_EVENT_HANGUP) ? 1 : 0);
+        log(WARN, "xcallback: X11 connection lost — server may have died (outstanding buffers=%d)", buffer_alloc_count - buffer_free_count);
         jobject instance = (*env)->CallStaticObjectMethod(env, MainActivity.self, MainActivity.getInstance);
-        if (instance)
+        if (instance) {
             (*env)->CallVoidMethod(env, instance, MainActivity.clientConnectedStateChanged);
+            if ((*env)->ExceptionCheck(env)) {
+                log(ERROR, "xcallback: JNI exception after clientConnectedStateChanged");
+                (*env)->ExceptionClear(env);
+            }
+        }
 
         ALooper_removeFd(ALooper_forThread(), fd);
         close(conn_fd);
         conn_fd = -1;
         rendererSetSharedState(NULL);
         rendererRemoveAllBuffers();
-        log(DEBUG, "disconnected");
+        log(DEBUG, "disconnected fd=%d", fd);
         return 1;
     }
 
@@ -200,9 +228,16 @@ static int xcallback(int fd, int events, __unused void* data) {
                     clipboard[e.clipboardSend.count] = 0;
                     log(DEBUG, "Clipboard content (%zu symbols) is %s", strlen(clipboard), clipboard);
                     jmethodID id = (*env)->GetMethodID(env, (*env)->GetObjectClass(env, thiz), "setClipboardText","(Ljava/lang/String;)V");
+                    log(DEBUG, "clipboard: NewDirectByteBuffer size=%zu", strlen(clipboard));
                     jobject bb = (*env)->NewDirectByteBuffer(env, clipboard, strlen(clipboard));
+                    if (!bb) {
+                        log(ERROR, "clipboard: NewDirectByteBuffer returned NULL for size=%zu", strlen(clipboard));
+                        break;
+                    }
+                    log(DEBUG, "clipboard: decoding UTF-8 charset");
                     jobject charset = (*env)->CallStaticObjectMethod(env, Charset.self, Charset.forName, (*env)->NewStringUTF(env, "UTF-8"));
                     jobject cb = (*env)->CallObjectMethod(env, charset, Charset.decode, bb);
+                    log(DEBUG, "clipboard: charset decode complete bb=%p cb=%p", bb, cb);
                     (*env)->DeleteLocalRef(env, bb);
 
                     jstring str = (*env)->CallObjectMethod(env, cb, CharBuffer.toString);
@@ -210,20 +245,24 @@ static int xcallback(int fd, int events, __unused void* data) {
                     break;
                 }
                 case EVENT_CLIPBOARD_REQUEST: {
+                    log(DEBUG, "xcallback: EVENT_CLIPBOARD_REQUEST");
                     (*env)->CallVoidMethod(env, thiz, (*env)->GetMethodID(env, (*env)->GetObjectClass(env, thiz), "requestClipboard", "()V"));
                     break;
                 }
                 case EVENT_SHARED_SERVER_STATE: {
                     struct lorie_shared_server_state* state = NULL;
                     int stateFd = ancil_recv_fd(conn_fd);
+                    log(DEBUG, "xcallback: EVENT_SHARED_SERVER_STATE stateFd=%d", stateFd);
 
                     if (stateFd < 0)
                         break;
 
                     state = mmap(NULL, sizeof(*state), PROT_READ|PROT_WRITE, MAP_SHARED, stateFd, 0);
                     if (!state || state == MAP_FAILED) {
-                        log(ERROR, "Failed to map server state: %s", strerror(errno));
+                        log(ERROR, "Failed to map server state: %s (fd=%d size=%zu)", strerror(errno), stateFd, sizeof(*state));
                         state = NULL;
+                    } else {
+                        log(DEBUG, "xcallback: mmap success addr=%p size=%zu fd=%d", state, sizeof(*state), stateFd);
                     }
 
                     rendererSetSharedState(state);
@@ -235,17 +274,31 @@ static int xcallback(int fd, int events, __unused void* data) {
                     static LorieBuffer* buffer = NULL;
                     const LorieBuffer_Desc* desc;
                     LorieBuffer_recvHandleFromUnixSocket(conn_fd, &buffer);
+                    if (!buffer) {
+                        log(ERROR, "xcallback: EVENT_ADD_BUFFER: LorieBuffer_recvHandleFromUnixSocket returned NULL");
+                        break;
+                    }
                     desc = LorieBuffer_description(buffer);
                     log(INFO, "Received shared buffer width %d stride %d height %d format %d type %d id %llu", desc->width, desc->stride, desc->height, desc->format, desc->type, desc->id);
+                    buffer_alloc_count++;
+                    log(DEBUG, "buffer: alloc count=%d (free=%d outstanding=%d)", buffer_alloc_count, buffer_free_count, buffer_alloc_count - buffer_free_count);
                     rendererAddBuffer(buffer);
                     break;
                 }
                 case EVENT_REMOVE_BUFFER: {
+                    log(DEBUG, "xcallback: EVENT_REMOVE_BUFFER id=%llu", e.removeBuffer.id);
+                    buffer_free_count++;
+                    log(DEBUG, "buffer: free count=%d (alloc=%d outstanding=%d)", buffer_free_count, buffer_alloc_count, buffer_alloc_count - buffer_free_count);
                     rendererRemoveBuffer(e.removeBuffer.id);
                     break;
                 }
                 case EVENT_WINDOW_FOCUS_CHANGED: {
+                    log(DEBUG, "xcallback: EVENT_WINDOW_FOCUS_CHANGED");
                     (*env)->CallVoidMethod(env, thiz, MainActivity.resetIme);
+                    if ((*env)->ExceptionCheck(env)) {
+                        log(ERROR, "xcallback: JNI exception after resetIme");
+                        (*env)->ExceptionClear(env);
+                    }
                 }
             }
         }
@@ -259,17 +312,19 @@ static int xcallback(int fd, int events, __unused void* data) {
 }
 
 static void connect_(__unused JNIEnv* env, __unused jobject cls, jint fd) {
+    int old_fd = conn_fd;
     if (conn_fd != -1) {
         ALooper_removeFd(ALooper_forThread(), conn_fd);
-        close(conn_fd);
+        int closeResult = close(conn_fd);
+        log(DEBUG, "connect_: closing old fd=%d close_result=%d", old_fd, closeResult);
         rendererSetSharedState(NULL);
         rendererRemoveAllBuffers();
-        log(DEBUG, "disconnected");
+        log(DEBUG, "disconnected old_fd=%d", old_fd);
     }
 
     if ((conn_fd = fd) != -1) {
         ALooper_addFd(ALooper_forThread(), fd, 0, ALOOPER_EVENT_INPUT | ALOOPER_EVENT_ERROR | ALOOPER_EVENT_HANGUP, xcallback, NULL);
-        log(DEBUG, "XCB connection is successfull");
+        log(DEBUG, "connect_: new fd=%d added to ALooper (old_fd=%d)", fd, old_fd);
     }
 }
 
@@ -278,11 +333,12 @@ static jboolean connected(__unused JNIEnv* env,__unused jclass clazz) {
 }
 
 static void startLogcat(JNIEnv *env, __unused jobject cls, jint fd) {
-    log(DEBUG, "Starting logcat with output to given fd");
+    log(INFO, "startLogcat: fd=%d pid=%d", fd, getpid());
 
-    switch(fork()) {
+    pid_t pid = fork();
+    switch(pid) {
         case -1:
-            log(ERROR, "fork: %s", strerror(errno));
+            log(ERROR, "startLogcat: fork failed: %s", strerror(errno));
             return;
         case 0:
             dup2(fd, 1);
@@ -290,9 +346,12 @@ static void startLogcat(JNIEnv *env, __unused jobject cls, jint fd) {
             prctl(PR_SET_PDEATHSIG, SIGTERM);
             char buf[64] = {0};
             sprintf(buf, "--pid=%d", getppid());
+            log(INFO, "startLogcat: child exec /system/bin/logcat logcat %s", buf);
             execl("/system/bin/logcat", "logcat", buf, NULL);
-            log(ERROR, "exec logcat: %s", strerror(errno));
+            log(ERROR, "startLogcat: exec logcat failed: %s", strerror(errno));
             (*env)->FatalError(env, "Exiting");
+        default:
+            log(INFO, "startLogcat: forked child pid=%d for logcat", pid);
     }
 }
 
