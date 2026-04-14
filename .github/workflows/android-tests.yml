@@ -1,0 +1,49 @@
+name: Android Tests
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'runelite-tablet/**'
+      - '.github/workflows/android-tests.yml'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - 'runelite-tablet/**'
+      - '.github/workflows/android-tests.yml'
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Run unit tests
+        working-directory: runelite-tablet
+        run: ./gradlew test --no-daemon
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: runelite-tablet/app/build/reports/tests/
+          retention-days: 14
