@@ -57,6 +57,7 @@ class RuneLiteSessionService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        AppLog.state("RuneLiteSessionService.onStartCommand: action=${intent?.action} startId=$startId")
         when (intent?.action) {
             ACTION_START_SESSION -> handleStartSession()
             ACTION_STOP_SESSION -> handleStopSession()
@@ -76,7 +77,9 @@ class RuneLiteSessionService : Service() {
     }
 
     private fun handleStartSession() {
-        if (_sessionState.value is SessionState.Running || _sessionState.value is SessionState.Starting) return
+        val oldState = _sessionState.value
+        if (oldState is SessionState.Running || oldState is SessionState.Starting) return
+        AppLog.state("RuneLiteSessionService: $oldState -> Starting")
         _sessionState.value = SessionState.Starting
         val startTime = System.currentTimeMillis()
         _sessionStartTime.value = startTime
@@ -86,6 +89,7 @@ class RuneLiteSessionService : Service() {
     }
 
     private fun handleStopSession() {
+        AppLog.state("RuneLiteSessionService: ${_sessionState.value} -> Stopped")
         _sessionState.value = SessionState.Stopped; healthMonitor.stopPolling()
         serviceScope.launch {
             try {
@@ -120,6 +124,7 @@ class RuneLiteSessionService : Service() {
     }
 
     private fun handleHealthStateChange(state: SessionState) {
+        AppLog.state("RuneLiteSessionService.handleHealthStateChange: ${_sessionState.value} -> $state")
         when (state) {
             is SessionState.Running -> {
                 _sessionState.value = SessionState.Running

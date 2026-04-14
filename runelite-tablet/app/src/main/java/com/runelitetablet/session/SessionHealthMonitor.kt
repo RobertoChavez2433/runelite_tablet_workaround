@@ -76,19 +76,39 @@ class SessionHealthMonitor(
             val result = commandRunner.execute(
                 commandPath = "${CommandRunner.TERMUX_BIN_PATH}/bash",
                 arguments = arrayOf("-c", """
+                    SESSION_ALIVE="no"
+                    VIRGL_STATUS="n/a"
                     if [ -f "${'$'}PREFIX/tmp/.rlt-session-alive" ]; then
-                        echo "RUNNING"
-                    else
-                        echo "STOPPED"
+                        SESSION_ALIVE="yes"
                     fi
+                    # Check VirGL process health if PID file exists
+                    ACTIVE_SESSION_DIR="${'$'}HOME/.rlt-session"
+                    if [ -f "${'$'}ACTIVE_SESSION_DIR/virgl.pid" ]; then
+                        VPID=${'$'}(cat "${'$'}ACTIVE_SESSION_DIR/virgl.pid" 2>/dev/null)
+                        if [ -n "${'$'}VPID" ] && kill -0 "${'$'}VPID" 2>/dev/null; then
+                            VIRGL_STATUS="alive:pid=${'$'}VPID"
+                        elif [ -f "${'$'}ACTIVE_SESSION_DIR/virgl.status" ]; then
+                            VIRGL_STATUS="dead:${'$'}(cat "${'$'}ACTIVE_SESSION_DIR/virgl.status" 2>/dev/null)"
+                        else
+                            VIRGL_STATUS="dead:pid=${'$'}VPID"
+                        fi
+                    fi
+                    echo "session=${'$'}SESSION_ALIVE virgl=${'$'}VIRGL_STATUS"
                 """.trimIndent()),
                 background = true,
                 timeoutMs = HEALTH_CHECK_TIMEOUT_MS
             )
-            when (result.stdout?.trim()) {
-                "RUNNING" -> SessionState.Running
-                "STOPPED" -> SessionState.Stopped
-                else -> SessionState.Error("Health check: unexpected output")
+            val output = result.stdout?.trim() ?: ""
+            val sessionAlive = output.contains("session=yes")
+            val virglDead = output.contains("virgl=dead")
+            if (virglDead) {
+                val virglInfo = output.substringAfter("virgl=", "unknown")
+                AppLog.w("SESSION", "checkHealth: VirGL server died ($virglInfo) — GPU rendering degraded")
+            }
+            when {
+                sessionAlive -> SessionState.Running
+                !sessionAlive && output.contains("session=no") -> SessionState.Stopped
+                else -> SessionState.Error("Health check: unexpected output: $output")
             }
         } catch (e: TimeoutCancellationException) {
             AppLog.w("SESSION", "checkHealth: timeout after ${HEALTH_CHECK_TIMEOUT_MS}ms")

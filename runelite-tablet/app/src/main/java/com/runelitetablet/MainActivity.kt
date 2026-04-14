@@ -40,7 +40,7 @@ class MainActivity : ComponentActivity() {
             "MainActivity.onCreate: savedInstanceState=$savedState " +
                 "PID=${android.os.Process.myPid()} thread=${Thread.currentThread().name}"
         )
-        AppLog.perf("onCreate: ${AppLog.perfSnapshot(applicationContext)}")
+        AppLog.perf("onCreate: ${com.runelitetablet.logging.PerfSnapshots.perfSnapshot(applicationContext)}")
 
         setContent {
             RuneLiteTabletTheme {
@@ -63,7 +63,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         AppLog.lifecycle("MainActivity.onResume: bindActions + recheckPermissions + checkSession triggered")
-        AppLog.perf("onResume: ${AppLog.perfSnapshot(applicationContext)}")
+        AppLog.perf("onResume: ${com.runelitetablet.logging.PerfSnapshots.perfSnapshot(applicationContext)}")
         viewModel.bindActions(this, authLauncher)
         viewModel.recheckPermissions()
         viewModel.checkSession()
@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         AppLog.lifecycle("MainActivity.onPause: unbindActions called")
-        AppLog.perf("onPause: ${AppLog.perfSnapshot(applicationContext)}")
+        AppLog.perf("onPause: ${com.runelitetablet.logging.PerfSnapshots.perfSnapshot(applicationContext)}")
         viewModel.unbindActions()
     }
 

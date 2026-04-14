@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import com.runelitetablet.di.AppContainer
 import com.runelitetablet.logging.AppLog
+import com.runelitetablet.logging.PerfSnapshots
 
 class RuneLiteTabletApp : Application() {
     lateinit var container: AppContainer
@@ -18,7 +19,7 @@ class RuneLiteTabletApp : Application() {
         container = AppContainer(this)
         AppLog.lifecycle(
             "RuneLiteTabletApp.onCreate: PID=${android.os.Process.myPid()} " +
-                "thread=${Thread.currentThread().name} | ${AppLog.perfSnapshot(this)}"
+                "thread=${Thread.currentThread().name} | ${PerfSnapshots.perfSnapshot(this)}"
         )
         createNotificationChannels()
         AppLog.lifecycle("RuneLiteTabletApp.onCreate complete: container created, notification channels created")

@@ -104,9 +104,9 @@ class TermuxCommandRunner(
         return try {
             val result = withTimeout(timeoutMs) { deferred.await() }
             val durationMs = System.currentTimeMillis() - startMs
-            AppLog.cmd(
-                executionId,
-                "result: exitCode=${result.exitCode} error=${result.error} " +
+            AppLog.shell(
+                "CMD",
+                "[id=$executionId] result: exitCode=${result.exitCode} error=${result.error} " +
                     "stdoutLen=${result.stdout?.length ?: 0} stderrLen=${result.stderr?.length ?: 0} " +
                     "durationMs=$durationMs"
             )

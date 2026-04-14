@@ -62,8 +62,8 @@ class ApkDownloader(
         onProgress: (bytesRead: Long, totalBytes: Long) -> Unit = { _, _ -> }
     ): File = withContext(ioDispatcher) {
         AppLog.http("download: repo=${repo.name} starting release fetch")
-        val memBefore = AppLog.memorySnapshot()
-        val diskBefore = AppLog.diskSnapshot(context)
+        val memBefore = com.runelitetablet.logging.PerfSnapshots.memorySnapshot()
+        val diskBefore = com.runelitetablet.logging.PerfSnapshots.diskSnapshot(context)
         AppLog.perf("download start: $memBefore | $diskBefore")
 
         val release = fetchRelease(repo)
@@ -172,8 +172,8 @@ class ApkDownloader(
             }
         }
 
-        val memAfter = AppLog.memorySnapshot()
-        val diskAfter = AppLog.diskSnapshot(context)
+        val memAfter = com.runelitetablet.logging.PerfSnapshots.memorySnapshot()
+        val diskAfter = com.runelitetablet.logging.PerfSnapshots.diskSnapshot(context)
         AppLog.perf("download complete: before=[$memBefore | $diskBefore] after=[$memAfter | $diskAfter]")
 
         apkFile

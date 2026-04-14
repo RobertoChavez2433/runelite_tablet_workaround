@@ -7,11 +7,13 @@ import android.content.Intent
 import com.runelitetablet.MainActivity
 import com.runelitetablet.PendingIntentCompat
 import com.runelitetablet.RuneLiteTabletApp
+import com.runelitetablet.logging.AppLog
 
 class SessionNotificationHelper(private val service: Service) {
     private var lastText: String? = null
 
     fun buildNotification(contentText: String): Notification {
+        AppLog.d("SESSION", "SessionNotificationHelper.buildNotification: text=$contentText")
         lastText = contentText
         val contentIntent = PendingIntent.getActivity(
             service, 0,
@@ -28,7 +30,7 @@ class SessionNotificationHelper(private val service: Service) {
             Intent(service, RuneLiteSessionService::class.java).apply { action = RuneLiteSessionService.ACTION_STOP_SESSION },
             PendingIntentCompat.IMMUTABLE_FLAGS
         )
-        return Notification.Builder(service, RuneLiteTabletApp.CHANNEL_SESSION)
+        val notification = Notification.Builder(service, RuneLiteTabletApp.CHANNEL_SESSION)
             .setContentTitle("RuneLite is running")
             .setContentText(contentText)
             .setSmallIcon(android.R.drawable.ic_media_play)
@@ -37,6 +39,14 @@ class SessionNotificationHelper(private val service: Service) {
             .addAction(Notification.Action.Builder(null, "Switch to Game", switchIntent).build())
             .addAction(Notification.Action.Builder(null, "Stop Game", stopIntent).build())
             .build()
+        AppLog.d("SESSION", "SessionNotificationHelper: built notification title='RuneLite is running' actions=2 channel=${RuneLiteTabletApp.CHANNEL_SESSION}")
+        return notification
+    }
+
+    fun promoteToForeground(contentText: String) {
+        val notification = buildNotification(contentText)
+        AppLog.i("SESSION", "SessionNotificationHelper: promoting to foreground service notificationId=$NOTIFICATION_ID")
+        service.startForeground(NOTIFICATION_ID, notification)
     }
 
     fun updateIfChanged(text: String) {
