@@ -1,0 +1,17 @@
+package com.runelitetablet.di
+
+import android.content.Context
+import com.runelitetablet.domain.logging.Logger
+import com.runelitetablet.logging.AppLog
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
+
+class CoreModule(context: Context) {
+    val logger: Logger = AppLog.also { it.init(context) }
+
+    val httpClient: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.MINUTES)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .build()
+}
