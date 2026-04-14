@@ -1,21 +1,23 @@
 {
   "permissions": {
     "allow": [
-      "Bash",
+      "Bash(*)",
       "Read",
-      "Write",
       "Edit",
+      "Write",
       "Glob",
       "Grep",
+      "Agent",
+      "Skill(*)",
       "WebSearch",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "mcp__jcodemunch__search_text",
-      "mcp__jcodemunch__index_folder"
+      "WebFetch(domain:developer.android.com)",
+      "WebFetch(domain:kotlinlang.org)",
+      "WebFetch(domain:developer.mozilla.org)",
+      "mcp__jcodemunch__*",
+      "mcp__context7__*"
     ]
   },
-  "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": [
-    "jcodemunch"
-  ]
+  "enableAllProjectMcpServers": true
 }
