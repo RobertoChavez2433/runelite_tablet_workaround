@@ -5,22 +5,21 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import com.runelitetablet.PendingIntentCompat
+import com.runelitetablet.domain.command.CommandResult
+import com.runelitetablet.domain.command.CommandRunner
 import com.runelitetablet.logging.AppLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 
-data class TermuxResult(
-    val stdout: String?,
-    val stderr: String?,
-    val exitCode: Int,
-    val error: String?
-) {
-    val isSuccess: Boolean get() = exitCode == 0 && error == null
-}
+/** Alias for backward compatibility — use CommandResult for new code. */
+typealias TermuxResult = CommandResult
 
-class TermuxCommandRunner(private val context: Context) {
+class TermuxCommandRunner(
+    private val context: Context,
+    val resultRegistry: TermuxResultRegistry = TermuxResultRegistry()
+) : CommandRunner {
 
     companion object {
         private const val RUN_COMMAND_SERVICE = "com.termux.app.RunCommandService"
@@ -34,27 +33,25 @@ class TermuxCommandRunner(private val context: Context) {
         private const val EXTRA_STDIN = "com.termux.RUN_COMMAND_STDIN"
         private const val EXTRA_PENDING_INTENT = "com.termux.RUN_COMMAND_PENDING_INTENT"
 
-        const val SESSION_ACTION_SWITCH_NEW = "0"
-        const val SESSION_ACTION_SWITCH_NEW_NO_ACTIVITY = "2"
-
-        const val TIMEOUT_SETUP_MS = 20L * 60 * 1000     // 20 minutes
-        const val TIMEOUT_VERIFY_MS = 30L * 1000          // 30 seconds
-
-        const val TERMUX_BIN_PATH = "/data/data/com.termux/files/usr/bin"
-        const val TERMUX_HOME_PATH = "/data/data/com.termux/files/home"
+        const val SESSION_ACTION_SWITCH_NEW = CommandRunner.SESSION_ACTION_SWITCH_NEW
+        const val SESSION_ACTION_SWITCH_NEW_NO_ACTIVITY = CommandRunner.SESSION_ACTION_SWITCH_NEW_NO_ACTIVITY
+        const val TIMEOUT_SETUP_MS = CommandRunner.DEFAULT_TIMEOUT_MS
+        const val TIMEOUT_VERIFY_MS = CommandRunner.TIMEOUT_VERIFY_MS
+        const val TERMUX_BIN_PATH = CommandRunner.TERMUX_BIN_PATH
+        const val TERMUX_HOME_PATH = CommandRunner.TERMUX_HOME_PATH
 
         private const val MAX_ARG_LOG_LENGTH = 200
     }
 
-    suspend fun execute(
+    override suspend fun execute(
         commandPath: String,
-        arguments: Array<String>? = null,
-        workdir: String? = null,
-        background: Boolean = true,
-        stdin: String? = null,
-        timeoutMs: Long = TIMEOUT_SETUP_MS
-    ): TermuxResult {
-        val executionId = TermuxResultService.createExecutionId()
+        arguments: Array<String>?,
+        workdir: String?,
+        background: Boolean,
+        stdin: String?,
+        timeoutMs: Long
+    ): CommandResult {
+        val executionId = resultRegistry.createExecutionId()
 
         val argsLog = arguments?.joinToString(" ")
             ?.let { if (it.length > MAX_ARG_LOG_LENGTH) it.take(MAX_ARG_LOG_LENGTH) + "…" else it }
@@ -66,8 +63,8 @@ class TermuxCommandRunner(private val context: Context) {
         )
 
         val deferred = CompletableDeferred<TermuxResult>()
-        TermuxResultService.pendingResults[executionId] = deferred
-        AppLog.cmd(executionId, "awaiting result: deferred created pendingResultsSize=${TermuxResultService.pendingResults.size} timeoutMs=$timeoutMs")
+        resultRegistry.pendingResults[executionId] = deferred
+        AppLog.cmd(executionId, "awaiting result: deferred created pendingResultsSize=${resultRegistry.pendingResults.size} timeoutMs=$timeoutMs")
 
         val pendingIntent = createPendingIntent(executionId)
 
@@ -95,7 +92,7 @@ class TermuxCommandRunner(private val context: Context) {
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             AppLog.e("CMD", "execute[$executionId]: startService failed: ${e.message}", e)
-            TermuxResultService.pendingResults.remove(executionId)
+            resultRegistry.pendingResults.remove(executionId)
             return TermuxResult(
                 stdout = null,
                 stderr = null,
@@ -117,7 +114,7 @@ class TermuxCommandRunner(private val context: Context) {
         } catch (e: TimeoutCancellationException) {
             val waitedMs = System.currentTimeMillis() - startMs
             AppLog.cmd(executionId, "timeout: waitedMs=$waitedMs timeoutMs=$timeoutMs executionId=$executionId")
-            TermuxResultService.pendingResults.remove(executionId)
+            resultRegistry.pendingResults.remove(executionId)
             TermuxResult(
                 stdout = null,
                 stderr = null,
@@ -125,12 +122,12 @@ class TermuxCommandRunner(private val context: Context) {
                 error = "Command timed out after ${timeoutMs}ms"
             )
         } catch (e: CancellationException) {
-            TermuxResultService.pendingResults.remove(executionId)
+            resultRegistry.pendingResults.remove(executionId)
             throw e
         } catch (e: Exception) {
             val durationMs = System.currentTimeMillis() - startMs
             AppLog.e("CMD", "execute[$executionId]: unexpected exception after ${durationMs}ms: ${e.message}", e)
-            TermuxResultService.pendingResults.remove(executionId)
+            resultRegistry.pendingResults.remove(executionId)
             TermuxResult(
                 stdout = null,
                 stderr = null,
@@ -140,10 +137,10 @@ class TermuxCommandRunner(private val context: Context) {
         }
     }
 
-    fun launch(
+    override fun launch(
         commandPath: String,
-        arguments: Array<String>? = null,
-        sessionAction: String = SESSION_ACTION_SWITCH_NEW
+        arguments: Array<String>?,
+        sessionAction: String
     ): Boolean {
         val argsLog = arguments?.joinToString(" ")
             ?.let { if (it.length > MAX_ARG_LOG_LENGTH) it.take(MAX_ARG_LOG_LENGTH) + "…" else it }
@@ -169,9 +166,9 @@ class TermuxCommandRunner(private val context: Context) {
         }
     }
 
-    fun launchBackground(
+    override fun launchBackground(
         commandPath: String,
-        arguments: Array<String>? = null
+        arguments: Array<String>?
     ): Boolean {
         val argsLog = arguments?.joinToString(" ")
             ?.let { if (it.length > MAX_ARG_LOG_LENGTH) it.take(MAX_ARG_LOG_LENGTH) + "…" else it }

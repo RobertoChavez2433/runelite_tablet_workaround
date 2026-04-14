@@ -1,7 +1,7 @@
 package com.runelitetablet.session
 
+import com.runelitetablet.domain.command.CommandRunner
 import com.runelitetablet.logging.AppLog
-import com.runelitetablet.termux.TermuxCommandRunner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
  * transitioning from Running to Stopped, to avoid flapping on transient health check failures.
  */
 class SessionHealthMonitor(
-    private val commandRunner: TermuxCommandRunner,
+    private val commandRunner: CommandRunner,
     private val scope: CoroutineScope
 ) {
     companion object {
@@ -74,7 +74,7 @@ class SessionHealthMonitor(
     suspend fun checkHealth(): SessionState {
         return try {
             val result = commandRunner.execute(
-                commandPath = "${TermuxCommandRunner.TERMUX_BIN_PATH}/bash",
+                commandPath = "${CommandRunner.TERMUX_BIN_PATH}/bash",
                 arguments = arrayOf("-c", """
                     if [ -f "${'$'}PREFIX/tmp/.rlt-session-alive" ]; then
                         echo "RUNNING"

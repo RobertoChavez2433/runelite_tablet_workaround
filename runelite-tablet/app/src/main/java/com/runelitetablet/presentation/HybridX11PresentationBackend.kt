@@ -2,8 +2,8 @@ package com.runelitetablet.presentation
 
 import android.content.Context
 import android.content.Intent
+import com.runelitetablet.domain.installer.PackageChecker
 import com.runelitetablet.presentation.hybrid.HybridX11HostActivity
-import com.runelitetablet.termux.TermuxPackageHelper
 import com.runelitetablet.ui.DisplayPreferences
 
 /**
@@ -14,8 +14,8 @@ object HybridX11PresentationBackend : PresentationBackend {
     override val id: String = "hybrid_x11"
     override val displayName: String = "Hybrid X11"
 
-    override fun isInstalled(termuxHelper: TermuxPackageHelper): Boolean =
-        termuxHelper.isTermuxX11Installed()
+    override fun isInstalled(packageChecker: PackageChecker): Boolean =
+        packageChecker.isTermuxX11Installed()
 
     override fun applyLaunchPreferences(context: Context, displayPreferences: DisplayPreferences) {
         TermuxX11PresentationBackend.applyLaunchPreferences(context, displayPreferences)

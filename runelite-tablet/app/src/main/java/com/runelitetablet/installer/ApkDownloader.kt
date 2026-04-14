@@ -4,6 +4,7 @@ import android.content.Context
 import com.runelitetablet.BuildConfig
 import com.runelitetablet.logging.AppLog
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
@@ -51,14 +52,15 @@ enum class GitHubRepo(
 
 class ApkDownloader(
     private val context: Context,
-    private val httpClient: OkHttpClient
+    private val httpClient: OkHttpClient,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
     suspend fun download(
         repo: GitHubRepo,
         onProgress: (bytesRead: Long, totalBytes: Long) -> Unit = { _, _ -> }
-    ): File = withContext(Dispatchers.IO) {
+    ): File = withContext(ioDispatcher) {
         AppLog.http("download: repo=${repo.name} starting release fetch")
         val memBefore = AppLog.memorySnapshot()
         val diskBefore = AppLog.diskSnapshot(context)
@@ -177,7 +179,7 @@ class ApkDownloader(
         apkFile
     }
 
-    private suspend fun fetchRelease(repo: GitHubRepo): GitHubRelease = withContext(Dispatchers.IO) {
+    private suspend fun fetchRelease(repo: GitHubRepo): GitHubRelease = withContext(ioDispatcher) {
         val url = if (repo.releaseTag != null) {
             "https://api.github.com/repos/${repo.owner}/${repo.repo}/releases/tags/${repo.releaseTag}"
         } else {

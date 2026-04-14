@@ -1,15 +1,20 @@
 package com.runelitetablet.cleanup
 
 import android.content.Context
+import com.runelitetablet.domain.setup.Cleaner
 import com.runelitetablet.logging.AppLog
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
-class CleanupManager(private val context: Context) {
+class CleanupManager(
+    private val context: Context,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+) : Cleaner {
 
-    suspend fun cleanup() = withContext(Dispatchers.IO) {
+    override suspend fun cleanup() = withContext(ioDispatcher) {
         val startMs = System.currentTimeMillis()
         AppLog.cleanup("Starting pre-setup cleanup")
 

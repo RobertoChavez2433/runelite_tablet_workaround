@@ -2,7 +2,7 @@ package com.runelitetablet.presentation
 
 import android.content.Context
 import android.content.Intent
-import com.runelitetablet.termux.TermuxPackageHelper
+import com.runelitetablet.domain.installer.PackageChecker
 import com.runelitetablet.ui.DisplayPreferences
 
 /**
@@ -15,7 +15,7 @@ interface PresentationBackend {
     val id: String
     val displayName: String
 
-    fun isInstalled(termuxHelper: TermuxPackageHelper): Boolean
+    fun isInstalled(packageChecker: PackageChecker): Boolean
 
     fun applyLaunchPreferences(context: Context, displayPreferences: DisplayPreferences)
 

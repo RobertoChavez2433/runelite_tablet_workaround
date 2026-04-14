@@ -8,6 +8,7 @@ import com.runelitetablet.PendingIntentCompat
 import com.runelitetablet.logging.AppLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
@@ -21,16 +22,12 @@ sealed class InstallResult {
     data class Failure(val message: String) : InstallResult()
 }
 
-class ApkInstaller(private val context: Context) {
-
-    companion object {
-        /**
-         * Callback invoked when PackageInstaller requires user confirmation (STATUS_PENDING_USER_ACTION).
-         * Routes the confirmation dialog through an Activity context (required on Android 10+).
-         * Set by SetupOrchestrator when actions are bound; null when unbound.
-         */
-        @Volatile var onNeedsUserAction: ((Intent) -> Unit)? = null
-    }
+class ApkInstaller(
+    private val context: Context,
+    val installRegistry: InstallResultRegistry = InstallResultRegistry(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+) {
+    @Volatile var onNeedsUserAction: ((Intent) -> Unit)? = null
 
     fun canInstallPackages(): Boolean {
         val result = context.packageManager.canRequestPackageInstalls()
@@ -92,10 +89,10 @@ class ApkInstaller(private val context: Context) {
             )
             val session = packageInstaller.openSession(sessionId)
 
-            InstallResultReceiver.pendingResults[sessionId] = deferred
+            installRegistry.pendingResults[sessionId] = deferred
 
             val writeStartMs = System.currentTimeMillis()
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 session.use { s ->
                     s.openWrite("apk", 0, apkFile.length()).use { outputStream ->
                         apkFile.inputStream().use { input ->
@@ -128,22 +125,22 @@ class ApkInstaller(private val context: Context) {
                 }
             } catch (e: TimeoutCancellationException) {
                 AppLog.install("install: timeout waitedMs=120000 sessionId=$sessionId")
-                InstallResultReceiver.pendingResults.remove(sessionId)
+                installRegistry.pendingResults.remove(sessionId)
                 if (sessionId != -1) try { context.packageManager.packageInstaller.abandonSession(sessionId) } catch (_: Exception) {}
                 InstallResult.Failure("Installation timed out after 2 minutes")
             }
         } catch (e: CancellationException) {
-            InstallResultReceiver.pendingResults.remove(sessionId)
+            installRegistry.pendingResults.remove(sessionId)
             if (sessionId != -1) try { context.packageManager.packageInstaller.abandonSession(sessionId) } catch (_: Exception) {}
             throw e
         } catch (e: IOException) {
             AppLog.e("INSTALL", "install: IOException sessionId=$sessionId message=${e.message}", e)
-            InstallResultReceiver.pendingResults.remove(sessionId)
+            installRegistry.pendingResults.remove(sessionId)
             if (sessionId != -1) try { context.packageManager.packageInstaller.abandonSession(sessionId) } catch (_: Exception) {}
             return InstallResult.Failure("Install failed: ${e.message}")
         } catch (e: SecurityException) {
             AppLog.e("INSTALL", "install: SecurityException sessionId=$sessionId message=${e.message}", e)
-            InstallResultReceiver.pendingResults.remove(sessionId)
+            installRegistry.pendingResults.remove(sessionId)
             if (sessionId != -1) try { context.packageManager.packageInstaller.abandonSession(sessionId) } catch (_: Exception) {}
             return InstallResult.Failure("Install permission denied: ${e.message}")
         }

@@ -10,12 +10,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import com.runelitetablet.logging.AppLog
 import com.runelitetablet.setup.SetupViewModel
+import com.runelitetablet.setup.SetupViewModelFactory
 import com.runelitetablet.ui.screens.SetupScreen
 import com.runelitetablet.ui.theme.RuneLiteTabletTheme
 
 class MainActivity : ComponentActivity() {
     private val viewModel: SetupViewModel by viewModels {
-        SetupViewModel.Factory(this, (application as RuneLiteTabletApp).httpClient)
+        SetupViewModelFactory(this)
     }
 
     /**

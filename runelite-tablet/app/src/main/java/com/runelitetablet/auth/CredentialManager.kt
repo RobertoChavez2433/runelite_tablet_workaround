@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.runelitetablet.domain.auth.CredentialStore
+import com.runelitetablet.domain.auth.Credentials
 import com.runelitetablet.logging.AppLog
 import java.security.GeneralSecurityException
 
@@ -17,7 +19,7 @@ import java.security.GeneralSecurityException
  * on first access, not at construction. This survives Keystore unavailability
  * (e.g., device locked after reboot).
  */
-class CredentialManager(private val context: Context) {
+class CredentialManager(private val context: Context) : CredentialStore {
 
     companion object {
         private const val PREFS_NAME = "jagex_credentials"
@@ -104,7 +106,7 @@ class CredentialManager(private val context: Context) {
         }
     }
 
-    fun hasCredentials(): Boolean {
+    override fun hasCredentials(): Boolean {
         return getPrefs()?.getString(KEY_SESSION_ID, null) != null
     }
 
@@ -119,25 +121,28 @@ class CredentialManager(private val context: Context) {
      * Store tokens from a successful OAuth2 token exchange or refresh.
      */
     fun storeTokens(response: TokenResponse) {
+        storeTokens(response.accessToken, response.refreshToken, response.accessTokenExpiry)
+    }
+
+    override fun storeTokens(accessToken: String?, refreshToken: String?, accessTokenExpiry: Long) {
         val prefs = getPrefs() ?: run {
             AppLog.e("AUTH", "storeTokens: Keystore unavailable")
             return
         }
-        // Keep access_token in memory only — never persisted to disk
-        inMemoryAccessToken = response.accessToken
+        inMemoryAccessToken = accessToken
         prefs.edit()
             .also { editor ->
-                response.refreshToken?.let { editor.putString(KEY_REFRESH_TOKEN, it) }
+                refreshToken?.let { editor.putString(KEY_REFRESH_TOKEN, it) }
             }
-            .putLong(KEY_ACCESS_TOKEN_EXPIRY, response.accessTokenExpiry)
+            .putLong(KEY_ACCESS_TOKEN_EXPIRY, accessTokenExpiry)
             .apply()
-        AppLog.step("auth", "storeTokens: tokens stored (access_token in-memory only), expiry=${response.accessTokenExpiry}")
+        AppLog.step("auth", "storeTokens: tokens stored (access_token in-memory only), expiry=$accessTokenExpiry")
     }
 
     /**
      * Store game session credentials after character selection.
      */
-    fun storeGameSession(sessionId: String, characterId: String, displayName: String) {
+    override fun storeGameSession(sessionId: String, characterId: String, displayName: String) {
         val prefs = getPrefs() ?: run {
             AppLog.e("AUTH", "storeGameSession: Keystore unavailable")
             return
@@ -153,12 +158,12 @@ class CredentialManager(private val context: Context) {
     /**
      * Get all stored credentials, or null if incomplete.
      */
-    fun getCredentials(): JagexCredentials? {
+    override fun getCredentials(): Credentials? {
         val prefs = getPrefs() ?: return null
         val sessionId = prefs.getString(KEY_SESSION_ID, null) ?: return null
         val characterId = prefs.getString(KEY_CHARACTER_ID, null) ?: return null
         val displayName = prefs.getString(KEY_DISPLAY_NAME, null) ?: return null
-        return JagexCredentials(
+        return Credentials(
             sessionId = sessionId,
             characterId = characterId,
             displayName = displayName,
@@ -170,28 +175,28 @@ class CredentialManager(private val context: Context) {
     /**
      * Get the display name of the currently authenticated user, or null.
      */
-    fun getDisplayName(): String? {
+    override fun getDisplayName(): String? {
         return getPrefs()?.getString(KEY_DISPLAY_NAME, null)
     }
 
     /**
      * Get the stored access token expiry as Unix seconds.
      */
-    fun getAccessTokenExpiry(): Long {
+    override fun getAccessTokenExpiry(): Long {
         return getPrefs()?.getLong(KEY_ACCESS_TOKEN_EXPIRY, 0L) ?: 0L
     }
 
     /**
      * Get the stored refresh token, or null.
      */
-    fun getRefreshToken(): String? {
+    override fun getRefreshToken(): String? {
         return getPrefs()?.getString(KEY_REFRESH_TOKEN, null)
     }
 
     /**
      * Clear all stored credentials. Used on sign-out or session expiry.
      */
-    fun clearCredentials() {
+    override fun clearCredentials() {
         inMemoryAccessToken = null
         _prefs?.edit()?.clear()?.apply()
         _prefs = null
@@ -199,15 +204,5 @@ class CredentialManager(private val context: Context) {
     }
 }
 
-/**
- * Holder for all Jagex credentials needed for RuneLite launch.
- */
-data class JagexCredentials(
-    val sessionId: String,
-    val characterId: String,
-    val displayName: String,
-    val accessToken: String?,
-    val refreshToken: String?
-) {
-    override fun toString(): String = "JagexCredentials(displayName=$displayName, [REDACTED])"
-}
+/** Alias for backward compatibility — use Credentials from domain for new code. */
+typealias JagexCredentials = Credentials

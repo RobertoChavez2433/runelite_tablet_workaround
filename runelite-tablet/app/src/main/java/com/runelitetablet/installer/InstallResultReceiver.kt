@@ -5,15 +5,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.os.Build
+import com.runelitetablet.RuneLiteTabletApp
 import com.runelitetablet.logging.AppLog
-import kotlinx.coroutines.CompletableDeferred
-import java.util.concurrent.ConcurrentHashMap
 
 class InstallResultReceiver : BroadcastReceiver() {
 
-    companion object {
-        val pendingResults = ConcurrentHashMap<Int, CompletableDeferred<InstallResult>>()
-    }
+    private fun registry(context: Context): InstallResultRegistry =
+        (context.applicationContext as RuneLiteTabletApp).container.installer.installResultRegistry
 
     override fun onReceive(context: Context, intent: Intent?) {
         AppLog.install("onReceive: callback at ${System.currentTimeMillis()}")
@@ -55,7 +53,7 @@ class InstallResultReceiver : BroadcastReceiver() {
             }
             if (confirmIntent != null) {
                 confirmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                val callback = ApkInstaller.onNeedsUserAction
+                val callback = (context.applicationContext as RuneLiteTabletApp).container.installer.apkInstaller.onNeedsUserAction
                 if (callback != null) {
                     AppLog.install("onReceive: STATUS_PENDING_USER_ACTION sessionId=$sessionId — routing via Activity callback, keeping deferred alive")
                     callback(confirmIntent)
@@ -65,7 +63,7 @@ class InstallResultReceiver : BroadcastReceiver() {
                         context.startActivity(confirmIntent)
                     } catch (e: Exception) {
                         AppLog.e("INSTALL", "onReceive: failed to start confirm activity sessionId=$sessionId: ${e.message}", e)
-                        pendingResults.remove(sessionId)?.complete(
+                        registry(context).pendingResults.remove(sessionId)?.complete(
                             InstallResult.Failure("Could not start install confirmation: ${e.message}")
                         )
                     }
@@ -77,17 +75,18 @@ class InstallResultReceiver : BroadcastReceiver() {
             }
         }
 
-        val deferred = pendingResults.remove(sessionId)
+        val reg = registry(context)
+        val deferred = reg.pendingResults.remove(sessionId)
         if (deferred == null) {
             AppLog.install(
                 "onReceive: deferred NOT found in pendingResults for sessionId=$sessionId " +
-                    "mapSize=${pendingResults.size}"
+                    "mapSize=${reg.pendingResults.size}"
             )
             return
         }
         AppLog.install(
             "onReceive: deferred found and removed for sessionId=$sessionId " +
-                "mapSizeAfter=${pendingResults.size}"
+                "mapSizeAfter=${reg.pendingResults.size}"
         )
 
         val result = when (status) {

@@ -31,13 +31,15 @@ data class ExternalXlorieLoadResult(
  * binder stay in place, while we experiment with moving only the visible host
  * surface into our app.
  */
-object ExternalXlorieLoader {
-    private const val APP_PACKAGE = "com.runelitetablet"
-    private const val TERMUX_X11_PACKAGE = "com.termux.x11"
-    private const val XLORIE_SO = "libXlorie.so"
-
+class ExternalXlorieLoader {
     @Volatile
     private var result: ExternalXlorieLoadResult? = null
+
+    companion object {
+        private const val APP_PACKAGE = "com.runelitetablet"
+        private const val TERMUX_X11_PACKAGE = "com.termux.x11"
+        private const val XLORIE_SO = "libXlorie.so"
+    }
 
     fun ensureLoaded(context: Context): ExternalXlorieLoadResult {
         result?.let { return it }

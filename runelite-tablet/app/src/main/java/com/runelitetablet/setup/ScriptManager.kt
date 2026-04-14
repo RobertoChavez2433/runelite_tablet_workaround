@@ -1,15 +1,18 @@
 package com.runelitetablet.setup
 
 import android.content.Context
+import com.runelitetablet.domain.setup.ScriptDeployer
 import com.runelitetablet.logging.AppLog
 import com.runelitetablet.termux.TermuxCommandRunner
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class ScriptManager(
     private val context: Context,
-    private val commandRunner: TermuxCommandRunner
-) {
+    private val commandRunner: TermuxCommandRunner,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+) : ScriptDeployer {
 
     companion object {
         private const val SCRIPTS_DIR = "${TermuxCommandRunner.TERMUX_HOME_PATH}/scripts"
@@ -33,14 +36,14 @@ class ScriptManager(
     private val scriptContentCache = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     /** Reset deployment cache, e.g. after an error that may have left scripts in a bad state */
-    fun invalidateDeployCache() {
+    override fun invalidateDeployCache() {
         scriptsDeployed = false
         configsDeployed = false
         scriptContentCache.clear()
         AppLog.script("invalidateDeployCache: deployment and content caches cleared")
     }
 
-    suspend fun deployScripts(): Boolean {
+    override suspend fun deployScripts(): Boolean {
         if (scriptsDeployed) {
             AppLog.script("deployScripts: skipping — already deployed (cached)")
             return true
@@ -58,7 +61,7 @@ class ScriptManager(
         return true
     }
 
-    suspend fun deployConfigs(): Boolean {
+    override suspend fun deployConfigs(): Boolean {
         if (configsDeployed) {
             AppLog.script("deployConfigs: skipping — already deployed (cached)")
             return true
@@ -76,12 +79,12 @@ class ScriptManager(
         return true
     }
 
-    fun getScriptPath(name: String): String = "$SCRIPTS_DIR/$name"
+    override fun getScriptPath(name: String): String = "$SCRIPTS_DIR/$name"
 
     private suspend fun deployScript(scriptName: String): Boolean {
         val assetReadStartMs = System.currentTimeMillis()
         val scriptContent = scriptContentCache.getOrPut(scriptName) {
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 context.assets.open("scripts/$scriptName").use {
                     // Strip \r to ensure LF-only line endings — CRLF breaks shebang on Termux
                     it.bufferedReader().readText().replace("\r", "")
@@ -124,7 +127,7 @@ class ScriptManager(
 
     private suspend fun deployConfig(configName: String): Boolean {
         val assetReadStartMs = System.currentTimeMillis()
-        val configContent = withContext(Dispatchers.IO) {
+        val configContent = withContext(ioDispatcher) {
             context.assets.open("configs/$configName").use {
                 it.bufferedReader().readText()
             }

@@ -3,16 +3,19 @@ package com.runelitetablet.termux
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import com.runelitetablet.RuneLiteTabletApp
+import com.runelitetablet.domain.command.CommandResult
 import com.runelitetablet.logging.AppLog
-import kotlinx.coroutines.CompletableDeferred
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
 
 class TermuxResultService : Service() {
 
-    companion object {
-        val pendingResults = ConcurrentHashMap<Int, CompletableDeferred<TermuxResult>>()
+    private val registry: TermuxResultRegistry
+        get() = (application as RuneLiteTabletApp).container.termux.resultRegistry
 
+    private val pendingResults get() = registry.pendingResults
+
+    companion object {
         private const val EXTRA_EXECUTION_ID = "execution_id"
         private const val EXTRA_STDOUT = "stdout"
         private const val EXTRA_STDERR = "stderr"
@@ -20,21 +23,14 @@ class TermuxResultService : Service() {
         private const val EXTRA_ERROR = "err"
         private const val EXTRA_ERROR_MSG = "errmsg"
         private const val EXTRA_RESULT_BUNDLE = "result"
-        private val counter = AtomicInteger(0)
 
         private const val STDOUT_PREVIEW_LEN = 200
 
-        /** Patterns that may contain credentials in stdout/stderr output. */
         private val CREDENTIAL_PATTERNS = listOf(
             Regex("""(JX_SESSION_ID|JX_ACCESS_TOKEN|JX_REFRESH_TOKEN|JX_CHARACTER_ID)=[^\s]+"""),
             Regex("""Bearer\s+[A-Za-z0-9._-]+""", RegexOption.IGNORE_CASE)
         )
 
-        fun createExecutionId(): Int = counter.incrementAndGet()
-
-        /**
-         * Scrub credential patterns from a string preview before logging.
-         */
         private fun scrubCredentials(preview: String): String {
             var scrubbed = preview
             for (pattern in CREDENTIAL_PATTERNS) {
@@ -99,7 +95,7 @@ class TermuxResultService : Service() {
                 "stderrLen=${stderr?.length ?: 0} stderrPreview='$stderrPreview'"
         )
 
-        val result = TermuxResult(
+        val result = CommandResult(
             stdout = stdout,
             stderr = stderr,
             exitCode = exitCode,

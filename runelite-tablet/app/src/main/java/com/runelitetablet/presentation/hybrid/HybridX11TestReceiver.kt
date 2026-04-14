@@ -264,7 +264,7 @@ class HybridX11TestReceiver : BroadcastReceiver() {
                             launchArguments += listOf("--runelite-launch-mode", runeliteLaunchModeOverride)
                         }
                         val envFilePath = LaunchEnvDeployer.deployToTermuxHome(
-                            credentialManager = CredentialManager(context),
+                            credentialStore = CredentialManager(context),
                             commandRunner = runner
                         )
                         if (envFilePath != null) {

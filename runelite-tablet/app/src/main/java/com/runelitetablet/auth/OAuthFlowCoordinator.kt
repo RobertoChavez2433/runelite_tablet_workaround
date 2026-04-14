@@ -1,0 +1,152 @@
+package com.runelitetablet.auth
+
+import java.net.URLDecoder
+
+/**
+ * Pure Kotlin OAuth state machine for the 2-step Jagex flow.
+ * Extracted from GeckoAuthActivity for testability.
+ *
+ * State transitions:
+ *   LOADING_STEP1 -> AWAITING_STEP1_REDIRECT -> EXCHANGING_TOKENS
+ *     -> (runescape) DONE_SUCCESS
+ *     -> (jagex) LOADING_STEP2 -> AWAITING_STEP2_REDIRECT -> DONE_SUCCESS
+ *   Any -> ERROR
+ */
+class OAuthFlowCoordinator(
+    private val oauthManager: JagexOAuth2Manager,
+    private val codeVerifier: String,
+    private val expectedStep1State: String,
+    private val expectedStep2State: String,
+    private val expectedNonce: String
+) {
+    enum class State {
+        LOADING_STEP1, AWAITING_STEP1_REDIRECT, EXCHANGING_TOKENS,
+        LOADING_STEP2, AWAITING_STEP2_REDIRECT, DONE_SUCCESS, ERROR
+    }
+
+    var currentState = State.LOADING_STEP1
+        private set
+
+    private var step1AccessToken: String? = null
+    private var step1RefreshToken: String? = null
+    private var step1ExpiresIn: Long = 0L
+    private var step1AccessTokenExpiry: Long = 0L
+
+    sealed class Result {
+        data class Success(
+            val loginProvider: String,
+            val accessToken: String?,
+            val refreshToken: String?,
+            val idToken: String?,
+            val expiresIn: Long,
+            val accessTokenExpiry: Long
+        ) : Result()
+        data class LoadStep2(val url: String) : Result()
+        data class Error(val message: String) : Result()
+    }
+
+    fun parseStep1Redirect(uri: String): Step1ParseResult? {
+        if (currentState != State.LOADING_STEP1 && currentState != State.AWAITING_STEP1_REDIRECT) return null
+        currentState = State.AWAITING_STEP1_REDIRECT
+
+        val params = parseJagexUri(uri)
+        val code = params["code"] ?: run {
+            currentState = State.ERROR
+            return Step1ParseResult.Error("Invalid login redirect: missing authorization code")
+        }
+        val state = params["state"]
+        if (state != expectedStep1State) {
+            currentState = State.ERROR
+            return Step1ParseResult.Error("Security check failed: state mismatch")
+        }
+
+        currentState = State.EXCHANGING_TOKENS
+        return Step1ParseResult.CodeCaptured(code)
+    }
+
+    suspend fun exchangeAndRoute(code: String, step2Url: String): Result {
+        val tokenResponse = oauthManager.exchangeCodeForTokens(code, codeVerifier)
+        val idToken = tokenResponse.idToken
+        val loginProvider = if (idToken != null) oauthManager.parseLoginProvider(idToken) else "jagex"
+
+        return when (loginProvider) {
+            "runescape" -> {
+                currentState = State.DONE_SUCCESS
+                Result.Success(loginProvider, tokenResponse.accessToken, tokenResponse.refreshToken,
+                    tokenResponse.idToken, tokenResponse.expiresIn, tokenResponse.accessTokenExpiry)
+            }
+            else -> {
+                step1AccessToken = tokenResponse.accessToken
+                step1RefreshToken = tokenResponse.refreshToken
+                step1ExpiresIn = tokenResponse.expiresIn
+                step1AccessTokenExpiry = tokenResponse.accessTokenExpiry
+                currentState = State.LOADING_STEP2
+                Result.LoadStep2(step2Url)
+            }
+        }
+    }
+
+    fun parseStep2Redirect(uri: String): Result {
+        if (currentState != State.LOADING_STEP2 && currentState != State.AWAITING_STEP2_REDIRECT) {
+            return Result.Error("Invalid state for Step 2 redirect: $currentState")
+        }
+        currentState = State.AWAITING_STEP2_REDIRECT
+
+        val fragment = uri.substringAfter("#", "")
+        if (fragment.isEmpty()) {
+            currentState = State.ERROR
+            return Result.Error("Could not capture consent token: fragment not available")
+        }
+
+        val params = parseFragmentParams(fragment)
+        val idToken = params["id_token"]
+        val state = params["state"]
+
+        if (idToken == null) {
+            currentState = State.ERROR
+            return Result.Error("Could not capture consent token: missing id_token")
+        }
+        if (state != expectedStep2State) {
+            currentState = State.ERROR
+            return Result.Error("Security check failed: consent state mismatch")
+        }
+        if (!oauthManager.verifyNonce(idToken, expectedNonce)) {
+            currentState = State.ERROR
+            return Result.Error("Security check failed: nonce mismatch")
+        }
+
+        currentState = State.DONE_SUCCESS
+        return Result.Success("jagex", step1AccessToken, step1RefreshToken,
+            idToken, step1ExpiresIn, step1AccessTokenExpiry)
+    }
+
+    sealed class Step1ParseResult {
+        data class CodeCaptured(val code: String) : Step1ParseResult()
+        data class Error(val message: String) : Step1ParseResult()
+    }
+
+    companion object {
+        fun parseJagexUri(uri: String): Map<String, String> {
+            val paramsStr = uri.removePrefix("jagex:")
+            if (paramsStr.isBlank()) return emptyMap()
+            return paramsStr.split(",", "&").mapNotNull { pair ->
+                val parts = pair.split("=", limit = 2)
+                if (parts.size == 2) {
+                    try { URLDecoder.decode(parts[0], "UTF-8") to URLDecoder.decode(parts[1], "UTF-8") }
+                    catch (_: Exception) { null }
+                } else null
+            }.toMap()
+        }
+
+        fun parseFragmentParams(fragment: String): Map<String, String> {
+            if (fragment.isBlank()) return emptyMap()
+            return fragment.split("&").mapNotNull { pair ->
+                val parts = pair.split("=", limit = 2)
+                if (parts.size == 2) {
+                    try { URLDecoder.decode(parts[0], "UTF-8") to URLDecoder.decode(parts[1], "UTF-8") }
+                    catch (_: Exception) { null }
+                } else null
+            }.toMap()
+        }
+    }
+}

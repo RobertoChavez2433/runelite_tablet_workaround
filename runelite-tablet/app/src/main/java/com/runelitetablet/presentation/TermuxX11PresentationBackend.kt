@@ -2,8 +2,8 @@ package com.runelitetablet.presentation
 
 import android.content.Context
 import android.content.Intent
+import com.runelitetablet.domain.installer.PackageChecker
 import com.runelitetablet.logging.AppLog
-import com.runelitetablet.termux.TermuxPackageHelper
 import com.runelitetablet.ui.DisplayPreferences
 
 object TermuxX11PresentationBackend : PresentationBackend {
@@ -12,12 +12,12 @@ object TermuxX11PresentationBackend : PresentationBackend {
     override val id: String = "termux_x11"
     override val displayName: String = "Termux:X11"
 
-    override fun isInstalled(termuxHelper: TermuxPackageHelper): Boolean =
-        termuxHelper.isTermuxX11Installed()
+    override fun isInstalled(packageChecker: PackageChecker): Boolean =
+        packageChecker.isTermuxX11Installed()
 
     override fun applyLaunchPreferences(context: Context, displayPreferences: DisplayPreferences) {
         val prefIntent = Intent(ACTION_CHANGE_PREFERENCE).apply {
-            setPackage(TermuxPackageHelper.TERMUX_X11_PACKAGE)
+            setPackage(PackageChecker.TERMUX_X11_PACKAGE)
             putExtra("fullscreen", displayPreferences.fullscreen.toString())
             putExtra("showAdditionalKbd", displayPreferences.showKeyboardBar.toString())
             putExtra("displayResolutionMode", displayPreferences.resolutionMode)
@@ -35,7 +35,7 @@ object TermuxX11PresentationBackend : PresentationBackend {
     }
 
     override fun createLaunchIntent(context: Context): Intent? =
-        context.packageManager.getLaunchIntentForPackage(TermuxPackageHelper.TERMUX_X11_PACKAGE)
+        context.packageManager.getLaunchIntentForPackage(PackageChecker.TERMUX_X11_PACKAGE)
 
     override fun shouldWaitForReadySignal(): Boolean = true
 }
