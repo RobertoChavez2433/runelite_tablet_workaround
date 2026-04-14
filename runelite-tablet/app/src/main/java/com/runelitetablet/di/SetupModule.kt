@@ -5,6 +5,7 @@ import com.runelitetablet.cleanup.CleanupManager
 import com.runelitetablet.domain.command.CommandRunner
 import com.runelitetablet.domain.installer.PackageChecker
 import com.runelitetablet.domain.logging.Logger
+import com.runelitetablet.logging.AppLog
 import com.runelitetablet.domain.setup.SetupStateStore
 import com.runelitetablet.installer.ApkDownloader
 import com.runelitetablet.installer.ApkInstaller
@@ -25,8 +26,12 @@ class SetupModule(
     apkInstaller: ApkInstaller,
     logger: Logger
 ) {
-    val stateStore: SetupStateStore = SharedPrefsSetupStateStore(context)
-    val scriptManager = ScriptManager(context, commandRunner as TermuxCommandRunner)
+    val stateStore: SetupStateStore = SharedPrefsSetupStateStore(context).also {
+        AppLog.d("DI", "SetupModule: SetupStateStore initialized")
+    }
+    val scriptManager = ScriptManager(context, commandRunner as TermuxCommandRunner).also {
+        AppLog.d("DI", "SetupModule: ScriptManager initialized")
+    }
     private val cleanupManager = CleanupManager(context)
     private val verifier = SetupVerifier(commandRunner, logger)
     private val reconciler = MarkerReconciler(commandRunner, scriptManager, logger)
@@ -38,5 +43,7 @@ class SetupModule(
     val orchestrator = SetupOrchestrator(
         packageChecker, stepRunner, verifier, reconciler,
         cleanupManager, stateStore, permissionHandler, apkInstaller, logger = logger
-    )
+    ).also {
+        AppLog.d("DI", "SetupModule: SetupOrchestrator initialized")
+    }
 }

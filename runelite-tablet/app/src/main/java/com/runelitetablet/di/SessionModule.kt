@@ -1,6 +1,7 @@
 package com.runelitetablet.di
 
 import com.runelitetablet.domain.command.CommandRunner
+import com.runelitetablet.logging.AppLog
 import com.runelitetablet.termux.TermuxCommandRunner
 
 /**
@@ -10,5 +11,7 @@ import com.runelitetablet.termux.TermuxCommandRunner
  */
 class SessionModule(commandRunner: CommandRunner) {
     /** Expose the concrete TermuxCommandRunner for RuneLiteSessionService. */
-    val termuxCommandRunner = commandRunner as TermuxCommandRunner
+    val termuxCommandRunner = (commandRunner as TermuxCommandRunner).also {
+        AppLog.d("DI", "SessionModule: TermuxCommandRunner bound")
+    }
 }

@@ -8,5 +8,8 @@ import okhttp3.OkHttpClient
 
 class AuthModule(context: Context, httpClient: OkHttpClient) {
     val credentialStore: CredentialStore = CredentialManager(context)
-    val oauthManager: JagexOAuth2Manager by lazy { JagexOAuth2Manager(httpClient) }
+    val oauthManager: JagexOAuth2Manager by lazy {
+        com.runelitetablet.logging.AppLog.d("DI", "AuthModule: lazy-init oauthManager")
+        JagexOAuth2Manager(httpClient)
+    }
 }

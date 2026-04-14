@@ -7,7 +7,7 @@ import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
 class CoreModule(context: Context) {
-    val logger: Logger = AppLog.also { it.init(context) }
+    val logger: Logger = AppLog.also { it.init(context); it.lifecycle("CoreModule: initialized logger + file writer") }
 
     val httpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)

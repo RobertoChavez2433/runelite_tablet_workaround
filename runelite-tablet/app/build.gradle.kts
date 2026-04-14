@@ -62,6 +62,10 @@ android {
         compose = true
     }
 
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
     lint {
         // GeckoView's ExoPlayer transitive dependency references POST_NOTIFICATIONS
         // but we don't use notifications — suppress to avoid false positive lint error
