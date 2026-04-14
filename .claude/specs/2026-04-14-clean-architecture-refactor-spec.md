@@ -719,3 +719,253 @@ Each phase has a pass/fail gate before proceeding:
 - [ ] CI pipeline blocks merge on test failure
 - [ ] 120fps frame timing logic validated without device
 - [ ] App verified functional on Samsung Tab S10 Ultra after all changes
+
+---
+
+## Phase 9: Comprehensive Logging System (Addendum — 2026-04-14, Revised 2026-04-14)
+
+**Goal**: Thread a unified, exhaustive logging system through EVERY file in the app — Kotlin and native C — with a single debug endpoint. Every data handoff, state transition, thread switch, fd operation, buffer copy, JNI call, GL state change, and frame event must be observable from one place. This is not optional instrumentation — this is the nervous system of the app. Without it, we are blind to why frames drop, why surfaces go black, why binders die, and why sessions hang.
+
+**Why this matters**: The rendering pipeline crosses 6 process/thread/IPC boundaries. A single silent failure at ANY boundary kills the entire frame path. We've already burned sessions debugging "black screen" (VirGL depth clamp), "0.2 FPS" (Xlorie legacy drawing), and "LOGGING_IN loop" (stale jars). Each of those would have been immediately visible with proper logging at the handoff points. This logging system exists so we NEVER debug blind again.
+
+**Existing infrastructure**: `AppLog` (Logcat + file), `LogFileWriter` (async file writer), `LogViewerScreen` (in-app viewer), `Logger` interface (domain-level), `PrintLogger` (tests). The systematic-debug skill already expects a log endpoint — this system provides it.
+
+### 9.1 — Single Debug Endpoint
+
+The app exposes ONE endpoint that the systematic-debug skill and any external tooling can connect to. All log output — Kotlin, native C (via JNI bridge), shell scripts (via stdout capture) — flows through this single pipe.
+
+- [ ] **9.1.1** Create `debug/DebugLogServer.kt` — lightweight WebSocket server (raw `ServerSocket` + `java.net` — no Ktor dependency) on configurable port (default 8099). This is the endpoint the systematic-debug skill hooks into.
+- [ ] **9.1.2** Server lifecycle managed by `AppContainer` — starts in `DEBUG` builds only, stops on app destroy. No global state.
+- [ ] **9.1.3** `AppLog` becomes the SOLE Kotlin-side log router: every `Logger` call flows to (a) Logcat, (b) file writer, (c) debug server WebSocket — all three, always, in DEBUG builds.
+- [ ] **9.1.4** Structured JSON format over WebSocket — every field mandatory, no optional nulls:
+  ```json
+  {
+    "ts": 1712000000000,
+    "elapsed": 5234,
+    "level": "D",
+    "tag": "FRAME",
+    "msg": "fps=118.2 jank=1 p99=9.1ms heap=45MB",
+    "thread": "main",
+    "correlationId": "launch-001",
+    "source": "kotlin",
+    "file": "HybridX11HostActivity.kt",
+    "line": 97
+  }
+  ```
+- [ ] **9.1.5** Native C logs bridge into same endpoint: `activity.c` and `renderer.c` call `__android_log_print()` which Logcat captures → `DebugLogServer` subscribes to Logcat via `Runtime.exec("logcat -v threadtime -s LorieNative:V")` and re-emits as structured JSON with `"source": "native"`.
+- [ ] **9.1.6** Shell script logs bridge: Termux command stdout/stderr captured by `TermuxCommandRunner` already — route to Logger with `"source": "shell"` tag.
+- [ ] **9.1.7** HTML/JS viewer served at `http://device-ip:8099/` — real-time WebSocket consumer with:
+  - Filter by: tag, level, correlationId, source (kotlin/native/shell), file, thread
+  - Highlight: jank frames (red), errors (red), warnings (yellow), handoffs (blue)
+  - Timeline view: correlate events across boundaries by timestamp
+  - Pause/resume stream without losing buffered events
+- [ ] **9.1.8** Dev machine access: `adb forward tcp:8099 tcp:8099` → `http://localhost:8099/`
+- [ ] **9.1.9** Programmatic access: systematic-debug skill connects to `ws://localhost:8099/ws` and receives the same JSON stream. No separate API needed — the WebSocket IS the API.
+
+### 9.2 — Logger Interface Enhancements
+
+The current `Logger` interface has 14 methods. It needs to grow to cover every type of event in the graphics pipeline, with correlation threading built into every call.
+
+- [ ] **9.2.1** Add `correlationId: String? = null` parameter to ALL existing Logger methods (`d`, `i`, `w`, `e`, and all convenience methods). This is the backbone of cross-boundary tracing. Every method call in an operation's chain passes the same correlationId.
+- [ ] **9.2.2** `frame(fps: Double, jankCount: Int, p99Ms: Double, heapMb: Int, message: String)` — frame timing aggregate, logged every N frames (configurable, default 120 = 1 second at 120fps)
+- [ ] **9.2.3** `jank(frameTimeMs: Double, expectedMs: Double, frameNumber: Long, message: String)` — individual jank event, logged EVERY TIME a frame exceeds threshold. Include frame number for correlation with native renderer stats.
+- [ ] **9.2.4** `handoff(from: String, to: String, dataType: String, dataSizeBytes: Int, message: String)` — explicit boundary crossing log. Examples: `handoff("OAuthFlowCoordinator", "CredentialManager", "tokens", 256, "step1 tokens saved")`, `handoff("LorieView", "native_renderer", "surface", 0, "surfaceChanged 2960x1848 BGRA_8888")`
+- [ ] **9.2.5** `surface(event: String, width: Int, height: Int, format: String, message: String)` — surface lifecycle. Events: `created`, `changed`, `destroyed`, `format_negotiation`, `refresh_rate_set`, `lockCanvas_failed`, `lockCanvas_fallback`
+- [ ] **9.2.6** `ipc(direction: String, endpoint: String, latencyMs: Long, message: String)` — IPC operations. Direction: `send`/`receive`/`bidirectional`. Endpoints: `termux_intent`, `binder`, `x11_socket`, `unix_socket`, `broadcast`
+- [ ] **9.2.7** `fd(operation: String, fd: Int, path: String, message: String)` — file descriptor lifecycle. Operations: `open`, `close`, `detach`, `transfer`, `leak_suspect`. Critical for X11 socket and binder fd tracking.
+- [ ] **9.2.8** `gl(operation: String, errorCode: Int?, message: String)` — GL/EGL state changes. Operations: `init`, `shader_compile`, `texture_upload`, `draw`, `swap`, `error`, `context_lost`
+- [ ] **9.2.9** `native(component: String, message: String)` — bridge method for native C logs that arrive via Logcat subscription. Component: `renderer`, `activity`, `buffer`, `xcallback`
+- [ ] **9.2.10** `thread(from: String, to: String, operation: String, message: String)` — thread transition tracking. Every `withContext()`, `runOnUiThread()`, `Handler.post()`, `launch()` that crosses dispatchers.
+- [ ] **9.2.11** `buffer(operation: String, sizeBytes: Int, format: String, message: String)` — buffer lifecycle. Operations: `allocate`, `copy`, `map`, `unmap`, `free`, `receive_from_socket`. For tracking mmap'd shared memory, ByteBuffer allocations, and X11 buffer transfers.
+
+### 9.3 — Thread Logging Into EVERY Kotlin File
+
+**53 of 82 files have zero logging. This is unacceptable.** Every file that contains logic — not just data classes and interfaces — gets instrumented. The standard is: if data enters, transforms, or leaves a method, it gets logged. Not "log the happy path" — log entries, exits, failures, edge cases, and timing.
+
+#### Setup Orchestration (14 files missing — THE biggest blind spot)
+- [ ] **9.3.1** `SetupOrchestrator` — Log: state machine entry/exit for every transition. Step start with step name + index. Step complete with duration + exit status. Step skip with reason (cached/already-done). Step fail with error + retry count. Total orchestration duration on completion. Coroutine cancellation. State snapshots on every transition (not just errors).
+- [ ] **9.3.2** `SetupStepRunner` — Log: which step executing, full command path, argument count, pre-execution state check, execution duration (timed with `System.nanoTime()`), exit code, stdout first 500 chars, stderr first 500 chars, whether retry was needed, post-execution state.
+- [ ] **9.3.3** `SetupVerifier` — Log: each verification target (proot/java/runelite/x11), raw command used, raw output received, parse result, pass/fail with reason, total verification duration. Log the actual version strings found (java -version output, proot --version, etc.).
+- [ ] **9.3.4** `MarkerReconciler` — Log: raw check-markers.sh output, each marker parsed with key-value, markers found vs markers expected, reconciliation delta (what changed since last check), final reconciled state map.
+- [ ] **9.3.5** `AuthCoordinator` — Log: auth trigger source (user tap vs auto-refresh), token state before action (has access token? refresh token? session? are they expired?), which auth path taken (fresh login vs refresh vs session reuse), result of each step, credential save confirmation, handoff to next coordinator.
+- [ ] **9.3.6** `LaunchCoordinator` — Log: pre-launch checklist items (update check, env deployment, backend selection, session start), each check result, which backend selected and WHY (probe result, user override, fallback), intent construction details (action, extras count, target component), session service start confirmation, handoff to presentation layer.
+- [ ] **9.3.7** `SetupViewModel` — Log: every screen state transition with old→new state, every user action (button name, action type), coroutine launch (scope, dispatcher), coroutine cancel (reason), StateFlow emissions that change UI, error states set/cleared.
+- [ ] **9.3.8** `SetupActionsImpl` — Log: action received (action name), delegation target (which coordinator/manager), delegation result, callback invocation.
+- [ ] **9.3.9** `PermissionHandler` — Log: permission requested (which permission), rationale shown (yes/no), user response (granted/denied/never ask again), follow-up action taken.
+- [ ] **9.3.10** `SharedPrefsSetupStateStore` — Log: step completion saves (which step, new value), reads (which step, cached value), clears (full clear vs single step), SharedPreferences commit success/failure.
+- [ ] **9.3.11** `SetupViewModelFactory` — Log: factory construction with dependency list, ViewModel creation invocation.
+
+#### Auth (5 files missing)
+- [ ] **9.3.12** `OAuthFlowCoordinator` — Log: state machine state on EVERY transition: `Idle→Step1Loading→Step1Redirect→Step1Complete→Step2Loading→Step2Redirect→Complete` (or `→Error` at any point). Log URI parsing: raw URI, extracted params (redacted tokens), validation result. Log token handoff: from coordinator to credential store, confirmation of save. Log timeout: which step, how long waited, what was expected.
+- [ ] **9.3.13** `GeckoAuthRuntime` — Log: GeckoView session creation (session ID), page load start/progress/complete for each URL, redirect interception (URL pattern matched, extracted params), navigation blocked/allowed decisions, GeckoView errors (category, description), process death detection.
+- [ ] **9.3.14** `PkceHelper` — Log: verifier generation (length, entropy source), challenge computation (method: S256), code challenge length. Do NOT log the actual verifier or challenge values (security).
+- [ ] **9.3.15** `OAuthUrls` — Log: URL construction for each endpoint (authorize, token, consent), parameter count, redirect URI used. Redact any token values in log output.
+
+#### Presentation (4 files missing)
+- [ ] **9.3.16** `DirectSurfaceProbeBackend` — Log: probe initiated (target Hz), activity launch intent, probe result received (actual Hz, surface dimensions), probe timeout, probe teardown.
+- [ ] **9.3.17** `HybridX11PresentationBackend` — Log: backend selection criteria (probe result, user config, device capabilities), activity launch intent construction (all extras), X11 configuration (display, resolution, DPI).
+- [ ] **9.3.18** `PresentationBackends` — Log: backend registration (name, class), selection query (criteria), selection result (which backend, why).
+
+#### Presentation/Hybrid (2 files missing — CRITICAL for graphics debugging)
+- [ ] **9.3.19** `X11AttachmentController` — This is where frames live or die. Wire the `logger` parameter to `AppLog` in `HybridX11HostActivity`. Log:
+  - Every `tryAttach()` call: attempt number, binder state (alive/dead/null), fd state
+  - Attachment success: fd value, latency from first attempt to success
+  - Attachment failure: reason (binder dead, fd invalid, exception), will retry (yes/no), retry delay
+  - Retry exhaustion: total attempts, total time spent, final state
+  - X11 connection handoff: fd transferred, logcat fd transferred, LorieView.connect() called
+  - Cancellation: who cancelled (lifecycle, user, error), cleanup actions taken
+- [ ] **9.3.20** `LorieServiceConnector` — Log:
+  - `attachXConnection()`: pre-call binder state, `getXConnection()` result (null?), `detachFd()` result (fd value, -1 = failure), `LorieView.connect(fd)` call, post-call state
+  - `attachLogcat()`: `getLogcatOutput()` result, `detachFd()` result, `startLogcat(fd)` call, failure handling (swallowed vs propagated)
+  - `sendWindowChange()`: dimensions sent, binder state at call time
+  - Every method: wrap in timing — log latency for each binder call
+
+#### Session (2 files missing)
+- [ ] **9.3.21** `SessionNotificationHelper` — Log: notification channel creation (channel ID, importance), notification build (content title, action count), foreground service promotion (`startForeground` call), notification update, notification dismiss.
+- [ ] **9.3.22** Log session state transitions IN `SessionHealthMonitor` and `RuneLiteSessionService`: every `SessionState` change with old→new, trigger event, timestamp. Log health poll results: sentinel file found (yes/no), consecutive STOPPED count, debounce state, transition decision.
+
+#### DI (6 files missing)
+- [ ] **9.3.23** `AppContainer` — Log: container creation start/end with timing, module instantiation order, total dependency count.
+- [ ] **9.3.24** ALL DI modules (`AuthModule`, `InstallerModule`, `SessionModule`, `SetupModule`, `TermuxModule`) — Log lazy initialization on first access: which dependency, when (elapsed since app start), who triggered it (calling class if available via stack trace in debug).
+
+#### Installer (1 file missing)
+- [ ] **9.3.25** `InstallResultRegistry` — Log: deferred registered (execution ID), result arrived (execution ID, success/fail), deferred completed (execution ID, latency from registration to completion), orphaned result (arrived with no waiting deferred — indicates race or stale ID), cleanup (expired deferreds removed).
+
+#### Termux (1 file missing)
+- [ ] **9.3.26** `TermuxResultRegistry` — Same as InstallResultRegistry: register, arrive, complete, orphan, cleanup. Additionally log: timeout expiration (which execution ID, how long waited), pending count at each operation.
+
+### 9.4 — Graphics/FPS Pipeline Logging (Exhaustive)
+
+**This is the PRIMARY motivation for the entire logging system.** The rendering pipeline has 6 boundaries. Each boundary is a potential frame killer. We instrument EVERY handoff point, not just the obvious ones. The research identified specific line-level logging targets in both Kotlin and native C code.
+
+#### Boundary A: Choreographer → Android App Layer
+- [ ] **9.4.1** Wire `FrameTimingTracker` into `HybridX11HostActivity` via `Choreographer.FrameCallback.doFrame(frameTimeNanos)`.
+- [ ] **9.4.2** Log every 120 frames (1 second at 120fps): `logger.frame(fps, jankCount, p99Ms, heapMb, "periodic")` — average FPS, jank count (>12ms), P99 frame time, current heap usage.
+- [ ] **9.4.3** Log EVERY jank frame individually: `logger.jank(frameTimeMs, 8.33, frameNumber, "reason")` — frame time, expected time, frame number, suspected reason (GC? binder? surface lock?).
+- [ ] **9.4.4** Log Choreographer re-registration: wrap `postFrameCallback(this)` in try-catch — if it throws, the entire frame loop is dead and nobody will know.
+- [ ] **9.4.5** In `DirectSurfaceProbeActivity.doFrame()`: log `lockHardwareCanvas` failure (currently caught silently at line ~146) — this reveals GPU driver issues.
+- [ ] **9.4.6** In `DirectSurfaceProbeActivity`: log `setFrameRate()` result — did the system honor our 120Hz request or silently ignore it?
+
+#### Boundary B: LorieView Surface → Native X11 Bridge (JNI crossing)
+- [ ] **9.4.7** `LorieView.surfaceCreated()`: Log `logger.surface("created", w, h, format, "holder=$holder")` with actual holder dimensions, not just measured.
+- [ ] **9.4.8** `LorieView.surfaceChanged()`: Log measured size vs holder size — if they differ, rotation race is happening. Log: `logger.surface("changed", w, h, format, "measured=${size.x}x${size.y} holder=${holder.surfaceFrame}")`.
+- [ ] **9.4.9** `LorieView.surfaceDestroyed()`: Log with timing — how long was the surface alive? Were frames being rendered?
+- [ ] **9.4.10** Wrap `external fun surfaceChanged(surface: Surface?)` JNI call with timing: `val startNs = System.nanoTime(); surfaceChanged(surface); logger.ipc("send", "jni_surfaceChanged", (System.nanoTime()-startNs)/1_000_000, "surface=${surface!=null}")`. This measures JNI overhead.
+- [ ] **9.4.11** `LorieView.triggerCallback()` (currently unlogged): Log the `post {}` and the callback execution — delayed execution here means UI thread is blocked.
+- [ ] **9.4.12** Surface format negotiation: Log when `BGRA_8888` is requested vs what the system provides. Log `R8G8B8A8_UNORM` vs `R8G8B8X8_UNORM` selection — this is the root cause of the "Xlorie legacy drawing" blocker.
+
+#### Boundary C: Native Renderer (C code — via Logcat bridge to endpoint)
+
+These are `__android_log_print()` calls in C that the debug server captures via Logcat subscription.
+
+- [ ] **9.4.13** `activity.c:nativeInit()` — Log JNI class/method lookup success/failure for EACH of the 16 registered methods. Currently partially logged; add per-method confirmation.
+- [ ] **9.4.14** `activity.c:connect_()` — Log old fd → new fd transition: `"connect_: closing old fd=%d, adding new fd=%d to ALooper"`. Currently MISSING — fd leaks are invisible.
+- [ ] **9.4.15** `activity.c:xcallback()` — Log event type on EVERY callback: `"xcallback: fd=%d events=%d type=%s"`. This is the X11 event loop — if it stops firing, frames stop. Add JNI exception check: `if ((*env)->ExceptionCheck(env)) { log(ERROR, "JNI exception in xcallback"); }`.
+- [ ] **9.4.16** `activity.c:requestConnection()` — Log socket creation, connect attempt, poll result, SO_ERROR, MAGIC write: full lifecycle of X11 socket establishment. Currently partial — poll timeout is silent.
+- [ ] **9.4.17** `activity.c:startLogcat()` — Log fork result, child exec, parent fd setup. Currently MISSING — fork failures are invisible.
+- [ ] **9.4.18** `renderer.c:rendererInit()` — Log EGL display acquisition, context creation, shader compilation success/failure, program link result. Currently partial — add comprehensive init summary: `"rendererInit: display=%p context=%p shaders=%d/%d program=%d"`.
+- [ ] **9.4.19** `renderer.c:checkGlError()` — Fix: currently returns after first error, hiding subsequent errors. Change to drain ALL errors: `do { err = glGetError(); log(...); } while (err != GL_NO_ERROR);`.
+- [ ] **9.4.20** `renderer.c` perf stats — Currently logs every 5 seconds. Change to every 1 second (120 frames). Add: lock time max, fence wait max, swap time max, frame count, buffer format, drawing mode (legacy vs DMA vs SHM).
+- [ ] **9.4.21** `renderer.c` shader compilation — Currently MISSING individual shader compile logs. Add after each `glCompileShader()`: `"shader compiled: type=%s status=%d log='%s'"`.
+
+#### Boundary D: Binder Bridge (HybridX11Bridge + TermuxX11StartReceiver)
+- [ ] **9.4.22** `HybridX11Bridge.attach()`: Log binder identity (hashCode), alive state, same-binder check, linkToDeath registration success, generation increment. Use `logger.ipc()`.
+- [ ] **9.4.23** `HybridX11Bridge.clear()`: Log reason, was-alive state, generation at clear time.
+- [ ] **9.4.24** `TermuxX11StartReceiver.onReceive()`: Log broadcast received, bundle extraction, binder extraction, alive check (BOTH checks — the race between line 30 and 40 is a known risk), stub cast result, attach call.
+- [ ] **9.4.25** Binder DeathRecipient: Log death detection with timing — how long was the binder alive? What was the last successful operation? This reveals binder churn patterns.
+- [ ] **9.4.26** Track and log broadcast count per second — frame throughput estimation. If broadcasts stop, X11 server died.
+
+#### Boundary E: File Descriptor Lifecycle (X11 socket + Binder fds)
+- [ ] **9.4.27** `LorieServiceConnector.attachXConnection()`: Log EVERY fd operation: `getXConnection()` result, `detachFd()` value, `LorieView.connect(fd)` call. If fd < 0, log as ERROR with binder state.
+- [ ] **9.4.28** `LorieServiceConnector.attachLogcat()`: Log fd detach, `startLogcat(fd)` call. Currently failure is swallowed ("don't block on logcat") — at minimum log the swallow.
+- [ ] **9.4.29** `activity.c:connect_()` fd close: Log `close(conn_fd)` result — if it fails, fd leak. Log new fd assignment.
+- [ ] **9.4.30** Create fd tracking map in debug builds: register every fd open/close, log at `onPause()` to detect leaks. Pattern: `logger.fd("open", fd, path, "purpose")` / `logger.fd("close", fd, path, "cleanup")`.
+
+#### Boundary F: Buffer/Memory Operations (Native shared memory)
+- [ ] **9.4.31** `activity.c` EVENT_SHARED_SERVER_STATE: Log mmap result (success/fail), mapped size, fd closure. Currently partial — enhance with: `"mmap: addr=%p size=%zu fd=%d"`.
+- [ ] **9.4.32** `activity.c` LorieBuffer_recvHandleFromUnixSocket: Log buffer receipt, buffer descriptor, allocation success/failure. Currently partial — add null check log.
+- [ ] **9.4.33** `activity.c` clipboard operations: Log buffer allocation, charset decode, JNI ByteBuffer creation — any of these can fail silently.
+- [ ] **9.4.34** Track buffer allocation/deallocation balance in debug builds — log periodic summary of outstanding allocations.
+
+#### Boundary G: Thread Transitions in Graphics Path (NEW — not in original 6)
+- [ ] **9.4.35** Log EVERY thread switch in the frame path: `logger.thread("ALooper", "UI", "xcallback_jni_upcall", "calling clientConnectedStateChanged")`. Thread switches are where race conditions hide.
+- [ ] **9.4.36** `HybridX11HostActivity.lifecycleScope.launch {}`: Log coroutine start thread and actual execution thread — if they differ, dispatcher routing is wrong.
+- [ ] **9.4.37** `X11AttachmentController` retry loop: Log which thread each retry executes on — thread pool exhaustion causes retry stalls.
+- [ ] **9.4.38** `LorieView.post {}` calls: Log post time vs execution time — long delays mean UI thread is saturated.
+- [ ] **9.4.39** Native `AttachCurrentThread` in `activity.c`: Log success/failure — JVM attachment from native threads can fail under memory pressure.
+
+#### Boundary H: Process Lifecycle (RuneLite + VirGL + Termux) (NEW)
+- [ ] **9.4.40** `HybridX11TestReceiver`: Log X11 process kill (which PIDs), sleep duration, restart confirmation. Log script validation BEFORE execution — is the script file present and executable?
+- [ ] **9.4.41** VirGL server process: Log start, health check (is process alive?), stderr output, unexpected death, restart. VirGL death = no GPU = black screen.
+- [ ] **9.4.42** RuneLite Java process: Log launch command, PID (if capturable), stdout first 1KB, crash detection (exit code != 0), OOM kill detection.
+- [ ] **9.4.43** Launch script execution: Log every env var set (redact tokens), every path validated, every prerequisite check, GPU driver selection rationale, final exec command.
+
+### 9.5 — Correlation IDs for Cross-Boundary Tracing
+
+Without correlation, a log stream at 120fps is noise. Correlation makes it a story.
+
+- [ ] **9.5.1** Generate UUID-based `correlationId` at each top-level user action: setup step start, auth flow start, launch start, session start. Format: `{action}-{shortUuid}` (e.g., `launch-a3f7`, `auth-b2c1`).
+- [ ] **9.5.2** Thread `correlationId` as parameter through EVERY method call in the operation's chain. This means method signatures change — every coordinator, service, and manager method gains an optional `correlationId` parameter.
+- [ ] **9.5.3** For frame-level correlation: use a `frameSessionId` generated at rendering start that persists across all frame logs for that session. Separate from per-action correlationId.
+- [ ] **9.5.4** For Termux commands: the existing `executionId` (AtomicInteger) becomes the correlationId for that command's lifecycle — from intent send through result receive.
+- [ ] **9.5.5** Debug server viewer: filter by correlationId to see COMPLETE operation trace across Kotlin → JNI → native C → shell. Timeline view shows events in chronological order with source indicators.
+- [ ] **9.5.6** Nested correlation: when one operation triggers another (e.g., launch triggers auth refresh), log BOTH correlationIds: `parentCorrelationId` + `correlationId`.
+
+### 9.6 — Things You Might Not Have Thought Of
+
+Additional logging points discovered during research that aren't covered by the boundary model:
+
+- [ ] **9.6.1** **SharedPreferences listener race**: `HybridX11HostActivity` registers an `OnSharedPreferenceChangeListener` — if the callback fires during `onDestroy()` (before `lorieView` is initialized), it crashes silently. Log: guard check + listener registration/deregistration.
+- [ ] **9.6.2** **Choreographer postFrameCallback exception**: If `doFrame()` throws during frame processing, `postFrameCallback(this)` for the NEXT frame never gets called. The frame loop silently dies. Nobody ever logs this. Wrap the re-registration in try-catch with error log.
+- [ ] **9.6.3** **LogFileWriter queue growth**: The `ConcurrentLinkedQueue` is unbounded. Under high-frequency frame logging (120 lines/sec), if the flush thread stalls, memory grows indefinitely. Add periodic log of queue size and warn if > 1000 entries.
+- [ ] **9.6.4** **Handler thread death**: `LogFileWriter` uses a `HandlerThread`. If that thread dies (OOM, unhandled exception), ALL file logging stops silently. Log handler thread health on each flush.
+- [ ] **9.6.5** **ALooper event error/hangup**: In `xcallback()`, `ALOOPER_EVENT_ERROR | ALOOPER_EVENT_HANGUP` means the X11 connection is dead. Currently logged at disconnect but not the error/hangup flags. Log both.
+- [ ] **9.6.6** **JNI exception leak**: Every `(*env)->Call*Method()` in `activity.c` can set a JNI exception. If not checked and cleared, subsequent JNI calls crash. Add `ExceptionCheck()` after every JNI upcall in `xcallback()`.
+- [ ] **9.6.7** **GL error drain**: `renderer.c:checkGlError()` returns after first error. Multiple errors can stack — subsequent errors are hidden. Fix to drain all errors.
+- [ ] **9.6.8** **Surface hardware canvas fallback**: `DirectSurfaceProbeActivity.drawFrame()` catches `lockHardwareCanvas()` failure and falls back to `lockCanvas()`. This means software rendering is active — log this as a WARNING because it means GPU acceleration failed.
+- [ ] **9.6.9** **Binder alive double-check race**: `TermuxX11StartReceiver` checks `binder.isBinderAlive` at line ~30, then uses the binder at line ~44. The binder can die between these lines. Log the check result AND the use result independently.
+- [ ] **9.6.10** **Memory pressure correlation**: When `PerfSnapshots.memorySnapshot()` shows high heap usage AND frame times spike, log a composite event: `logger.perf("MEMORY_PRESSURE: heap=${heapMb}MB free=${freeMb}MB concurrent_jank=${jankCount}")`. This catches GC-induced jank.
+- [ ] **9.6.11** **Separate perf log file**: Frame logs at 120Hz = 120 lines/sec = 7200 lines/min. Mixing with general app logs makes both unreadable. Create a separate `PerfLogWriter` for frame-related logs, same async pattern, separate file (`rlt-perf-*.log`), separate rotation. Both streams still flow to the single WebSocket endpoint.
+
+### 9.7 — Remaining Spec Items Still Incomplete
+
+#### Device Verification (P0)
+- [ ] **9.7.1** Build and deploy to Samsung Tab S10 Ultra
+- [ ] **9.7.2** Verify app boots to setup screen
+- [ ] **9.7.3** Verify setup flow completes (Termux, proot, Java, RuneLite, X11)
+- [ ] **9.7.4** Verify auth flow works (Jagex OAuth 2-step)
+- [ ] **9.7.5** Verify RuneLite launches and renders frames
+- [ ] **9.7.6** Verify session health monitoring works
+
+#### Phase 5: MockWebServer Integration Tests (P1)
+- [ ] **9.7.7** `JagexOAuth2ManagerTest` — real manager + real OkHttp + MockWebServer (spec item 5.1)
+- [ ] **9.7.8** `ApkDownloaderTest` — real downloader + real OkHttp + MockWebServer (spec item 5.2)
+- [ ] **9.7.9** `LaunchEnvDeployerTest` already exists — verify coverage is complete (spec item 5.3)
+
+#### Phase 4: Missing Tests (P2)
+- [ ] **9.7.10** `LaunchCoordinatorTest` — pre-launch sequence testing (spec item 4.9)
+- [ ] **9.7.11** `SetupViewModelTest` — all state transition scenarios (spec item 4.1)
+
+#### AppLog 50-Line Target
+- [ ] **9.7.12** Trim `AppLog` from 58 LoC to ≤50 LoC (move `memorySnapshot`/`diskSnapshot`/`perfSnapshot` convenience methods elsewhere)
+
+### 9.8 — Verification Gate
+
+**The logging system is not done until ALL of these are true:**
+
+- [ ] EVERY file in `main/java/com/runelitetablet/` that contains business logic or data handoff has at least one `logger.*` call — **zero exceptions**
+- [ ] `DebugLogServer` starts on DEBUG builds and streams structured JSON to WebSocket on port 8099
+- [ ] Native C logs (`activity.c`, `renderer.c`) flow through Logcat bridge into the same WebSocket stream with `"source": "native"`
+- [ ] Shell script logs flow through `TermuxCommandRunner` into the same stream with `"source": "shell"`
+- [ ] `adb forward tcp:8099 tcp:8099` + browser at `http://localhost:8099/` shows live filterable log stream
+- [ ] Systematic-debug skill can connect to `ws://localhost:8099/ws` and receive the JSON stream
+- [ ] FPS metrics logged every second during active rendering (aggregate + individual janks)
+- [ ] All 8 graphics pipeline boundaries (A through H) have explicit handoff logging at EVERY crossing point
+- [ ] `FrameTimingTracker` wired into `HybridX11HostActivity` via Choreographer
+- [ ] Correlation IDs trace a full operation from user tap through Kotlin → JNI → native → shell → back
+- [ ] Separate perf log file for frame-rate data (doesn't pollute general logs)
+- [ ] fd tracking active in debug builds — open/close/transfer/leak detection
+- [ ] JNI exception checks after every native upcall in `xcallback()`
+- [ ] GL error drain (not single-error return) in `renderer.c`
+- [ ] Log queue health monitoring in `LogFileWriter` (warn on >1000 pending)
+- [ ] No silent catch blocks anywhere in the graphics path — every catch logs
