@@ -14,8 +14,9 @@ import java.util.concurrent.ConcurrentLinkedQueue
 /**
  * Async file writer for AppLog. Queues log lines and writes them
  * on a background HandlerThread with periodic flushing.
+ * Monitors queue health — warns if > 1000 pending entries.
  */
-class LogFileWriter(logFile: File?) {
+open class LogFileWriter(logFile: File?) {
     private val queue = ConcurrentLinkedQueue<String>()
     private val handlerThread: HandlerThread?
     private val handler: Handler?
@@ -23,6 +24,14 @@ class LogFileWriter(logFile: File?) {
 
     private val flushRunnable = object : Runnable {
         override fun run() {
+            val queueSize = queue.size
+            if (queueSize > QUEUE_WARN_THRESHOLD) {
+                Log.w("RLT", "LogFileWriter: queue size=$queueSize exceeds threshold=$QUEUE_WARN_THRESHOLD")
+            }
+            if (handlerThread != null && !handlerThread.isAlive) {
+                Log.e("RLT", "LogFileWriter: handler thread DEAD — file logging will stop")
+                return
+            }
             drainQueue()
             flushWriter()
             handler?.postDelayed(this, FLUSH_INTERVAL_MS)
@@ -91,6 +100,7 @@ class LogFileWriter(logFile: File?) {
         private const val BUFFER_SIZE = 8192
         private const val MAX_LOG_FILES = 5
         private const val MAX_LOG_AGE_MS = 24L * 60L * 60L * 1000L
+        private const val QUEUE_WARN_THRESHOLD = 1000
 
         fun initForSession(logsDir: File): LogFileWriter {
             if (!logsDir.exists()) logsDir.mkdirs()

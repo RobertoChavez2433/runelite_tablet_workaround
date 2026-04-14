@@ -9,50 +9,56 @@ import java.io.File
 
 object AppLog : Logger {
     private const val TAG = "RLT"
-    private const val MAX_STACK_FRAMES = 10
-
+    private val PERF_TAGS = setOf("FRAME", "JANK", "SURFACE", "GL", "BUFFER")
     private var fileWriter: LogFileWriter = LogFileWriter(null)
+    private var perfWriter: LogFileWriter = LogFileWriter(null)
+    private var debugServer: DebugLogServer? = null
     private val startTime = SystemClock.elapsedRealtime()
 
     fun init(context: Context) {
-        fileWriter.shutdown()
-        val logsDir = File(context.filesDir, "logs")
-        fileWriter = try {
-            LogFileWriter.initForSession(logsDir)
-        } catch (e: Exception) {
-            Log.e(TAG, "AppLog.init failed: ${e.message}")
-            LogFileWriter(null)
-        }
+        fileWriter.shutdown(); perfWriter.shutdown()
+        val dir = File(context.filesDir, "logs")
+        fileWriter = runCatching { LogFileWriter.initForSession(dir) }.getOrElse { LogFileWriter(null) }
+        perfWriter = runCatching { PerfLogWriter.initForSession(dir) }.getOrElse { LogFileWriter(null) }
     }
 
-    override fun d(tag: String, message: String) = log(tag, message) { Log.d(TAG, it) }
-    override fun i(tag: String, message: String) = log(tag, message) { Log.i(TAG, it) }
-    override fun w(tag: String, message: String) = log(tag, message) { Log.w(TAG, it) }
+    fun startDebugServer(server: DebugLogServer) { debugServer = server; server.start() }
+    fun stopDebugServer() { debugServer?.stop(); debugServer = null }
 
-    override fun e(tag: String, message: String, throwable: Throwable?) {
-        val line = formatLine(tag, message)
-        if (throwable != null) {
-            Log.e(TAG, line, throwable)
-            val frames = throwable.stackTrace.take(MAX_STACK_FRAMES)
-                .joinToString("\n") { "  at $it" }
-            val extra = (throwable.stackTrace.size - frames.count { it == '\n' } - 1)
-                .let { if (it > 0) "\n  ... $it more frames" else "" }
-            fileWriter.write("$line\n$frames$extra")
-        } else { Log.e(TAG, line); fileWriter.write(line) }
+    override fun d(tag: String, msg: String, correlationId: String?) = route("D", tag, msg, correlationId) { Log.d(TAG, it) }
+    override fun i(tag: String, msg: String, correlationId: String?) = route("I", tag, msg, correlationId) { Log.i(TAG, it) }
+    override fun w(tag: String, msg: String, correlationId: String?) = route("W", tag, msg, correlationId) { Log.w(TAG, it) }
+    override fun e(tag: String, msg: String, throwable: Throwable?, correlationId: String?) {
+        val line = fmt(tag, msg, correlationId)
+        if (throwable != null) Log.e(TAG, line, throwable) else Log.e(TAG, line)
+        if (BuildConfig.DEBUG) writer(tag).write(if (throwable != null) "$line\n${trunc(throwable)}" else line)
+        emit("E", tag, msg, correlationId)
     }
 
-    fun memorySnapshot() = PerfSnapshots.memorySnapshot()
-    fun diskSnapshot(context: Context) = PerfSnapshots.diskSnapshot(context)
-    fun perfSnapshot(context: Context) = PerfSnapshots.perfSnapshot(context)
-
-    private inline fun log(tag: String, message: String, logcat: (String) -> Unit) {
-        val line = formatLine(tag, message)
-        logcat(line)
-        if (BuildConfig.DEBUG) fileWriter.write(line)
+    fun shell(tag: String, msg: String, cid: String? = null) {
+        val line = fmt(tag, msg, cid); Log.i(TAG, line)
+        if (BuildConfig.DEBUG) writer(tag).write(line); emit("I", tag, msg, cid, source = "shell")
     }
 
-    private fun formatLine(prefix: String, message: String): String {
-        val elapsed = SystemClock.elapsedRealtime() - startTime
-        return "+${elapsed}ms [$prefix] $message | thread=${Thread.currentThread().name}"
+    private inline fun route(lvl: String, tag: String, msg: String, cid: String?, logcat: (String) -> Unit) {
+        logcat(fmt(tag, msg, cid)); if (BuildConfig.DEBUG) writer(tag).write(fmt(tag, msg, cid)); emit(lvl, tag, msg, cid)
+    }
+
+    private fun writer(tag: String) = if (tag in PERF_TAGS) perfWriter else fileWriter
+
+    private fun emit(lvl: String, tag: String, msg: String, cid: String?, source: String = "kotlin") {
+        val s = debugServer ?: return; val c = Throwable().stackTrace.getOrNull(3)
+        s.broadcast(s.buildLogJson(lvl, tag, msg, Thread.currentThread().name, source, c?.fileName ?: "", c?.lineNumber ?: 0, cid))
+    }
+
+    private fun fmt(prefix: String, msg: String, cid: String?): String {
+        val corr = if (cid != null) " corr=$cid" else ""
+        return "+${SystemClock.elapsedRealtime() - startTime}ms [$prefix] $msg$corr | thread=${Thread.currentThread().name}"
+    }
+
+    private fun trunc(t: Throwable): String {
+        val frames = t.stackTrace.take(10).joinToString("\n") { "  at $it" }
+        val more = (t.stackTrace.size - 10).let { if (it > 0) "\n  ... $it more" else "" }
+        return "$frames$more"
     }
 }
