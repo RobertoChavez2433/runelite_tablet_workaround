@@ -3,14 +3,14 @@
     "app_name": "Runelite for Tablet",
     "app_version": "0.1.0",
     "description": "Android installer app that runs the real RuneLite client on Samsung Tab S10 Ultra via Termux + proot-distro",
-    "last_updated": "2026-03-16T02:47:00Z",
-    "session_notes": "Session 60: Added a working internal-hybrid direct-jvm real RuneLite launch mode, fixed the evidence harness so appended Termux launch logs no longer cause false-positive readiness, fixed CRLF corruption in seeded direct classpaths, and validated fresh launcher-vs-direct comparisons. Direct-jvm reaches real RuneLite on VirGL, but it still lands in the same broad sustained FPS band, so bypassing the RuneLite launcher bootstrap is not the missing unlock. Added a direct classpath override directory for patched jars and confirmed the next concrete client patch target is GpuPlugin.prepareInterfaceTexture(...) / drawUi(...) in client-1.12.20.jar."
+    "last_updated": "2026-03-16T16:05:00Z",
+    "session_notes": "Session 62: Continued real-device 120 FPS diagnostics. Corrected the build/install target mistake: internal-hybrid uses libXlorie.so from com.runelitetablet base.apk, and the app-process X server extracts that same library to /data/data/com.termux/files/usr/tmp/termux-x11-com.runelitetablet-libs/arm64-v8a-libXlorie.so. Added native XlorieIdentity logs in lorie/activity.c and lorie/cmdentrypoint.c plus live DamageTraceV2 backend/function tracing in xserver/miext/damage/damage.c. Verified the real workload now emits DamageTraceV2 and is dominated by PutImage on WINDOW with backend=other from the extracted server libXlorie.so. Present remains inactive and sustained FPS is still ~30-33 average LorieNative. Next step is offset-map the hot PutImage/Composite function pointers back to the unstripped local libXlorie.so and instrument that exact implementation."
   },
   "current_phase": {
-    "phase_name": "Direct Android Surface Spike — Direct-JVM Patch Vehicle",
-    "phase_status": "direct_jvm_ready_for_client_patch_experiments",
-    "phase_started": "2026-03-15",
-    "progress_percentage": 99
+    "phase_name": "Presentation Pipeline 120 FPS Optimization",
+    "phase_status": "runtime_path_proven_offset_mapping_next",
+    "phase_started": "2026-03-16",
+    "progress_percentage": 22
   },
   "release_cycle": {
     "last_release": null,
@@ -21,27 +21,40 @@
   "active_blockers": [
     {
       "id": "real-runelite-sustained-fps-below-target",
-      "description": "On spike/direct-android-surface, clean-start real RuneLite evidence now spans stock, external hybrid, internal-hybrid, and internal-hybrid direct-jvm, and all of them still sit in essentially the same broad sustained performance band on the X11/VirGL route. Session 60 validated that bypassing the RuneLite launcher bootstrap does not unlock a credible sustained 120 FPS regime. The visible surface can still receive repeated ExplicitDefault (120.00 Hz) votes, yet real sustained throughput remains far below target.",
+      "description": "Corrected internal-hybrid evidence still shows the real workload far below target after proving the runtime path. Validated captures 20260316-114835, 20260316-115145, and 20260316-115428 kept LorieNative around ~30-33 FPS average while the visible surface still received 120 Hz votes.",
       "severity": "P0",
       "discovered": "2026-03-15",
-      "session": 60
+      "session": 62
     },
     {
-      "id": "upstream-frame-production-cadence-below-target",
-      "description": "Native timing and cadence instrumentation still show the Android-present step is not the main cap. Choreographer callbacks and redraw wakeups can still hit 120 FPS, while damage-triggered redraw cadence remains much lower and the renderer's estimated cadence follows that band. Session 60 further removed launcher ownership as the likely limiter, so the remaining ceiling still appears upstream in the RuneLite client render / upload / synchronization path rather than the Android presenter itself.",
+      "id": "hot-putimage-implementation-unresolved",
+      "description": "DamageTraceV2 now proves the hot steady-state path is PutImage on WINDOW with backend=other, not fbPutImage or miPutImage. The active function pointer lives inside the extracted app-process libXlorie.so, but its exact implementation has not yet been mapped back to the unstripped local binary.",
       "severity": "P0",
-      "discovered": "2026-03-15",
-      "session": 60
+      "discovered": "2026-03-16",
+      "session": 62
     },
     {
-      "id": "patched-client-jar-experiment-not-yet-run",
-      "description": "The branch now has a working direct-jvm patch vehicle plus a classpath-override directory for jar substitution, but no client-side patched jar experiment has been executed yet. The next meaningful step is to patch the identified RuneLite GPU upload target and measure it, not to keep iterating on launcher/X11 ownership.",
+      "id": "hot-function-symbols-stripped",
+      "description": "dladdr now resolves the hot PutImage and Composite function pointers to the extracted app-process libXlorie.so, but symbol names remain unknown. Offset logging and offline mapping against the unstripped local runelite-tablet build output are still needed.",
       "severity": "P1",
-      "discovered": "2026-03-15",
-      "session": 60
+      "discovered": "2026-03-16",
+      "session": 62
+    },
+    {
+      "id": "present-path-still-inactive",
+      "description": "Across the corrected runtime-identity captures, Present remains inactive (`present after-flips = 0 FPS`). The current workload is still not exercising the speculative Present/AHB path, so that phase remains gated behind direct hot-path mapping.",
+      "severity": "P1",
+      "discovered": "2026-03-16",
+      "session": 62
     }
   ],
   "resolved_blockers": [
+    {
+      "id": "hybrid-native-build-target-misidentified",
+      "description": "The 120 FPS investigation initially rebuilt and reinstalled only third_party/termux-x11-upstream :app, while the validated internal-hybrid path was actually using libXlorie.so packaged inside com.runelitetablet and extracted by CmdEntryPoint at runtime.",
+      "resolved": "2026-03-16",
+      "resolution": "Session 62: Added XlorieIdentity logs in activity.c and cmdentrypoint.c, proved the host process loads base.apk!/lib/arm64-v8a/libXlorie.so and the app-process server loads /data/data/com.termux/files/usr/tmp/termux-x11-com.runelitetablet-libs/arm64-v8a-libXlorie.so, then switched the correct build/install loop to runelite-tablet :app."
+    },
     {
       "id": "internal-hybrid-synthetic-control-not-yet-clean",
       "description": "The combined synthetic probe harness could drive the internal-hybrid CmdEntryPoint route, but the first fullscreen glxgears control attempt was invalid because deploy and probe overlapped. Android force-stopped com.runelitetablet during installPackageLI, so the resulting sample could not be used as a trustworthy control measurement.",
@@ -225,6 +238,11 @@
       "phase_name": "Direct-JVM Patch Vehicle",
       "completed": "2026-03-15",
       "notes": "Session 60: Added a working internal-hybrid direct-jvm launch mode, fixed launch-state scoping and CRLF classpath corruption, validated fresh launcher-vs-direct runs, and added a classpath-override directory for patched jar experiments. Pulled and disassembled the live RuneLite jars to confirm the concrete next patch target in GpuPlugin.prepareInterfaceTexture(...) / drawUi(...)."
+    },
+    {
+      "phase_name": "Presentation Pipeline Runtime Path Proof",
+      "completed": "2026-03-16",
+      "notes": "Session 62: Corrected the hybrid build/install target to runelite-tablet :app, proved runtime identity for both the host and app-process server copies of libXlorie.so, and validated that the live hot path is DamageTraceV2 PutImage on WINDOW with backend=other inside the extracted server library."
     }
   ],
   "dependencies_at_risk": [],

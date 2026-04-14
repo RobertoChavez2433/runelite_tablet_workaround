@@ -169,12 +169,12 @@
       "id": "gpu-acceleration",
       "name": "GPU Acceleration (Mali VirGL / Adreno Turnip)",
       "description": "lfdevs Mesa install, VirGL+ANGLE server, virpipe Gallium driver, Zink+Turnip for Adreno, dynamic Mesa version from GitHub API, runtime auto-detection with software fallback",
-      "status": "broken",
+      "status": "in_progress",
       "test_coverage": "none",
       "key_files": ["assets/scripts/setup-gpu.sh", "assets/scripts/setup-gpu-mali.sh", "assets/scripts/launch-runelite.sh", "setup/SetupOrchestrator.kt"],
       "session_implemented": 36,
-      "session_updated": 47,
-      "notes": "Session 47: lfdevs Mesa 26.1.0-devel installed. VirGL server runs. But virpipe driver can't find server socket from inside proot. BLOCKER: socket path not bind-mounted."
+      "session_updated": 62,
+      "notes": "Session 62: VirGL and the real GPU plugin path are working in validated internal-hybrid runs, but sustained throughput is still far below 120 FPS. Runtime identity is now proven for the app-owned host and app-process X server copies of libXlorie.so. The current hot path is DamageTraceV2 PutImage on WINDOW with backend=other from the extracted server library; exact symbol/offset mapping is the next step."
     },
     {
       "id": "session-ui",
