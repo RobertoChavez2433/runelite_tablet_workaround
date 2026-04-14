@@ -542,16 +542,32 @@ elif [ "$GPU_VENDOR" = "mali" ]; then
                 ;;
         esac
 
-        echo "Starting VirGL server profile '$VIRGL_SERVER_PROFILE' ($VIRGL_SERVER_DESCRIPTION)..." | tee -a "$LOGFILE"
-        env -u LD_LIBRARY_PATH virgl_test_server_android $VIRGL_SERVER_ARGS &
+        VIRGL_LOG="$HOME/virgl-server.log"
+        echo "Starting VirGL server profile='$VIRGL_SERVER_PROFILE' ($VIRGL_SERVER_DESCRIPTION)..." | tee -a "$LOGFILE"
+        env -u LD_LIBRARY_PATH virgl_test_server_android $VIRGL_SERVER_ARGS > "$VIRGL_LOG" 2>&1 &
         VIRGL_PID=$!
+        echo "VirGL server forked PID=$VIRGL_PID args='$VIRGL_SERVER_ARGS' log=$VIRGL_LOG" | tee -a "$LOGFILE"
 
         # Wait for server to be ready (PID alive AND socket exists)
         VIRGL_READY=false
+        VIRGL_PROBE_START=$(date +%s%3N 2>/dev/null || date +%s)
         for i in $(seq 1 30); do
-            if kill -0 $VIRGL_PID 2>/dev/null && [ -S "$VIRGL_SOCKET" ]; then
+            ALIVE=$(kill -0 $VIRGL_PID 2>/dev/null && echo "yes" || echo "no")
+            SOCKET_EXISTS=$([ -S "$VIRGL_SOCKET" ] && echo "yes" || echo "no")
+            if [ "$ALIVE" = "yes" ] && [ "$SOCKET_EXISTS" = "yes" ]; then
                 VIRGL_READY=true
+                echo "VirGL health probe $i/30: pid_alive=$ALIVE socket=$SOCKET_EXISTS — READY" | tee -a "$LOGFILE"
                 break
+            fi
+            if [ "$ALIVE" = "no" ]; then
+                echo "VirGL health probe $i/30: pid_alive=no — server died during startup (exit=$(wait $VIRGL_PID 2>/dev/null; echo $?))" | tee -a "$LOGFILE"
+                echo "VirGL stderr (last 20 lines):" | tee -a "$LOGFILE"
+                tail -20 "$VIRGL_LOG" 2>/dev/null | tee -a "$LOGFILE"
+                break
+            fi
+            # Only log every 5th probe to avoid spam
+            if [ $((i % 5)) -eq 0 ]; then
+                echo "VirGL health probe $i/30: pid_alive=$ALIVE socket=$SOCKET_EXISTS — waiting" | tee -a "$LOGFILE"
             fi
             sleep 0.2
         done
@@ -587,10 +603,15 @@ write_session_value state backend-starting
 
 # Re-check VirGL server is still alive (it may have crashed after initial health check)
 if [ -n "$VIRGL_PID" ] && ! kill -0 "$VIRGL_PID" 2>/dev/null; then
-    echo "WARNING: VirGL server died before launch — falling back to software rendering" | tee -a "$LOGFILE"
+    VIRGL_EXIT=$(wait "$VIRGL_PID" 2>/dev/null; echo $?)
+    echo "WARNING: VirGL server died before launch (exit=$VIRGL_EXIT) — falling back to software rendering" | tee -a "$LOGFILE"
+    echo "VirGL stderr (last 20 lines):" | tee -a "$LOGFILE"
+    tail -20 "$HOME/virgl-server.log" 2>/dev/null | tee -a "$LOGFILE"
     VIRGL_PID=""
     PROOT_GPU_ENV=""
     rm -f "$(session_file virgl.pid)" 2>/dev/null || true
+elif [ -n "$VIRGL_PID" ]; then
+    echo "VirGL server pre-launch re-check: PID $VIRGL_PID alive, socket=$(ls -la "$PREFIX/tmp/.virgl_test" 2>&1 | tail -1)" | tee -a "$LOGFILE"
 fi
 
 # Set display resolution via Termux:X11 preferences (xrandr doesn't work — no transform support).
@@ -618,6 +639,22 @@ if [ -n "$PROOT_GPU_ENV" ]; then
 else
     echo "Setting display: 1480x924 (software rendering, half-res)" | tee -a "$LOGFILE"
     timeout 5 termux-x11-preference displayResolutionMode:custom displayResolutionCustom:1480x924 2>&1 | tee -a "$LOGFILE" || true
+fi
+
+# Start VirGL background watchdog (detects mid-session death and logs it)
+if [ -n "$VIRGL_PID" ]; then
+    (
+        while kill -0 "$VIRGL_PID" 2>/dev/null; do
+            sleep 10
+        done
+        VIRGL_EXIT=$(wait "$VIRGL_PID" 2>/dev/null; echo $?)
+        echo "VIRGL_WATCHDOG: VirGL server died mid-session (PID=$VIRGL_PID exit=$VIRGL_EXIT) — GPU rendering will fail" | tee -a "$LOGFILE"
+        echo "VIRGL_WATCHDOG: last 30 lines of virgl-server.log:" | tee -a "$LOGFILE"
+        tail -30 "$HOME/virgl-server.log" 2>/dev/null | tee -a "$LOGFILE"
+        # Write death marker so Kotlin side can detect it
+        echo "dead:exit=$VIRGL_EXIT" > "$(session_file virgl.status)" 2>/dev/null || true
+    ) &
+    echo "VirGL watchdog started (background PID=$!)" | tee -a "$LOGFILE"
 fi
 
 echo "Launching RuneLite..." | tee -a "$LOGFILE"
@@ -688,21 +725,31 @@ elif [ "$PROOT_GPU_ENV" = "mali-angle" ] || [ "$PROOT_GPU_ENV" = "mali-native" ]
     export MESA_NO_ERROR=1
     export MESA_EXTENSION_OVERRIDE=-GL_ARB_depth_clamp,-GL_EXT_depth_clamp
 
-    echo "VirGL socket visible: $(ls -la /tmp/.virgl_test 2>&1)" >&2
-    GEARS_OUTPUT=$(timeout 3 glxgears -info 2>&1 || true)
-    GL_RENDERER=$(echo "$GEARS_OUTPUT" | grep -i "GL_RENDERER" | head -1 || true)
-    echo "VirGL glxgears check: $GL_RENDERER" >&2
-
-    if echo "$GL_RENDERER" | grep -qi "virgl"; then
-        OVERRIDE="4.3COMPAT"
-        GLSL_OVERRIDE="430"
-        export MESA_GL_VERSION_OVERRIDE="$OVERRIDE"
-        export MESA_GLSL_VERSION_OVERRIDE="$GLSL_OVERRIDE"
-        GPU_AVAILABLE=true
-        echo "GPU acceleration: ENABLED (VirGL, GL=$OVERRIDE GLSL=$GLSL_OVERRIDE)" >&2
-    else
-        echo "GPU acceleration: VirGL not detected ($GL_RENDERER), falling back to software" >&2
+    VIRGL_SOCKET_STATUS=$(ls -la /tmp/.virgl_test 2>&1)
+    echo "VirGL socket visible: $VIRGL_SOCKET_STATUS" >&2
+    if [ ! -S /tmp/.virgl_test ]; then
+        echo "VIRGL_VALIDATION: FAIL — socket /tmp/.virgl_test does not exist or is not a socket" >&2
+        echo "VIRGL_VALIDATION: This means the VirGL server (running in Termux) is not reachable from proot" >&2
         unset GALLIUM_DRIVER VTEST_SOCKET_NAME MESA_GLX_ALPHA_BITS MESA_NO_ERROR MESA_EXTENSION_OVERRIDE
+    else
+        GEARS_OUTPUT=$(timeout 3 glxgears -info 2>&1 || true)
+        GL_RENDERER=$(echo "$GEARS_OUTPUT" | grep -i "GL_RENDERER" | head -1 || true)
+        GL_VENDOR=$(echo "$GEARS_OUTPUT" | grep -i "GL_VENDOR" | head -1 || true)
+        GEARS_FPS=$(echo "$GEARS_OUTPUT" | grep -i "frames in" | head -1 || true)
+        echo "VirGL glxgears: renderer='$GL_RENDERER' vendor='$GL_VENDOR' fps='$GEARS_FPS'" >&2
+
+        if echo "$GL_RENDERER" | grep -qi "virgl"; then
+            OVERRIDE="4.3COMPAT"
+            GLSL_OVERRIDE="430"
+            export MESA_GL_VERSION_OVERRIDE="$OVERRIDE"
+            export MESA_GLSL_VERSION_OVERRIDE="$GLSL_OVERRIDE"
+            GPU_AVAILABLE=true
+            echo "VIRGL_VALIDATION: PASS — GL=$OVERRIDE GLSL=$GLSL_OVERRIDE renderer=$GL_RENDERER" >&2
+        else
+            echo "VIRGL_VALIDATION: FAIL — GL_RENDERER='$GL_RENDERER' does not contain 'virgl'" >&2
+            echo "VIRGL_VALIDATION: Socket exists but rendering pipeline broken — check virgl-server.log" >&2
+            unset GALLIUM_DRIVER VTEST_SOCKET_NAME MESA_GLX_ALPHA_BITS MESA_NO_ERROR MESA_EXTENSION_OVERRIDE
+        fi
     fi
 else
     echo "GPU acceleration: UNAVAILABLE (software rendering)" >&2
