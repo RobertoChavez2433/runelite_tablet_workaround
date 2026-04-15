@@ -34,6 +34,9 @@ class AppContainer(context: Context) {
     val session = SessionModule(termux.commandRunner).also {
         AppLog.d("DI", "AppContainer: SessionModule instantiated")
     }
+    val perf = PerfModule(core.logger).also {
+        AppLog.d("DI", "AppContainer: PerfModule instantiated")
+    }
     val displayPreferences = DisplayPreferences(context)
     val presentationBackend = PresentationBackends.stable
     val xlorieLoader = ExternalXlorieLoader()

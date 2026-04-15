@@ -21,6 +21,7 @@ import com.runelitetablet.BuildConfig
 import com.runelitetablet.logging.AppLog
 import com.runelitetablet.logging.FdTracker
 import com.runelitetablet.logging.PerfSnapshots
+import com.runelitetablet.perf.PerfDashboard
 import com.termux.x11.LorieView
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -37,6 +38,7 @@ class HybridX11HostActivity : ComponentActivity() {
     private var lastHandledGeneration = 0
     private var lastStatusMessage: String? = null
     private var lifecycleActive = false
+    private var perfDashboard: PerfDashboard? = null
     private val frameTracker = FrameTimingTracker()
     private var frameCount = 0L
     private var lastFrameLogCount = 0L
@@ -103,6 +105,14 @@ class HybridX11HostActivity : ComponentActivity() {
         initViews()
         initAttachController()
         observeBridgeState()
+        val container = (application as com.runelitetablet.RuneLiteTabletApp).container
+        perfDashboard = container.perf.dashboard
+        // Wire native XloriePerf stats into the perf dashboard
+        container.debugLogServer?.nativeLogListener = { msg ->
+            PerfDashboard.parseXloriePerfLine(msg)?.let { stats ->
+                perfDashboard?.updateRendererStats(stats.fps, stats.choreoPct, stats.contentPct, stats.statePct)
+            }
+        }
         AppLog.lifecycle("HybridX11HostActivity.onCreate")
         updateStatus("loaded Xlorie from ${loadResult.loadedFrom}")
     }
@@ -182,16 +192,24 @@ class HybridX11HostActivity : ComponentActivity() {
         previousFrameTimeNanos = 0L
         Choreographer.getInstance().postFrameCallback(frameCallback)
         attachController.startAttachLoop(lifecycleScope)
-        AppLog.lifecycle("HybridX11HostActivity.onResume: frame callback + attach loop started, sessionId=$frameSessionId")
+        // Phase 2C: Lifecycle parity — reload preferences and notify connection state on resume
+        // (upstream MainActivity does this; prevents legacy_drawing regression after backgrounding)
+        if (::lorieView.isInitialized && ::sharedPrefs.isInitialized) {
+            lorieView.reloadPreferences(sharedPrefs)
+            com.termux.x11.MainActivity.getInstance()?.clientConnectedStateChanged()
+        }
+        perfDashboard?.start()
+        AppLog.lifecycle("HybridX11HostActivity.onResume: frame callback + attach loop + perf dashboard started, sessionId=$frameSessionId")
     }
 
     override fun onPause() {
         lifecycleActive = false
+        perfDashboard?.stop()
         Choreographer.getInstance().removeFrameCallback(frameCallback)
         frameSessionId = null
         attachController.cancelAttachLoop()
         FdTracker.dumpLeaks("onPause")
-        AppLog.lifecycle("HybridX11HostActivity.onPause: frame callback + attach loop stopped")
+        AppLog.lifecycle("HybridX11HostActivity.onPause: frame callback + attach loop + perf dashboard stopped")
         super.onPause()
     }
 

@@ -23,38 +23,64 @@ class DebugLogServer(private val port: Int = DEFAULT_PORT) {
     private var serverSocket: ServerSocket? = null
     private var acceptThread: Thread? = null
     private var logcatThread: Thread? = null
+    private var sendThread: Thread? = null
     private val clients = CopyOnWriteArrayList<WsClient>()
+    private val sendQueue = ConcurrentLinkedQueue<ByteArray>()
     private val startTimeMs = System.currentTimeMillis()
+
+    /** Callback for native log lines (XloriePerf, etc). Set by PerfDashboard to receive renderer stats. */
+    @Volatile var nativeLogListener: ((String) -> Unit)? = null
 
     fun start() {
         if (!running.compareAndSet(false, true)) return
         acceptThread = Thread({ acceptLoop() }, "DebugLogServer-Accept").also { it.isDaemon = true; it.start() }
         logcatThread = Thread({ logcatBridge() }, "DebugLogServer-Logcat").also { it.isDaemon = true; it.start() }
+        sendThread = Thread({ sendLoop() }, "DebugLogServer-Send").also { it.isDaemon = true; it.start() }
     }
 
     fun stop() {
         if (!running.compareAndSet(true, false)) return
         try { serverSocket?.close() } catch (_: Exception) {}
         logcatThread?.interrupt()
+        sendThread?.interrupt()
         clients.forEach { it.close() }
         clients.clear()
+        sendQueue.clear()
     }
 
+    /**
+     * Enqueue a log for broadcast. Safe to call from any thread (including main).
+     * Actual socket writes happen on the send thread to avoid NetworkOnMainThreadException.
+     */
     fun broadcast(json: String) {
-        val frame = encodeWsFrame(json)
-        val dead = mutableListOf<WsClient>()
-        for (client in clients) {
-            try { client.send(frame) } catch (_: Exception) { dead.add(client) }
-        }
-        dead.forEach { it.close(); clients.remove(it) }
+        if (clients.isEmpty()) return
+        sendQueue.offer(encodeWsFrame(json))
+        // Cap queue to prevent unbounded growth when no clients are draining fast enough
+        while (sendQueue.size > 500) sendQueue.poll()
     }
 
     val isRunning: Boolean get() = running.get()
     val clientCount: Int get() = clients.size
 
+    private fun sendLoop() {
+        while (running.get()) {
+            val frame = sendQueue.poll()
+            if (frame == null) {
+                Thread.sleep(10) // Avoid busy spin
+                continue
+            }
+            val dead = mutableListOf<WsClient>()
+            for (client in clients) {
+                try { client.send(frame) } catch (_: Exception) { dead.add(client) }
+            }
+            dead.forEach { it.close(); clients.remove(it) }
+        }
+    }
+
     private fun acceptLoop() {
         try {
             serverSocket = ServerSocket(port).also { it.reuseAddress = true }
+            Log.i(TAG, "DebugLogServer listening on port $port")
             while (running.get()) {
                 val socket = serverSocket!!.accept()
                 Thread({ handleConnection(socket) }, "DebugLogServer-Client").also { it.isDaemon = true; it.start() }
@@ -66,14 +92,28 @@ class DebugLogServer(private val port: Int = DEFAULT_PORT) {
 
     private fun handleConnection(socket: Socket) {
         try {
-            val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
-            val requestLine = reader.readLine() ?: return
+            // Read HTTP headers as raw bytes — do NOT wrap in BufferedReader/InputStreamReader
+            // which do read-ahead buffering and corrupt the stream for WebSocket upgrade.
+            val input = socket.getInputStream()
+            val headerBytes = ByteArray(4096)
+            var pos = 0
+            while (pos < headerBytes.size) {
+                val b = input.read()
+                if (b == -1) return
+                headerBytes[pos++] = b.toByte()
+                // Detect end of headers: \r\n\r\n
+                if (pos >= 4 &&
+                    headerBytes[pos - 4] == '\r'.code.toByte() && headerBytes[pos - 3] == '\n'.code.toByte() &&
+                    headerBytes[pos - 2] == '\r'.code.toByte() && headerBytes[pos - 1] == '\n'.code.toByte()
+                ) break
+            }
+            val headerText = String(headerBytes, 0, pos, Charsets.US_ASCII)
+            val lines = headerText.split("\r\n")
+            val requestLine = lines.firstOrNull() ?: return
             val headers = mutableMapOf<String, String>()
-            var line = reader.readLine()
-            while (!line.isNullOrEmpty()) {
-                val colon = line.indexOf(':')
-                if (colon > 0) headers[line.substring(0, colon).trim().lowercase()] = line.substring(colon + 1).trim()
-                line = reader.readLine()
+            for (i in 1 until lines.size) {
+                val colon = lines[i].indexOf(':')
+                if (colon > 0) headers[lines[i].substring(0, colon).trim().lowercase()] = lines[i].substring(colon + 1).trim()
             }
 
             val path = requestLine.split(" ").getOrNull(1) ?: "/"
@@ -97,6 +137,7 @@ class DebugLogServer(private val port: Int = DEFAULT_PORT) {
         socket.getOutputStream().flush()
         val client = WsClient(socket)
         clients.add(client)
+        Log.i(TAG, "WebSocket client connected, total clients: ${clients.size}")
         // Keep connection alive — read loop (handles pings/close frames)
         try {
             val input = socket.getInputStream()
@@ -134,16 +175,21 @@ class DebugLogServer(private val port: Int = DEFAULT_PORT) {
 
     private fun logcatBridge() {
         try {
-            val process = Runtime.getRuntime().exec(arrayOf("logcat", "-v", "threadtime", "-s", "LorieNative:V"))
+            val process = Runtime.getRuntime().exec(arrayOf(
+                "logcat", "-v", "threadtime", "-s",
+                "LorieNative:V", "gles-renderer:V", "XlorieCaps:V", "Xlorie:V"
+            ))
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             while (running.get()) {
                 val line = reader.readLine() ?: break
+                val msg = parseLogcatMessage(line)
                 val json = buildLogJson(
-                    level = parseLogcatLevel(line), tag = "LorieNative",
-                    msg = line, thread = parseLogcatThread(line),
+                    level = parseLogcatLevel(line), tag = parseLogcatTag(line),
+                    msg = msg, thread = parseLogcatThread(line),
                     source = "native", file = "", lineNum = 0, correlationId = null
                 )
                 broadcast(json)
+                if (msg.contains("XloriePerf:")) nativeLogListener?.invoke(msg)
             }
             process.destroy()
         } catch (e: Exception) {
@@ -203,6 +249,19 @@ class DebugLogServer(private val port: Int = DEFAULT_PORT) {
         private fun parseLogcatThread(line: String): String {
             val parts = line.trim().split(Regex("\\s+"))
             return if (parts.size >= 4) parts[3] else "unknown"
+        }
+
+        fun parseLogcatTag(line: String): String {
+            // threadtime format: "04-14 17:36:43.823 27320 27400 D gles-renderer: message"
+            // parts: [date, time, pid, tid, level, tag:, ...]
+            val parts = line.trim().split(Regex("\\s+"))
+            return if (parts.size >= 6) parts[5].trimEnd(':') else "native"
+        }
+
+        fun parseLogcatMessage(line: String): String {
+            // Everything after first ": " is the message body
+            val colonSpace = line.indexOf(": ")
+            return if (colonSpace >= 0) line.substring(colonSpace + 2) else line
         }
 
         fun buildViewerHtml(): String = """<!DOCTYPE html>
