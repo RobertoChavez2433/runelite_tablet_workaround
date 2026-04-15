@@ -1,55 +1,65 @@
 # Session State
 
-**Last Updated**: 2026-04-14 | **Session**: 67
+**Last Updated**: 2026-04-14 | **Session**: 69
 
 ## Current Phase
-- **Phase**: Phase 9 — Comprehensive Logging System (COMPLETE)
-- **Status**: 205 tests passing. Phase 9 fully implemented: DebugLogServer, Logger extensions, 30+ Kotlin files instrumented, native C instrumented (activity.c + renderer.c), PerfLogWriter, correlation IDs, MockWebServer integration tests, LaunchCoordinator + SetupViewModel unit tests.
+- **Phase**: Phase 9 — Comprehensive Logging System (COMPLETE + DEVICE-VERIFIED)
+- **Status**: 210 tests passing. 127/128 spec items PASS. All logging verified operational on Samsung Tab S10 Ultra. RuneLite renders at 120 FPS Kotlin-side, 42-54 FPS native damage redraws (VirGL bottleneck).
 
 ## HOT CONTEXT - Resume Here
 
 ### EXACTLY WHERE WE LEFT OFF
 
-**Session 67: Phase 9 fully implemented + tests. 205 tests pass.**
+**Session 69: Device verification PASSED. All logging operational. RuneLite running.**
 
-All spec items implemented:
-- **9.1**: DebugLogServer WebSocket on port 8099 with HTML viewer + logcat bridge
-- **9.2**: Logger interface: 11 new methods + correlationId on all methods
-- **9.3**: 30+ Kotlin files instrumented (setup, auth, session, DI, presentation, installer, termux)
-- **9.4**: Graphics pipeline logging — Choreographer frame callback, surface lifecycle timing, JNI call timing, binder lifecycle + death timing, fd tracking, native C: nativeInit per-method confirmation, connect_ fd transition, xcallback event/error logging, JNI exception checks, startLogcat fork logging, GL error drain fix, shader compile logging, perf stats 1s interval, rendererInit summary
-- **9.5**: Correlation IDs at setup/auth/launch top-level actions
-- **9.6**: LogFileWriter queue health + handler death, Choreographer re-registration protection, binder race check, PerfLogWriter, AppLog convenience methods moved to PerfSnapshots
-- **9.7**: JagexOAuth2ManagerTest (10 MockWebServer tests), LaunchCoordinatorTest (5 tests), SetupViewModelTest (10 tests)
+Device verification results (Samsung Tab S10 Ultra, API 36, arm64):
+- **App boot → setup**: 29.7s, all steps pass, `corr=setup-78a7`
+- **Auth**: Token expired → GeckoView login → 2-step OAuth → session valid (200)
+- **Launch**: health check OK, env deploy, backend=hybrid_x11, binder attach 2ms
+- **Surface**: 2960x1848 BGRA_8888, JNI latency 0-8ms, framerate=120
+- **Frame timing**: 120 FPS, 0 jank, P99=8.3ms, heap=12MB
+- **Native**: All 16 JNI methods OK, shaders compiled, buffer balance tracking works
+- **DebugLogServer**: HTML viewer + WebSocket both serving on port 8099
+- **Correlation IDs**: 3-level nesting verified (`launch-26d9/auth-refresh-19ae/refresh-5e2c`)
 
 ### What Needs to Happen Next
 
-1. **P0: Device verification** — deploy to Samsung Tab S10 Ultra, verify app boots, setup completes, auth works, RuneLite renders
-2. **P0: Verify DebugLogServer** — `adb forward tcp:8099 tcp:8099` + browser at localhost:8099 shows live logs
-3. **P2: ApkDownloaderTest with MockWebServer** — requires Android instrumented test (Context.cacheDir)
+1. **P0: Fix native FPS ceiling** — damage-triggered redraws at 42-54 FPS vs 120 FPS choreographer. VirGL readback is the bottleneck.
+2. **P1: Attach loop chatty** — X11AttachmentController retries every 250ms even when connected (attempt=280+). Should stop after successful attach.
+3. **P1: Session health monitor** — `session=no virgl=n/a` during launch (sentinel not yet created). First poll always shows STOPPED, debounce handles it but ideally delay first poll.
+4. **P2: triggerCallback 34ms delay** — UI thread saturated during initial attach. Investigate.
 
 ## Blockers
 
-**1. VirGL vtest synchronous readback is the structural FPS ceiling**
+**1. VirGL vtest synchronous readback is the structural FPS ceiling** (confirmed: 42-54 FPS native redraws)
 **2. Xlorie legacy drawing active on Mali due to wrong format**
 **3. `waitForNextFrame` 2-vsync cap**
 
 ## Recent Sessions
 
-### Session 67 (2026-04-14)
-**Work**: Full Phase 9 implementation. DebugLogServer, Logger 11 new methods + correlationId, 30+ Kotlin files instrumented, native C (activity.c + renderer.c) instrumented with fd transition logging/JNI exception checks/GL error drain/shader logging/1s perf interval. Created PerfLogWriter. Correlation IDs. Edge case protections. JagexOAuth2ManagerTest (10 MockWebServer tests), LaunchCoordinatorTest (5 tests), SetupViewModelTest (10 tests). Added `returnDefaultValues=true` to build.gradle. 205 tests pass.
-**Decisions**: PkceHelper stays pure JVM. DisplayPreferences too simple to log. ApkDownloaderTest needs instrumented test (Context). GL error drain changed from single-return to full drain loop. Perf stats interval 5s→1s.
-**Next**: Device verification.
+### Session 69 (2026-04-14)
+**Work**: Device verification on Samsung Tab S10 Ultra. Built + deployed debug APK. Full end-to-end: boot → setup (29.7s) → auth (token expired → GeckoView → 2-step OAuth → valid) → launch (health check → env deploy → hybrid_x11) → rendering (120 FPS Kotlin, 42-54 FPS native). All logging layers verified: DI, setup, auth, correlation IDs (3 levels), surface lifecycle, binder bridge, fd tracking, buffer balance, native init/shaders/mmap, DebugLogServer HTML+WebSocket, session health. Saved device logs to docs/logs/.
+**Decisions**: Attach loop needs a connected-state guard (too chatty). Session health first-poll timing needs work. Frame timing reporting is accurate.
+**Next**: Fix native FPS ceiling (VirGL readback bottleneck).
 
-### Session 66 (2026-04-14)
-**Work**: Spec audit (9/10 PASS). Logging audit (53/82 files unlogged). Wrote Phase 9 spec.
+### Session 68 (2026-04-14)
+**Work**: Three spec audit rounds closing ALL gaps. 127/128 spec items PASS. VirGL watchdog, FdTracker, deep correlation threading, ApkDownloaderTest. 11 layer-organized commits. 210 tests.
+**Decisions**: FdTracker as singleton. Logger injection with AppLog default. VirGL background watchdog.
+**Next**: Device verification (completed in session 69).
+
+### Session 67 (2026-04-14)
+**Work**: Full Phase 9 implementation. DebugLogServer, Logger 11 new methods, 30+ files instrumented, native C instrumented. 205 tests.
+**Next**: Spec audit (completed in session 68).
 
 ## Active Plans
 
-- **Phase 9: Comprehensive Logging System** — **COMPLETE**. All spec items implemented. 205 tests pass.
+- **Phase 9: Comprehensive Logging System** — **COMPLETE + DEVICE-VERIFIED**. 127/128 spec items. 210 tests. All layers verified on device.
 - **Clean Architecture Refactor (Phases 1-8)** — **COMPLETE**.
-- **Presentation Pipeline 120 FPS** — **UNBLOCKED by logging system**. Testing pipeline + logging will enable fast iteration.
+- **Presentation Pipeline 120 FPS** — **UNBLOCKED**. Logging confirms VirGL readback is the ceiling (42-54 FPS damage redraws). Next: attack the readback path.
 
 ## Reference
 - **Source code**: `runelite-tablet/app/src/main/java/com/runelitetablet/`
 - **Test code**: `runelite-tablet/app/src/test/java/com/runelitetablet/`
 - **Native code**: `third_party/termux-x11-upstream/app/src/main/cpp/lorie/`
+- **Debug docs**: `runelite-tablet/docs/debug-logging.md`
+- **Device logs (session 69)**: `runelite-tablet/docs/logs/2026-04-14-device-verification-rlt.log` (10K lines), `*-native.log` (1.4K lines), `*-full.log` (149K lines)

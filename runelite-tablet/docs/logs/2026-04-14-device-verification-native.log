@@ -1,0 +1,1375 @@
+04-14 17:45:37.999 28700 28700 I LorieNative: XlorieIdentity: where=activity.constructor pid=28700 prog=app_process exe=/system/bin/app_process64 so=/data/app/~~4xWWPGGetyYO42NeBLUUNg==/com.termux.x11-pp-5OZarLAmzzHwFxuTsOw==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=/system/bin/app_process -Xnoimage-dex2oat / com.termux.x11.Loader :0 
+04-14 17:45:38.000 28700 28700 I LorieNative: XlorieIdentity: where=activity.JNI_OnLoad pid=28700 prog=app_process exe=/system/bin/app_process64 so=/data/app/~~4xWWPGGetyYO42NeBLUUNg==/com.termux.x11-pp-5OZarLAmzzHwFxuTsOw==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=/system/bin/app_process -Xnoimage-dex2oat / com.termux.x11.Loader :0 
+04-14 17:45:38.220 28700 28700 I LorieNative: XlorieIdentity: where=cmd.start pid=28700 prog=app_process exe=/system/bin/app_process64 so=/data/app/~~4xWWPGGetyYO42NeBLUUNg==/com.termux.x11-pp-5OZarLAmzzHwFxuTsOw==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=/system/bin/app_process -Xnoimage-dex2oat / com.termux.x11.Loader :0 
+04-14 17:45:38.221 28700 28700 V LorieNative: Using TMPDIR="/data/data/com.termux/files/usr/tmp"
+04-14 17:45:38.295 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=AHARDWAREBUFFER format=5 imported=0 flipped=0 mem=0 id=0
+04-14 17:45:38.296 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=1
+04-14 17:45:38.297 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=2
+04-14 17:45:38.297 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=3
+04-14 17:45:39.495 23282 23282 I LorieNative: XlorieIdentity: where=activity.constructor pid=23282 prog=com.runelitetablet exe=/system/bin/app_process64 so=/data/app/~~GwVgmwgw9Vl0uLfvqkfeNQ==/com.runelitetablet-3rYsTMjvCPfilUW61_rtAQ==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=com.runelitetablet                                                                                 
+04-14 17:45:39.495 23282 23282 I LorieNative: XlorieIdentity: where=activity.JNI_OnLoad pid=23282 prog=com.runelitetablet exe=/system/bin/app_process64 so=/data/app/~~GwVgmwgw9Vl0uLfvqkfeNQ==/com.runelitetablet-3rYsTMjvCPfilUW61_rtAQ==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=com.runelitetablet                                                                                 
+04-14 17:45:39.497 23282 23282 I LorieNative: XlorieIdentity: where=activity.nativeInit pid=23282 prog=com.runelitetablet exe=/system/bin/app_process64 so=/data/app/~~GwVgmwgw9Vl0uLfvqkfeNQ==/com.runelitetablet-3rYsTMjvCPfilUW61_rtAQ==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=com.runelitetablet                                                                                 
+04-14 17:45:39.497 23282 23282 I LorieNative: nativeInit: initializing JNI class/method lookups
+04-14 17:45:39.497 23282 23282 D LorieNative: nativeInit: Charset class+methods OK
+04-14 17:45:39.497 23282 23282 D LorieNative: nativeInit: CharBuffer class+methods OK
+04-14 17:45:39.498 23282 23282 I LorieNative: nativeInit: all 16 JNI methods registered successfully
+04-14 17:45:39.498 23282 23282 I LorieNative: nativeInit: AttachCurrentThread result=0 env=0xb40000762fa2bc90
+04-14 17:45:39.500 23282 28764 D LorieNative: shader: type=VERTEX status=1
+04-14 17:45:39.500 23282 28764 D LorieNative: shader: type=FRAGMENT status=1
+04-14 17:45:39.501 23282 28764 D LorieNative: shader: type=VERTEX status=1
+04-14 17:45:39.501 23282 28764 D LorieNative: shader: type=FRAGMENT status=1
+04-14 17:45:39.504 28700 28738 I LorieNative: XlorieIdentity: where=cmd.getXConnection pid=28700 prog=app_process exe=/system/bin/app_process64 so=/data/app/~~4xWWPGGetyYO42NeBLUUNg==/com.termux.x11-pp-5OZarLAmzzHwFxuTsOw==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=/system/bin/app_process -Xnoimage-dex2oat / com.termux.x11.Loader :0 
+04-14 17:45:39.505 28700 28729 I LorieNative: Sent shared buffer width 1280 stride 1280 height 1024 format 5 type 3 id 0
+04-14 17:45:39.505 23282 23282 D LorieNative: connect_: new fd=259 added to ALooper (old_fd=-1)
+04-14 17:45:39.510 23282 23282 D LorieNative: xcallback: EVENT_SHARED_SERVER_STATE stateFd=258
+04-14 17:45:39.510 23282 23282 D LorieNative: xcallback: mmap success addr=0x75beb67000 size=1048760 fd=258
+04-14 17:45:39.511 23282 23282 I LorieNative: Received shared buffer width 1280 stride 1280 height 1024 format 5 type 3 id 0
+04-14 17:45:39.511 23282 23282 D LorieNative: buffer: alloc count=1 (free=0 outstanding=1)
+04-14 17:45:39.521 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=AHARDWAREBUFFER format=5 imported=0 flipped=0 mem=0 id=4
+04-14 17:45:39.524 28700 28729 I LorieNative: PixmapTrace: SetWindowPixmap old-root pixmap=0xb400007adfc75f50 drawable=1280x1024 hasPriv=1 hasBuffer=1 type=AHARDWAREBUFFER format=5 imported=0 flipped=0 mem=0 id=0
+04-14 17:45:39.525 28700 28729 I LorieNative: PixmapTrace: SetWindowPixmap new-root pixmap=0xb400007adfc786b0 drawable=2960x1848 hasPriv=1 hasBuffer=1 type=AHARDWAREBUFFER format=5 imported=0 flipped=0 mem=0 id=4
+04-14 17:45:39.525 28700 28729 I LorieNative: Sent shared buffer width 2960 stride 2960 height 1848 format 5 type 3 id 4
+04-14 17:45:39.526 28700 28729 V LorieNative: New reported framerate is 120
+04-14 17:45:39.533 23282 23282 D LorieNative: xcallback: EVENT_REMOVE_BUFFER id=0
+04-14 17:45:39.533 23282 23282 D LorieNative: buffer: free count=1 (alloc=1 outstanding=0)
+04-14 17:45:39.533 23282 23282 I LorieNative: Received shared buffer width 2960 stride 2960 height 1848 format 5 type 3 id 4
+04-14 17:45:39.533 23282 23282 D LorieNative: buffer: alloc count=2 (free=1 outstanding=1)
+04-14 17:45:43.295 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 54.8 FPS
+04-14 17:45:43.295 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 53.4 FPS
+04-14 17:45:43.295 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 0.2 FPS
+04-14 17:45:43.295 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:45:43.295 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:45:43.295 28700 28729 I LorieNative: 4 frames in 5.0 seconds = 0.8 FPS
+04-14 17:45:48.295 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 38.4 FPS
+04-14 17:45:48.295 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 38.4 FPS
+04-14 17:45:48.295 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 0.0 FPS
+04-14 17:45:48.295 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:45:48.295 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:45:53.295 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 31.2 FPS
+04-14 17:45:53.295 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 31.2 FPS
+04-14 17:45:53.295 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 0.0 FPS
+04-14 17:45:53.295 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:45:53.295 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:45:53.295 28700 28729 I LorieNative: 8 frames in 5.0 seconds = 1.6 FPS
+04-14 17:45:58.296 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 80.6 FPS
+04-14 17:45:58.296 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 80.6 FPS
+04-14 17:45:58.296 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 0.0 FPS
+04-14 17:45:58.296 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:45:58.296 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:45:58.296 28700 28729 I LorieNative: 119 frames in 5.0 seconds = 23.8 FPS
+04-14 17:46:03.296 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 55.6 FPS
+04-14 17:46:03.296 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 55.6 FPS
+04-14 17:46:03.296 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 22.0 FPS
+04-14 17:46:03.296 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:46:03.296 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:46:03.296 28700 28729 I LorieNative: 109 frames in 5.0 seconds = 21.8 FPS
+04-14 17:46:03.839 23282 23282 D LorieNative: xcallback: EVENT_REMOVE_BUFFER id=4
+04-14 17:46:03.839 23282 23282 D LorieNative: buffer: free count=2 (alloc=2 outstanding=0)
+04-14 17:46:03.855 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=AHARDWAREBUFFER format=5 imported=0 flipped=0 mem=0 id=5
+04-14 17:46:03.855 28700 28729 I LorieNative: Sent shared buffer width 2960 stride 2960 height 1848 format 5 type 3 id 5
+04-14 17:46:03.855 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=6
+04-14 17:46:03.856 23282 23282 I LorieNative: Received shared buffer width 2960 stride 2960 height 1848 format 5 type 3 id 5
+04-14 17:46:03.856 23282 23282 D LorieNative: buffer: alloc count=3 (free=2 outstanding=1)
+04-14 17:46:03.856 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=7
+04-14 17:46:03.856 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=8
+04-14 17:46:04.584 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=9
+04-14 17:46:04.662 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=10
+04-14 17:46:04.663 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=11
+04-14 17:46:04.663 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=12
+04-14 17:46:04.663 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=13
+04-14 17:46:04.663 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=14
+04-14 17:46:04.663 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=15
+04-14 17:46:04.663 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=16
+04-14 17:46:04.664 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=17
+04-14 17:46:04.664 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=18
+04-14 17:46:04.664 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=19
+04-14 17:46:04.664 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=20
+04-14 17:46:04.664 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=21
+04-14 17:46:04.664 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=22
+04-14 17:46:04.664 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=23
+04-14 17:46:04.664 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=24
+04-14 17:46:04.664 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=25
+04-14 17:46:04.665 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=26
+04-14 17:46:04.665 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=27
+04-14 17:46:04.665 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=28
+04-14 17:46:04.665 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=29
+04-14 17:46:04.665 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=30
+04-14 17:46:04.665 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=31
+04-14 17:46:04.665 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=32
+04-14 17:46:04.665 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=33
+04-14 17:46:04.665 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=34
+04-14 17:46:04.665 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=35
+04-14 17:46:04.665 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=36
+04-14 17:46:04.665 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=37
+04-14 17:46:04.666 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=38
+04-14 17:46:04.666 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=39
+04-14 17:46:04.666 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=40
+04-14 17:46:04.666 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=41
+04-14 17:46:04.666 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=42
+04-14 17:46:04.666 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=43
+04-14 17:46:04.666 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=44
+04-14 17:46:04.666 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=45
+04-14 17:46:04.666 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=46
+04-14 17:46:04.666 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=47
+04-14 17:46:04.666 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=48
+04-14 17:46:04.666 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=49
+04-14 17:46:04.666 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=50
+04-14 17:46:04.666 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=51
+04-14 17:46:04.666 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=52
+04-14 17:46:04.667 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=53
+04-14 17:46:04.668 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=54
+04-14 17:46:04.668 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=55
+04-14 17:46:04.668 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=56
+04-14 17:46:04.668 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=57
+04-14 17:46:04.668 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=58
+04-14 17:46:04.668 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=59
+04-14 17:46:04.668 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=60
+04-14 17:46:04.668 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=61
+04-14 17:46:04.668 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=62
+04-14 17:46:04.668 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=63
+04-14 17:46:04.668 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=64
+04-14 17:46:04.668 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=65
+04-14 17:46:04.668 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=66
+04-14 17:46:04.669 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=67
+04-14 17:46:04.669 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=68
+04-14 17:46:04.669 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=69
+04-14 17:46:04.684 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=70
+04-14 17:46:04.684 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=71
+04-14 17:46:04.684 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=72
+04-14 17:46:04.729 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=73
+04-14 17:46:04.729 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=74
+04-14 17:46:04.729 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=75
+04-14 17:46:04.729 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=76
+04-14 17:46:04.789 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=77
+04-14 17:46:04.789 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=78
+04-14 17:46:04.789 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=79
+04-14 17:46:05.262 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=80
+04-14 17:46:05.263 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=81
+04-14 17:46:05.263 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=82
+04-14 17:46:05.263 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=83
+04-14 17:46:05.263 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=84
+04-14 17:46:05.263 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=85
+04-14 17:46:05.263 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=86
+04-14 17:46:05.263 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=87
+04-14 17:46:05.263 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=88
+04-14 17:46:05.263 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=89
+04-14 17:46:05.263 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=90
+04-14 17:46:05.263 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=91
+04-14 17:46:05.263 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=92
+04-14 17:46:05.263 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=93
+04-14 17:46:05.264 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=94
+04-14 17:46:05.264 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=95
+04-14 17:46:05.264 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=96
+04-14 17:46:05.264 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=97
+04-14 17:46:05.264 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=98
+04-14 17:46:05.264 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=99
+04-14 17:46:05.264 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=100
+04-14 17:46:05.264 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=101
+04-14 17:46:05.264 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=102
+04-14 17:46:05.264 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=103
+04-14 17:46:05.264 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=104
+04-14 17:46:05.264 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=105
+04-14 17:46:05.264 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=106
+04-14 17:46:05.265 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=107
+04-14 17:46:05.265 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=108
+04-14 17:46:05.265 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=109
+04-14 17:46:05.265 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=110
+04-14 17:46:05.265 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=111
+04-14 17:46:05.265 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=112
+04-14 17:46:05.265 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=113
+04-14 17:46:05.265 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=114
+04-14 17:46:05.265 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=115
+04-14 17:46:05.265 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=116
+04-14 17:46:05.265 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=117
+04-14 17:46:05.299 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=118
+04-14 17:46:05.299 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=119
+04-14 17:46:05.299 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=120
+04-14 17:46:05.299 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=121
+04-14 17:46:05.299 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=122
+04-14 17:46:05.299 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=123
+04-14 17:46:05.299 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=124
+04-14 17:46:05.299 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=125
+04-14 17:46:05.299 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=126
+04-14 17:46:05.299 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=127
+04-14 17:46:05.299 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=128
+04-14 17:46:05.299 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=129
+04-14 17:46:05.299 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=130
+04-14 17:46:05.299 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=131
+04-14 17:46:05.299 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=132
+04-14 17:46:05.300 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=133
+04-14 17:46:05.300 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=134
+04-14 17:46:05.300 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=135
+04-14 17:46:05.300 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=136
+04-14 17:46:05.300 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=137
+04-14 17:46:05.300 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=138
+04-14 17:46:05.300 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=139
+04-14 17:46:05.300 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=140
+04-14 17:46:05.300 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=141
+04-14 17:46:05.300 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=142
+04-14 17:46:05.300 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=143
+04-14 17:46:05.300 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=144
+04-14 17:46:05.300 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=145
+04-14 17:46:05.300 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=146
+04-14 17:46:05.300 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=147
+04-14 17:46:05.300 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=148
+04-14 17:46:05.300 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=149
+04-14 17:46:05.307 23282 23282 D LorieNative: xcallback: EVENT_WINDOW_FOCUS_CHANGED
+04-14 17:46:08.855 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 53.2 FPS
+04-14 17:46:08.855 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 52.8 FPS
+04-14 17:46:08.855 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 13.0 FPS
+04-14 17:46:08.855 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:46:08.855 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:46:08.855 28700 28729 I LorieNative: 68 frames in 5.0 seconds = 13.6 FPS
+04-14 17:46:09.019 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=150
+04-14 17:46:09.462 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=151
+04-14 17:46:09.462 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=152
+04-14 17:46:09.462 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=153
+04-14 17:46:09.462 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=154
+04-14 17:46:09.462 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=155
+04-14 17:46:09.462 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=156
+04-14 17:46:09.510 23282 23282 D LorieNative: xcallback: EVENT_WINDOW_FOCUS_CHANGED
+04-14 17:46:09.591 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=157
+04-14 17:46:09.871 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=158
+04-14 17:46:09.872 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=159
+04-14 17:46:09.872 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=160
+04-14 17:46:09.872 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=161
+04-14 17:46:09.872 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=162
+04-14 17:46:09.872 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=163
+04-14 17:46:09.872 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=164
+04-14 17:46:09.872 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=165
+04-14 17:46:09.877 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=166
+04-14 17:46:09.957 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=167
+04-14 17:46:09.957 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=168
+04-14 17:46:09.957 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=169
+04-14 17:46:09.957 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=170
+04-14 17:46:09.957 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=171
+04-14 17:46:09.957 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=172
+04-14 17:46:09.957 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=173
+04-14 17:46:09.957 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=174
+04-14 17:46:09.957 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=175
+04-14 17:46:09.957 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=176
+04-14 17:46:09.957 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=177
+04-14 17:46:11.227 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=178
+04-14 17:46:11.227 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=179
+04-14 17:46:11.228 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=180
+04-14 17:46:11.228 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=181
+04-14 17:46:11.608 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=182
+04-14 17:46:11.608 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=183
+04-14 17:46:11.608 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=184
+04-14 17:46:11.608 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=185
+04-14 17:46:11.608 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=186
+04-14 17:46:11.608 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=187
+04-14 17:46:11.608 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=188
+04-14 17:46:11.608 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=189
+04-14 17:46:11.608 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=190
+04-14 17:46:11.608 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=191
+04-14 17:46:11.608 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=192
+04-14 17:46:11.608 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=193
+04-14 17:46:12.058 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=194
+04-14 17:46:12.059 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=195
+04-14 17:46:12.559 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=196
+04-14 17:46:13.061 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=197
+04-14 17:46:13.168 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=198
+04-14 17:46:13.169 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=199
+04-14 17:46:13.268 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=200
+04-14 17:46:13.268 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=201
+04-14 17:46:13.270 23282 23282 D LorieNative: xcallback: EVENT_WINDOW_FOCUS_CHANGED
+04-14 17:46:13.282 23282 23282 D LorieNative: xcallback: EVENT_WINDOW_FOCUS_CHANGED
+04-14 17:46:13.855 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 68.8 FPS
+04-14 17:46:13.855 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 68.8 FPS
+04-14 17:46:13.855 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 2.8 FPS
+04-14 17:46:13.855 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:46:13.855 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:46:13.855 28700 28729 I LorieNative: 15 frames in 5.0 seconds = 3.0 FPS
+04-14 17:46:14.933 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=202
+04-14 17:46:15.497 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=203
+04-14 17:46:15.497 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=204
+04-14 17:46:15.497 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=205
+04-14 17:46:15.497 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=206
+04-14 17:46:15.497 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=207
+04-14 17:46:15.497 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=208
+04-14 17:46:15.576 23282 23282 D LorieNative: xcallback: EVENT_WINDOW_FOCUS_CHANGED
+04-14 17:46:15.651 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=209
+04-14 17:46:16.207 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=210
+04-14 17:46:16.337 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=211
+04-14 17:46:16.337 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=212
+04-14 17:46:16.337 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=213
+04-14 17:46:18.719 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=214
+04-14 17:46:18.855 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 41.2 FPS
+04-14 17:46:18.855 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 41.2 FPS
+04-14 17:46:18.855 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 0.8 FPS
+04-14 17:46:18.855 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:46:18.855 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:46:18.855 28700 28729 I LorieNative: 5 frames in 5.0 seconds = 1.0 FPS
+04-14 17:46:23.492 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=215
+04-14 17:46:23.855 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 64.8 FPS
+04-14 17:46:23.856 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 64.8 FPS
+04-14 17:46:23.856 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 1.8 FPS
+04-14 17:46:23.856 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:46:23.856 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:46:23.856 28700 28729 I LorieNative: 9 frames in 5.0 seconds = 1.8 FPS
+04-14 17:46:27.158 23282 23282 D LorieNative: xcallback: EVENT_WINDOW_FOCUS_CHANGED
+04-14 17:46:27.161 23282 23282 D LorieNative: xcallback: EVENT_WINDOW_FOCUS_CHANGED
+04-14 17:46:27.451 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=216
+04-14 17:46:27.532 23282 23282 D LorieNative: xcallback: EVENT_WINDOW_FOCUS_CHANGED
+04-14 17:46:28.094 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=217
+04-14 17:46:28.152 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=218
+04-14 17:46:28.177 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=219
+04-14 17:46:28.178 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=220
+04-14 17:46:28.178 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=221
+04-14 17:46:28.178 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=222
+04-14 17:46:28.178 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=223
+04-14 17:46:28.178 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=224
+04-14 17:46:28.180 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=225
+04-14 17:46:28.180 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=226
+04-14 17:46:28.180 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=227
+04-14 17:46:28.180 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=228
+04-14 17:46:28.181 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=229
+04-14 17:46:28.181 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=230
+04-14 17:46:28.182 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=231
+04-14 17:46:28.182 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=232
+04-14 17:46:28.856 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 75.4 FPS
+04-14 17:46:28.856 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 75.4 FPS
+04-14 17:46:28.856 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 10.4 FPS
+04-14 17:46:28.856 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:46:28.856 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:46:28.856 28700 28729 I LorieNative: 54 frames in 5.0 seconds = 10.8 FPS
+04-14 17:46:33.483 28700 28729 I LorieNative: PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=233
+04-14 17:46:33.856 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:46:33.856 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:46:33.856 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 119.4 FPS
+04-14 17:46:33.856 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:46:33.856 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:46:33.856 28700 28729 I LorieNative: 596 frames in 5.0 seconds = 119.2 FPS
+04-14 17:46:38.856 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:46:38.856 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:46:38.856 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 112.4 FPS
+04-14 17:46:38.856 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:46:38.856 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:46:38.856 28700 28729 I LorieNative: 562 frames in 5.0 seconds = 112.4 FPS
+04-14 17:46:43.856 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:46:43.856 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:46:43.856 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 119.0 FPS
+04-14 17:46:43.856 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:46:43.856 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:46:43.856 28700 28729 I LorieNative: 595 frames in 5.0 seconds = 119.0 FPS
+04-14 17:46:48.857 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 99.4 FPS
+04-14 17:46:48.857 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 99.4 FPS
+04-14 17:46:48.857 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 42.2 FPS
+04-14 17:46:48.857 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:46:48.857 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:46:48.857 28700 28729 I LorieNative: 211 frames in 5.0 seconds = 42.2 FPS
+04-14 17:46:53.861 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:46:53.861 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:46:53.861 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 54.2 FPS
+04-14 17:46:53.861 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:46:53.861 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:46:53.861 28700 28729 I LorieNative: 270 frames in 5.0 seconds = 54.0 FPS
+04-14 17:46:58.861 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:46:58.861 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:46:58.861 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 49.2 FPS
+04-14 17:46:58.861 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:46:58.861 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:46:58.861 28700 28729 I LorieNative: 247 frames in 5.0 seconds = 49.4 FPS
+04-14 17:47:03.861 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:47:03.861 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:47:03.861 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 49.8 FPS
+04-14 17:47:03.861 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:47:03.861 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:47:03.861 28700 28729 I LorieNative: 249 frames in 5.0 seconds = 49.8 FPS
+04-14 17:47:08.875 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.4 FPS
+04-14 17:47:08.875 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.4 FPS
+04-14 17:47:08.875 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 49.6 FPS
+04-14 17:47:08.875 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:47:08.875 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:47:08.875 28700 28729 I LorieNative: 247 frames in 5.0 seconds = 49.4 FPS
+04-14 17:47:13.878 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:47:13.878 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:47:13.878 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.4 FPS
+04-14 17:47:13.878 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:47:13.878 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:47:13.878 28700 28729 I LorieNative: 197 frames in 5.0 seconds = 39.4 FPS
+04-14 17:47:18.885 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:47:18.885 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:47:18.885 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.0 FPS
+04-14 17:47:18.885 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:47:18.885 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:47:18.885 28700 28729 I LorieNative: 195 frames in 5.0 seconds = 39.0 FPS
+04-14 17:47:23.888 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:47:23.888 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:47:23.888 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 46.0 FPS
+04-14 17:47:23.888 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:47:23.888 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:47:23.888 28700 28729 I LorieNative: 230 frames in 5.0 seconds = 46.0 FPS
+04-14 17:47:28.888 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:47:28.888 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:47:28.888 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.0 FPS
+04-14 17:47:28.888 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:47:28.888 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:47:28.888 28700 28729 I LorieNative: 216 frames in 5.0 seconds = 43.2 FPS
+04-14 17:47:33.890 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:47:33.890 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:47:33.890 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.2 FPS
+04-14 17:47:33.890 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:47:33.890 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:47:33.890 28700 28729 I LorieNative: 195 frames in 5.0 seconds = 39.0 FPS
+04-14 17:47:38.899 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:47:38.900 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:47:38.900 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.4 FPS
+04-14 17:47:38.900 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:47:38.900 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:47:38.900 28700 28729 I LorieNative: 217 frames in 5.0 seconds = 43.4 FPS
+04-14 17:47:43.907 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:47:43.907 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:47:43.907 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 45.0 FPS
+04-14 17:47:43.907 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:47:43.907 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:47:43.907 28700 28729 I LorieNative: 225 frames in 5.0 seconds = 45.0 FPS
+04-14 17:47:48.907 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:47:48.908 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:47:48.908 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 48.6 FPS
+04-14 17:47:48.908 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:47:48.908 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:47:48.908 28700 28729 I LorieNative: 244 frames in 5.0 seconds = 48.8 FPS
+04-14 17:47:53.908 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:47:53.908 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:47:53.908 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.2 FPS
+04-14 17:47:53.908 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:47:53.908 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:47:53.908 28700 28729 I LorieNative: 221 frames in 5.0 seconds = 44.2 FPS
+04-14 17:47:58.908 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:47:58.908 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:47:58.908 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.4 FPS
+04-14 17:47:58.908 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:47:58.908 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:47:58.908 28700 28729 I LorieNative: 192 frames in 5.0 seconds = 38.4 FPS
+04-14 17:48:03.920 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.4 FPS
+04-14 17:48:03.920 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.4 FPS
+04-14 17:48:03.920 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.0 FPS
+04-14 17:48:03.920 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:48:03.920 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:48:03.920 28700 28729 I LorieNative: 194 frames in 5.0 seconds = 38.8 FPS
+04-14 17:48:08.929 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:48:08.929 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:48:08.929 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.4 FPS
+04-14 17:48:08.929 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:48:08.929 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:48:08.929 28700 28729 I LorieNative: 222 frames in 5.0 seconds = 44.4 FPS
+04-14 17:48:13.929 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:48:13.929 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:48:13.929 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 42.8 FPS
+04-14 17:48:13.929 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:48:13.929 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:48:13.929 28700 28729 I LorieNative: 214 frames in 5.0 seconds = 42.8 FPS
+04-14 17:48:18.929 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:48:18.929 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:48:18.929 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 45.4 FPS
+04-14 17:48:18.929 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:48:18.929 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:48:18.929 28700 28729 I LorieNative: 227 frames in 5.0 seconds = 45.4 FPS
+04-14 17:48:23.930 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:48:23.931 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:48:23.931 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 36.0 FPS
+04-14 17:48:23.931 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:48:23.931 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:48:23.931 28700 28729 I LorieNative: 179 frames in 5.0 seconds = 35.8 FPS
+04-14 17:48:28.944 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.4 FPS
+04-14 17:48:28.944 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.4 FPS
+04-14 17:48:28.944 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 45.0 FPS
+04-14 17:48:28.944 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:48:28.944 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:48:28.944 28700 28729 I LorieNative: 225 frames in 5.0 seconds = 45.0 FPS
+04-14 17:48:33.945 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:48:33.945 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:48:33.945 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 37.2 FPS
+04-14 17:48:33.945 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:48:33.945 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:48:33.945 28700 28729 I LorieNative: 187 frames in 5.0 seconds = 37.4 FPS
+04-14 17:48:38.945 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:48:38.945 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:48:38.945 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.2 FPS
+04-14 17:48:38.945 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:48:38.945 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:48:38.945 28700 28729 I LorieNative: 216 frames in 5.0 seconds = 43.2 FPS
+04-14 17:48:43.959 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.4 FPS
+04-14 17:48:43.959 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.4 FPS
+04-14 17:48:43.959 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 37.8 FPS
+04-14 17:48:43.959 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:48:43.959 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:48:43.959 28700 28729 I LorieNative: 188 frames in 5.0 seconds = 37.6 FPS
+04-14 17:48:48.963 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:48:48.963 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:48:48.963 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.4 FPS
+04-14 17:48:48.963 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:48:48.963 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:48:48.963 28700 28729 I LorieNative: 222 frames in 5.0 seconds = 44.4 FPS
+04-14 17:48:53.963 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:48:53.963 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:48:53.963 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.6 FPS
+04-14 17:48:53.963 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:48:53.963 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:48:53.963 28700 28729 I LorieNative: 193 frames in 5.0 seconds = 38.6 FPS
+04-14 17:48:58.972 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:48:58.972 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:48:58.972 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 45.0 FPS
+04-14 17:48:58.972 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:48:58.972 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:48:58.972 28700 28729 I LorieNative: 225 frames in 5.0 seconds = 45.0 FPS
+04-14 17:49:03.972 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:49:03.972 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:49:03.972 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.2 FPS
+04-14 17:49:03.972 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:49:03.972 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:49:03.972 28700 28729 I LorieNative: 197 frames in 5.0 seconds = 39.4 FPS
+04-14 17:49:08.972 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:49:08.972 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:49:08.972 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 42.6 FPS
+04-14 17:49:08.972 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:49:08.972 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:49:08.972 28700 28729 I LorieNative: 213 frames in 5.0 seconds = 42.6 FPS
+04-14 17:49:13.972 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:49:13.972 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:49:13.972 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 45.4 FPS
+04-14 17:49:13.972 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:49:13.972 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:49:13.972 28700 28729 I LorieNative: 227 frames in 5.0 seconds = 45.4 FPS
+04-14 17:49:18.972 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:49:18.972 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:49:18.972 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 48.6 FPS
+04-14 17:49:18.972 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:49:18.972 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:49:18.972 28700 28729 I LorieNative: 243 frames in 5.0 seconds = 48.6 FPS
+04-14 17:49:23.972 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:49:23.972 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:49:23.972 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 41.4 FPS
+04-14 17:49:23.972 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:49:23.972 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:49:23.972 28700 28729 I LorieNative: 207 frames in 5.0 seconds = 41.4 FPS
+04-14 17:49:28.972 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:49:28.972 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:49:28.972 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.4 FPS
+04-14 17:49:28.972 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:49:28.972 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:49:28.972 28700 28729 I LorieNative: 197 frames in 5.0 seconds = 39.4 FPS
+04-14 17:49:33.977 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:49:33.977 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:49:33.977 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 37.2 FPS
+04-14 17:49:33.977 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:49:33.977 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:49:33.977 28700 28729 I LorieNative: 185 frames in 5.0 seconds = 37.0 FPS
+04-14 17:49:38.981 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:49:38.981 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:49:38.981 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 40.8 FPS
+04-14 17:49:38.981 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:49:38.981 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:49:38.981 28700 28729 I LorieNative: 204 frames in 5.0 seconds = 40.8 FPS
+04-14 17:49:43.981 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:49:43.981 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:49:43.981 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.2 FPS
+04-14 17:49:43.981 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:49:43.981 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:49:43.981 28700 28729 I LorieNative: 191 frames in 5.0 seconds = 38.2 FPS
+04-14 17:49:48.984 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:49:48.985 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:49:48.985 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.8 FPS
+04-14 17:49:48.985 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:49:48.985 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:49:48.985 28700 28729 I LorieNative: 218 frames in 5.0 seconds = 43.6 FPS
+04-14 17:49:53.985 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:49:53.985 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:49:53.986 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 42.6 FPS
+04-14 17:49:53.986 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:49:53.986 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:49:53.986 28700 28729 I LorieNative: 214 frames in 5.0 seconds = 42.8 FPS
+04-14 17:49:58.986 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:49:58.986 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:49:58.986 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 42.0 FPS
+04-14 17:49:58.986 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:49:58.986 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:49:58.986 28700 28729 I LorieNative: 210 frames in 5.0 seconds = 42.0 FPS
+04-14 17:50:03.986 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:50:03.986 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:50:03.986 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.0 FPS
+04-14 17:50:03.986 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:50:03.986 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:50:03.986 28700 28729 I LorieNative: 195 frames in 5.0 seconds = 39.0 FPS
+04-14 17:50:08.986 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:50:08.986 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:50:08.986 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 51.0 FPS
+04-14 17:50:08.986 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:50:08.986 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:50:08.986 28700 28729 I LorieNative: 255 frames in 5.0 seconds = 51.0 FPS
+04-14 17:50:13.997 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:50:13.997 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:50:13.997 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.6 FPS
+04-14 17:50:13.997 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:50:13.997 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:50:13.997 28700 28729 I LorieNative: 197 frames in 5.0 seconds = 39.4 FPS
+04-14 17:50:18.997 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:50:18.997 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:50:18.997 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 42.2 FPS
+04-14 17:50:18.997 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:50:18.997 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:50:18.997 28700 28729 I LorieNative: 212 frames in 5.0 seconds = 42.4 FPS
+04-14 17:50:23.997 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:50:23.997 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:50:23.997 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 41.0 FPS
+04-14 17:50:23.997 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:50:23.997 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:50:23.997 28700 28729 I LorieNative: 204 frames in 5.0 seconds = 40.8 FPS
+04-14 17:50:28.997 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:50:28.997 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:50:28.997 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.4 FPS
+04-14 17:50:28.997 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:50:28.997 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:50:28.997 28700 28729 I LorieNative: 193 frames in 5.0 seconds = 38.6 FPS
+04-14 17:50:34.004 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:50:34.004 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:50:34.004 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 41.8 FPS
+04-14 17:50:34.004 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:50:34.004 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:50:34.004 28700 28729 I LorieNative: 207 frames in 5.0 seconds = 41.4 FPS
+04-14 17:50:39.004 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:50:39.004 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:50:39.004 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.4 FPS
+04-14 17:50:39.004 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:50:39.004 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:50:39.004 28700 28729 I LorieNative: 223 frames in 5.0 seconds = 44.6 FPS
+04-14 17:50:44.010 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:50:44.010 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:50:44.010 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.2 FPS
+04-14 17:50:44.010 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:50:44.010 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:50:44.010 28700 28729 I LorieNative: 190 frames in 5.0 seconds = 38.0 FPS
+04-14 17:50:49.010 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:50:49.011 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:50:49.011 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.2 FPS
+04-14 17:50:49.011 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:50:49.011 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:50:49.011 28700 28729 I LorieNative: 217 frames in 5.0 seconds = 43.4 FPS
+04-14 17:50:54.018 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:50:54.018 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:50:54.018 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 37.8 FPS
+04-14 17:50:54.018 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:50:54.018 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:50:54.018 28700 28729 I LorieNative: 188 frames in 5.0 seconds = 37.6 FPS
+04-14 17:50:59.019 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:50:59.019 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:50:59.019 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 46.2 FPS
+04-14 17:50:59.019 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:50:59.019 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:50:59.019 28700 28729 I LorieNative: 231 frames in 5.0 seconds = 46.2 FPS
+04-14 17:51:04.024 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:51:04.024 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:51:04.024 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.8 FPS
+04-14 17:51:04.024 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:51:04.024 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:51:04.024 28700 28729 I LorieNative: 220 frames in 5.0 seconds = 44.0 FPS
+04-14 17:51:09.025 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:51:09.025 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:51:09.025 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.2 FPS
+04-14 17:51:09.025 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:51:09.025 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:51:09.025 28700 28729 I LorieNative: 221 frames in 5.0 seconds = 44.2 FPS
+04-14 17:51:14.031 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:51:14.031 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:51:14.031 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 40.0 FPS
+04-14 17:51:14.031 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:51:14.031 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:51:14.031 28700 28729 I LorieNative: 199 frames in 5.0 seconds = 39.8 FPS
+04-14 17:51:19.031 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:51:19.031 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:51:19.031 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.4 FPS
+04-14 17:51:19.031 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:51:19.031 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:51:19.031 28700 28729 I LorieNative: 198 frames in 5.0 seconds = 39.6 FPS
+04-14 17:51:24.032 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:51:24.032 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:51:24.032 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.0 FPS
+04-14 17:51:24.032 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:51:24.032 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:51:24.032 28700 28729 I LorieNative: 190 frames in 5.0 seconds = 38.0 FPS
+04-14 17:51:29.032 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:51:29.033 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:51:29.033 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.8 FPS
+04-14 17:51:29.033 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:51:29.033 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:51:29.033 28700 28729 I LorieNative: 193 frames in 5.0 seconds = 38.6 FPS
+04-14 17:51:34.048 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.4 FPS
+04-14 17:51:34.049 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.4 FPS
+04-14 17:51:34.049 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.4 FPS
+04-14 17:51:34.049 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:51:34.049 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:51:34.049 28700 28729 I LorieNative: 221 frames in 5.0 seconds = 44.2 FPS
+04-14 17:51:39.050 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:51:39.050 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:51:39.050 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.6 FPS
+04-14 17:51:39.050 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:51:39.050 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:51:39.050 28700 28729 I LorieNative: 219 frames in 5.0 seconds = 43.8 FPS
+04-14 17:51:44.050 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:51:44.050 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:51:44.050 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 36.6 FPS
+04-14 17:51:44.050 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:51:44.050 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:51:44.050 28700 28729 I LorieNative: 183 frames in 5.0 seconds = 36.6 FPS
+04-14 17:51:49.050 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:51:49.050 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:51:49.050 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.6 FPS
+04-14 17:51:49.050 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:51:49.050 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:51:49.050 28700 28729 I LorieNative: 222 frames in 5.0 seconds = 44.4 FPS
+04-14 17:51:54.050 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:51:54.050 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:51:54.050 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 49.6 FPS
+04-14 17:51:54.050 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:51:54.050 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:51:54.050 28700 28729 I LorieNative: 248 frames in 5.0 seconds = 49.6 FPS
+04-14 17:51:59.056 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:51:59.056 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:51:59.057 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.4 FPS
+04-14 17:51:59.057 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:51:59.057 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:51:59.057 28700 28729 I LorieNative: 196 frames in 5.0 seconds = 39.2 FPS
+04-14 17:52:04.067 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.4 FPS
+04-14 17:52:04.067 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.4 FPS
+04-14 17:52:04.067 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 46.0 FPS
+04-14 17:52:04.067 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:52:04.067 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:52:04.067 28700 28729 I LorieNative: 230 frames in 5.0 seconds = 46.0 FPS
+04-14 17:52:09.071 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:52:09.071 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:52:09.071 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.6 FPS
+04-14 17:52:09.071 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:52:09.071 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:52:09.071 28700 28729 I LorieNative: 193 frames in 5.0 seconds = 38.6 FPS
+04-14 17:52:14.081 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:52:14.081 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:52:14.081 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.6 FPS
+04-14 17:52:14.081 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:52:14.081 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:52:14.081 28700 28729 I LorieNative: 193 frames in 5.0 seconds = 38.6 FPS
+04-14 17:52:19.082 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:52:19.083 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:52:19.083 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.8 FPS
+04-14 17:52:19.083 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:52:19.083 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:52:19.083 28700 28729 I LorieNative: 195 frames in 5.0 seconds = 39.0 FPS
+04-14 17:52:24.095 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.4 FPS
+04-14 17:52:24.095 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.4 FPS
+04-14 17:52:24.095 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.0 FPS
+04-14 17:52:24.095 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:52:24.095 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:52:24.095 28700 28729 I LorieNative: 194 frames in 5.0 seconds = 38.8 FPS
+04-14 17:52:29.103 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:52:29.103 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:52:29.104 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 40.0 FPS
+04-14 17:52:29.104 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:52:29.104 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:52:29.104 28700 28729 I LorieNative: 200 frames in 5.0 seconds = 40.0 FPS
+04-14 17:52:34.118 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.4 FPS
+04-14 17:52:34.118 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.4 FPS
+04-14 17:52:34.118 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 40.0 FPS
+04-14 17:52:34.118 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:52:34.118 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:52:34.118 28700 28729 I LorieNative: 200 frames in 5.0 seconds = 40.0 FPS
+04-14 17:52:39.118 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:52:39.118 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:52:39.118 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.4 FPS
+04-14 17:52:39.118 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:52:39.118 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:52:39.118 28700 28729 I LorieNative: 198 frames in 5.0 seconds = 39.6 FPS
+04-14 17:52:44.120 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:52:44.120 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:52:44.120 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.4 FPS
+04-14 17:52:44.120 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:52:44.120 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:52:44.120 28700 28729 I LorieNative: 196 frames in 5.0 seconds = 39.2 FPS
+04-14 17:52:49.126 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:52:49.126 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:52:49.126 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.8 FPS
+04-14 17:52:49.126 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:52:49.126 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:52:49.126 28700 28729 I LorieNative: 199 frames in 5.0 seconds = 39.8 FPS
+04-14 17:52:54.127 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 119.8 FPS
+04-14 17:52:54.127 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 119.8 FPS
+04-14 17:52:54.127 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 37.2 FPS
+04-14 17:52:54.127 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:52:54.127 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:52:54.127 28700 28729 I LorieNative: 187 frames in 5.0 seconds = 37.4 FPS
+04-14 17:52:59.127 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:52:59.127 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:52:59.127 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.4 FPS
+04-14 17:52:59.127 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:52:59.127 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:52:59.127 28700 28729 I LorieNative: 215 frames in 5.0 seconds = 43.0 FPS
+04-14 17:53:04.127 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:53:04.127 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:53:04.127 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 42.2 FPS
+04-14 17:53:04.127 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:53:04.127 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:53:04.127 28700 28729 I LorieNative: 211 frames in 5.0 seconds = 42.2 FPS
+04-14 17:53:09.130 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:53:09.130 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:53:09.130 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 40.0 FPS
+04-14 17:53:09.130 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:53:09.130 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:53:09.130 28700 28729 I LorieNative: 199 frames in 5.0 seconds = 39.8 FPS
+04-14 17:53:14.130 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:53:14.130 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:53:14.130 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 42.6 FPS
+04-14 17:53:14.130 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:53:14.130 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:53:14.130 28700 28729 I LorieNative: 214 frames in 5.0 seconds = 42.8 FPS
+04-14 17:53:19.131 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:53:19.131 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:53:19.131 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.0 FPS
+04-14 17:53:19.131 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:53:19.131 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:53:19.131 28700 28729 I LorieNative: 220 frames in 5.0 seconds = 44.0 FPS
+04-14 17:53:24.132 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:53:24.132 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:53:24.132 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.2 FPS
+04-14 17:53:24.132 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:53:24.132 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:53:24.132 28700 28729 I LorieNative: 195 frames in 5.0 seconds = 39.0 FPS
+04-14 17:53:29.134 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:53:29.134 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:53:29.134 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.2 FPS
+04-14 17:53:29.134 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:53:29.134 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:53:29.134 28700 28729 I LorieNative: 222 frames in 5.0 seconds = 44.4 FPS
+04-14 17:53:34.134 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:53:34.134 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:53:34.134 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.2 FPS
+04-14 17:53:34.134 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:53:34.134 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:53:34.134 28700 28729 I LorieNative: 221 frames in 5.0 seconds = 44.2 FPS
+04-14 17:53:39.144 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:53:39.144 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:53:39.144 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.6 FPS
+04-14 17:53:39.144 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:53:39.144 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:53:39.144 28700 28729 I LorieNative: 222 frames in 5.0 seconds = 44.4 FPS
+04-14 17:53:44.146 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:53:44.146 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:53:44.146 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.2 FPS
+04-14 17:53:44.146 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:53:44.146 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:53:44.146 28700 28729 I LorieNative: 221 frames in 5.0 seconds = 44.2 FPS
+04-14 17:53:49.162 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.4 FPS
+04-14 17:53:49.162 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.4 FPS
+04-14 17:53:49.162 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.0 FPS
+04-14 17:53:49.162 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:53:49.162 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:53:49.162 28700 28729 I LorieNative: 220 frames in 5.0 seconds = 44.0 FPS
+04-14 17:53:54.162 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:53:54.162 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:53:54.162 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.0 FPS
+04-14 17:53:54.162 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:53:54.162 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:53:54.162 28700 28729 I LorieNative: 196 frames in 5.0 seconds = 39.2 FPS
+04-14 17:53:59.162 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:53:59.162 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:53:59.162 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.8 FPS
+04-14 17:53:59.162 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:53:59.162 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:53:59.162 28700 28729 I LorieNative: 218 frames in 5.0 seconds = 43.6 FPS
+04-14 17:54:04.162 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:54:04.162 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:54:04.162 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.6 FPS
+04-14 17:54:04.162 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:54:04.162 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:54:04.162 28700 28729 I LorieNative: 194 frames in 5.0 seconds = 38.8 FPS
+04-14 17:54:09.162 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:54:09.162 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:54:09.162 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 40.4 FPS
+04-14 17:54:09.162 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:54:09.162 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:54:09.162 28700 28729 I LorieNative: 202 frames in 5.0 seconds = 40.4 FPS
+04-14 17:54:14.162 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:54:14.162 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:54:14.162 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 42.8 FPS
+04-14 17:54:14.162 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:54:14.162 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:54:14.162 28700 28729 I LorieNative: 214 frames in 5.0 seconds = 42.8 FPS
+04-14 17:54:19.162 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:54:19.162 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:54:19.162 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.8 FPS
+04-14 17:54:19.162 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:54:19.162 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:54:19.162 28700 28729 I LorieNative: 199 frames in 5.0 seconds = 39.8 FPS
+04-14 17:54:24.175 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.4 FPS
+04-14 17:54:24.175 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.4 FPS
+04-14 17:54:24.175 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.4 FPS
+04-14 17:54:24.175 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:54:24.175 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:54:24.175 28700 28729 I LorieNative: 216 frames in 5.0 seconds = 43.2 FPS
+04-14 17:54:29.177 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:54:29.177 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:54:29.177 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.0 FPS
+04-14 17:54:29.177 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:54:29.177 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:54:29.177 28700 28729 I LorieNative: 220 frames in 5.0 seconds = 44.0 FPS
+04-14 17:54:34.177 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:54:34.177 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:54:34.177 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.6 FPS
+04-14 17:54:34.177 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:54:34.177 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:54:34.177 28700 28729 I LorieNative: 199 frames in 5.0 seconds = 39.8 FPS
+04-14 17:54:39.178 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:54:39.178 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:54:39.178 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 45.2 FPS
+04-14 17:54:39.178 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:54:39.178 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:54:39.178 28700 28729 I LorieNative: 226 frames in 5.0 seconds = 45.2 FPS
+04-14 17:54:44.178 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:54:44.178 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:54:44.178 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.2 FPS
+04-14 17:54:44.178 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:54:44.178 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:54:44.178 28700 28729 I LorieNative: 196 frames in 5.0 seconds = 39.2 FPS
+04-14 17:54:49.180 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:54:49.180 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:54:49.180 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.6 FPS
+04-14 17:54:49.180 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:54:49.180 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:54:49.180 28700 28729 I LorieNative: 222 frames in 5.0 seconds = 44.4 FPS
+04-14 17:54:54.181 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:54:54.181 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:54:54.181 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.4 FPS
+04-14 17:54:54.181 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:54:54.181 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:54:54.181 28700 28729 I LorieNative: 222 frames in 5.0 seconds = 44.4 FPS
+04-14 17:54:59.181 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:54:59.181 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:54:59.181 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.0 FPS
+04-14 17:54:59.181 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:54:59.181 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:54:59.182 28700 28729 I LorieNative: 191 frames in 5.0 seconds = 38.2 FPS
+04-14 17:55:04.192 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:55:04.192 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:55:04.192 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.4 FPS
+04-14 17:55:04.192 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:55:04.192 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:55:04.192 28700 28729 I LorieNative: 221 frames in 5.0 seconds = 44.2 FPS
+04-14 17:55:09.192 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:55:09.192 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:55:09.192 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 45.8 FPS
+04-14 17:55:09.192 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:55:09.192 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:55:09.192 28700 28729 I LorieNative: 229 frames in 5.0 seconds = 45.8 FPS
+04-14 17:55:14.202 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.4 FPS
+04-14 17:55:14.202 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.4 FPS
+04-14 17:55:14.202 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.6 FPS
+04-14 17:55:14.202 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:55:14.202 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:55:14.202 28700 28729 I LorieNative: 218 frames in 5.0 seconds = 43.6 FPS
+04-14 17:55:19.203 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:55:19.203 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:55:19.203 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 50.4 FPS
+04-14 17:55:19.203 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:55:19.203 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:55:19.203 28700 28729 I LorieNative: 253 frames in 5.0 seconds = 50.6 FPS
+04-14 17:55:24.204 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:55:24.204 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:55:24.204 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.4 FPS
+04-14 17:55:24.204 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:55:24.204 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:55:24.204 28700 28729 I LorieNative: 197 frames in 5.0 seconds = 39.4 FPS
+04-14 17:55:29.205 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:55:29.205 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:55:29.205 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 48.8 FPS
+04-14 17:55:29.205 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:55:29.205 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:55:29.205 28700 28729 I LorieNative: 243 frames in 5.0 seconds = 48.6 FPS
+04-14 17:55:34.216 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:55:34.216 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:55:34.216 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 45.0 FPS
+04-14 17:55:34.216 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:55:34.216 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:55:34.216 28700 28729 I LorieNative: 225 frames in 5.0 seconds = 45.0 FPS
+04-14 17:55:39.216 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:55:39.216 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:55:39.216 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.8 FPS
+04-14 17:55:39.216 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:55:39.216 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:55:39.216 28700 28729 I LorieNative: 225 frames in 5.0 seconds = 45.0 FPS
+04-14 17:55:44.218 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:55:44.218 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:55:44.218 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.0 FPS
+04-14 17:55:44.218 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:55:44.218 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:55:44.218 28700 28729 I LorieNative: 214 frames in 5.0 seconds = 42.8 FPS
+04-14 17:55:49.218 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:55:49.218 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:55:49.218 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.2 FPS
+04-14 17:55:49.218 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:55:49.218 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:55:49.218 28700 28729 I LorieNative: 191 frames in 5.0 seconds = 38.2 FPS
+04-14 17:55:54.223 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:55:54.224 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:55:54.224 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 45.6 FPS
+04-14 17:55:54.224 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:55:54.224 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:55:54.224 28700 28729 I LorieNative: 227 frames in 5.0 seconds = 45.4 FPS
+04-14 17:55:59.239 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.4 FPS
+04-14 17:55:59.239 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.4 FPS
+04-14 17:55:59.239 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.8 FPS
+04-14 17:55:59.239 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:55:59.239 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:55:59.239 28700 28729 I LorieNative: 224 frames in 5.0 seconds = 44.8 FPS
+04-14 17:56:04.247 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:56:04.247 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:56:04.247 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.0 FPS
+04-14 17:56:04.247 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:56:04.247 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:56:04.247 28700 28729 I LorieNative: 195 frames in 5.0 seconds = 39.0 FPS
+04-14 17:56:09.247 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:56:09.247 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:56:09.247 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.6 FPS
+04-14 17:56:09.247 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:56:09.247 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:56:09.247 28700 28729 I LorieNative: 219 frames in 5.0 seconds = 43.8 FPS
+04-14 17:56:14.247 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:56:14.247 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:56:14.247 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.6 FPS
+04-14 17:56:14.247 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:56:14.247 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:56:14.247 28700 28729 I LorieNative: 198 frames in 5.0 seconds = 39.6 FPS
+04-14 17:56:19.248 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:56:19.248 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:56:19.248 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.8 FPS
+04-14 17:56:19.248 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:56:19.248 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:56:19.248 28700 28729 I LorieNative: 194 frames in 5.0 seconds = 38.8 FPS
+04-14 17:56:24.248 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:56:24.248 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:56:24.248 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.6 FPS
+04-14 17:56:24.248 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:56:24.248 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:56:24.248 28700 28729 I LorieNative: 193 frames in 5.0 seconds = 38.6 FPS
+04-14 17:56:29.251 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:56:29.252 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:56:29.252 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 40.0 FPS
+04-14 17:56:29.252 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:56:29.252 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:56:29.252 28700 28729 I LorieNative: 199 frames in 5.0 seconds = 39.8 FPS
+04-14 17:56:34.252 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:56:34.252 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:56:34.252 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.8 FPS
+04-14 17:56:34.252 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:56:34.252 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:56:34.252 28700 28729 I LorieNative: 200 frames in 5.0 seconds = 40.0 FPS
+04-14 17:56:39.258 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 119.8 FPS
+04-14 17:56:39.258 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 119.8 FPS
+04-14 17:56:39.258 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.4 FPS
+04-14 17:56:39.258 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:56:39.258 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:56:39.258 28700 28729 I LorieNative: 221 frames in 5.0 seconds = 44.2 FPS
+04-14 17:56:44.258 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:56:44.258 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:56:44.258 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.8 FPS
+04-14 17:56:44.258 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:56:44.258 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:56:44.258 28700 28729 I LorieNative: 220 frames in 5.0 seconds = 44.0 FPS
+04-14 17:56:49.259 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:56:49.259 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:56:49.259 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.8 FPS
+04-14 17:56:49.259 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:56:49.259 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:56:49.259 28700 28729 I LorieNative: 224 frames in 5.0 seconds = 44.8 FPS
+04-14 17:56:54.259 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:56:54.259 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:56:54.259 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.2 FPS
+04-14 17:56:54.259 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:56:54.259 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:56:54.259 28700 28729 I LorieNative: 196 frames in 5.0 seconds = 39.2 FPS
+04-14 17:56:59.259 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:56:59.259 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:56:59.259 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.4 FPS
+04-14 17:56:59.259 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:56:59.259 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:56:59.259 28700 28729 I LorieNative: 192 frames in 5.0 seconds = 38.4 FPS
+04-14 17:57:04.259 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 119.8 FPS
+04-14 17:57:04.259 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 119.8 FPS
+04-14 17:57:04.259 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 37.4 FPS
+04-14 17:57:04.259 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:57:04.259 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:57:04.259 28700 28729 I LorieNative: 187 frames in 5.0 seconds = 37.4 FPS
+04-14 17:57:09.259 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:57:09.259 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:57:09.259 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 40.2 FPS
+04-14 17:57:09.259 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:57:09.259 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:57:09.259 28700 28729 I LorieNative: 201 frames in 5.0 seconds = 40.2 FPS
+04-14 17:57:14.259 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:57:14.259 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:57:14.259 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.0 FPS
+04-14 17:57:14.259 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:57:14.259 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:57:14.259 28700 28729 I LorieNative: 220 frames in 5.0 seconds = 44.0 FPS
+04-14 17:57:19.260 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:57:19.260 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 119.8 FPS
+04-14 17:57:19.260 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.4 FPS
+04-14 17:57:19.260 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:57:19.260 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:57:19.260 28700 28729 I LorieNative: 197 frames in 5.0 seconds = 39.4 FPS
+04-14 17:57:24.271 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:57:24.271 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.4 FPS
+04-14 17:57:24.271 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.4 FPS
+04-14 17:57:24.271 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:57:24.271 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:57:24.271 28700 28729 I LorieNative: 221 frames in 5.0 seconds = 44.2 FPS
+04-14 17:57:29.271 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 119.8 FPS
+04-14 17:57:29.271 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 119.8 FPS
+04-14 17:57:29.271 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.4 FPS
+04-14 17:57:29.271 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:57:29.271 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:57:29.271 28700 28729 I LorieNative: 222 frames in 5.0 seconds = 44.4 FPS
+04-14 17:57:34.272 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:57:34.272 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:57:34.272 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 40.0 FPS
+04-14 17:57:34.272 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:57:34.272 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:57:34.272 28700 28729 I LorieNative: 200 frames in 5.0 seconds = 40.0 FPS
+04-14 17:57:39.280 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:57:39.280 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:57:39.280 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 40.2 FPS
+04-14 17:57:39.280 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:57:39.280 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:57:39.280 28700 28729 I LorieNative: 201 frames in 5.0 seconds = 40.2 FPS
+04-14 17:57:44.280 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:57:44.280 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:57:44.280 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 45.0 FPS
+04-14 17:57:44.280 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:57:44.280 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:57:44.280 28700 28729 I LorieNative: 226 frames in 5.0 seconds = 45.2 FPS
+04-14 17:57:49.280 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:57:49.280 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:57:49.280 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.2 FPS
+04-14 17:57:49.280 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:57:49.280 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:57:49.280 28700 28729 I LorieNative: 196 frames in 5.0 seconds = 39.2 FPS
+04-14 17:57:54.282 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:57:54.282 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:57:54.282 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 40.0 FPS
+04-14 17:57:54.282 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:57:54.282 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:57:54.282 28700 28729 I LorieNative: 199 frames in 5.0 seconds = 39.8 FPS
+04-14 17:57:59.290 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:57:59.290 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:57:59.290 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 50.0 FPS
+04-14 17:57:59.290 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:57:59.290 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:57:59.290 28700 28729 I LorieNative: 250 frames in 5.0 seconds = 50.0 FPS
+04-14 17:58:04.303 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.4 FPS
+04-14 17:58:04.303 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.4 FPS
+04-14 17:58:04.303 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 45.0 FPS
+04-14 17:58:04.303 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:58:04.303 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:58:04.303 28700 28729 I LorieNative: 225 frames in 5.0 seconds = 45.0 FPS
+04-14 17:58:09.304 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:58:09.304 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:58:09.304 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 46.2 FPS
+04-14 17:58:09.304 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:58:09.304 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:58:09.304 28700 28729 I LorieNative: 231 frames in 5.0 seconds = 46.2 FPS
+04-14 17:58:14.304 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:58:14.305 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:58:14.305 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 42.0 FPS
+04-14 17:58:14.305 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:58:14.305 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:58:14.305 28700 28729 I LorieNative: 211 frames in 5.0 seconds = 42.2 FPS
+04-14 17:58:19.314 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:58:19.314 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:58:19.314 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 45.4 FPS
+04-14 17:58:19.314 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:58:19.314 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:58:19.314 28700 28729 I LorieNative: 225 frames in 5.0 seconds = 45.0 FPS
+04-14 17:58:24.321 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:58:24.321 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:58:24.321 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.0 FPS
+04-14 17:58:24.322 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:58:24.322 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:58:24.322 28700 28729 I LorieNative: 215 frames in 5.0 seconds = 43.0 FPS
+04-14 17:58:29.321 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:58:29.322 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:58:29.322 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.0 FPS
+04-14 17:58:29.322 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:58:29.322 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:58:29.322 28700 28729 I LorieNative: 219 frames in 5.0 seconds = 43.8 FPS
+04-14 17:58:34.321 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:58:34.322 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:58:34.322 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.6 FPS
+04-14 17:58:34.322 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:58:34.322 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:58:34.322 28700 28729 I LorieNative: 224 frames in 5.0 seconds = 44.8 FPS
+04-14 17:58:39.322 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:58:39.322 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:58:39.322 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.2 FPS
+04-14 17:58:39.322 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:58:39.322 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:58:39.322 28700 28729 I LorieNative: 215 frames in 5.0 seconds = 43.0 FPS
+04-14 17:58:44.331 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:58:44.332 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:58:44.332 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 45.6 FPS
+04-14 17:58:44.332 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:58:44.332 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:58:44.332 28700 28729 I LorieNative: 226 frames in 5.0 seconds = 45.2 FPS
+04-14 17:58:49.332 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:58:49.332 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:58:49.332 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.4 FPS
+04-14 17:58:49.332 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:58:49.332 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:58:49.332 28700 28729 I LorieNative: 193 frames in 5.0 seconds = 38.6 FPS
+04-14 17:58:54.332 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:58:54.332 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:58:54.332 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.8 FPS
+04-14 17:58:54.332 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:58:54.332 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:58:54.332 28700 28729 I LorieNative: 199 frames in 5.0 seconds = 39.8 FPS
+04-14 17:58:59.333 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:58:59.333 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:58:59.333 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.4 FPS
+04-14 17:58:59.333 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:58:59.333 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:58:59.333 28700 28729 I LorieNative: 197 frames in 5.0 seconds = 39.4 FPS
+04-14 17:59:04.342 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:59:04.342 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:59:04.342 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.8 FPS
+04-14 17:59:04.342 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:59:04.342 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:59:04.342 28700 28729 I LorieNative: 198 frames in 5.0 seconds = 39.6 FPS
+04-14 17:59:09.352 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.4 FPS
+04-14 17:59:09.353 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.4 FPS
+04-14 17:59:09.353 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.8 FPS
+04-14 17:59:09.353 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:59:09.353 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:59:09.353 28700 28729 I LorieNative: 199 frames in 5.0 seconds = 39.8 FPS
+04-14 17:59:14.353 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:59:14.353 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:59:14.353 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.6 FPS
+04-14 17:59:14.353 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:59:14.353 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:59:14.353 28700 28729 I LorieNative: 199 frames in 5.0 seconds = 39.8 FPS
+04-14 17:59:19.353 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:59:19.353 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:59:19.353 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.2 FPS
+04-14 17:59:19.353 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:59:19.353 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:59:19.353 28700 28729 I LorieNative: 220 frames in 5.0 seconds = 44.0 FPS
+04-14 17:59:24.359 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:59:24.359 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:59:24.359 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.6 FPS
+04-14 17:59:24.359 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:59:24.359 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:59:24.359 28700 28729 I LorieNative: 223 frames in 5.0 seconds = 44.6 FPS
+04-14 17:59:29.365 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:59:29.365 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:59:29.365 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 45.0 FPS
+04-14 17:59:29.365 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:59:29.365 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:59:29.365 28700 28729 I LorieNative: 225 frames in 5.0 seconds = 45.0 FPS
+04-14 17:59:34.365 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:59:34.365 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:59:34.365 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.8 FPS
+04-14 17:59:34.365 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:59:34.365 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:59:34.365 28700 28729 I LorieNative: 220 frames in 5.0 seconds = 44.0 FPS
+04-14 17:59:39.373 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:59:39.374 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:59:39.374 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 52.2 FPS
+04-14 17:59:39.374 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:59:39.374 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:59:39.374 28700 28729 I LorieNative: 260 frames in 5.0 seconds = 52.0 FPS
+04-14 17:59:44.379 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 17:59:44.379 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 17:59:44.379 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.0 FPS
+04-14 17:59:44.379 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:59:44.379 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:59:44.379 28700 28729 I LorieNative: 190 frames in 5.0 seconds = 38.0 FPS
+04-14 17:59:49.379 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:59:49.379 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:59:49.379 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 40.2 FPS
+04-14 17:59:49.379 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:59:49.379 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:59:49.379 28700 28729 I LorieNative: 201 frames in 5.0 seconds = 40.2 FPS
+04-14 17:59:54.379 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:59:54.379 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:59:54.379 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 46.0 FPS
+04-14 17:59:54.379 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:59:54.379 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:59:54.379 28700 28729 I LorieNative: 231 frames in 5.0 seconds = 46.2 FPS
+04-14 17:59:59.379 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 17:59:59.379 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 17:59:59.379 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 41.6 FPS
+04-14 17:59:59.379 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 17:59:59.379 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 17:59:59.379 28700 28729 I LorieNative: 207 frames in 5.0 seconds = 41.4 FPS
+04-14 18:00:04.379 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 18:00:04.379 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 18:00:04.379 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 47.6 FPS
+04-14 18:00:04.379 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 18:00:04.379 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 18:00:04.379 28700 28729 I LorieNative: 239 frames in 5.0 seconds = 47.8 FPS
+04-14 18:00:09.379 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 18:00:09.379 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 18:00:09.379 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 36.4 FPS
+04-14 18:00:09.379 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 18:00:09.379 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 18:00:09.379 28700 28729 I LorieNative: 181 frames in 5.0 seconds = 36.2 FPS
+04-14 18:00:14.379 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 18:00:14.379 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 18:00:14.379 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 39.0 FPS
+04-14 18:00:14.379 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 18:00:14.379 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 18:00:14.379 28700 28729 I LorieNative: 196 frames in 5.0 seconds = 39.2 FPS
+04-14 18:00:19.379 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 18:00:19.379 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 18:00:19.379 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 37.6 FPS
+04-14 18:00:19.379 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 18:00:19.379 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 18:00:19.379 28700 28729 I LorieNative: 188 frames in 5.0 seconds = 37.6 FPS
+04-14 18:00:24.394 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.4 FPS
+04-14 18:00:24.394 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.4 FPS
+04-14 18:00:24.394 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 45.2 FPS
+04-14 18:00:24.394 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 18:00:24.394 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 18:00:24.394 28700 28729 I LorieNative: 225 frames in 5.0 seconds = 45.0 FPS
+04-14 18:00:29.394 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 18:00:29.394 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 18:00:29.394 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 40.6 FPS
+04-14 18:00:29.394 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 18:00:29.394 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 18:00:29.394 28700 28729 I LorieNative: 203 frames in 5.0 seconds = 40.6 FPS
+04-14 18:00:34.395 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 18:00:34.395 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 18:00:34.395 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 44.6 FPS
+04-14 18:00:34.395 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 18:00:34.395 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 18:00:34.395 28700 28729 I LorieNative: 223 frames in 5.0 seconds = 44.6 FPS
+04-14 18:00:39.395 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 18:00:39.395 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 18:00:39.395 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.6 FPS
+04-14 18:00:39.395 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 18:00:39.395 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 18:00:39.395 28700 28729 I LorieNative: 219 frames in 5.0 seconds = 43.8 FPS
+04-14 18:00:44.395 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 18:00:44.395 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 18:00:44.395 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 38.6 FPS
+04-14 18:00:44.395 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 18:00:44.395 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 18:00:44.395 28700 28729 I LorieNative: 192 frames in 5.0 seconds = 38.4 FPS
+04-14 18:00:49.396 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.0 FPS
+04-14 18:00:49.396 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.0 FPS
+04-14 18:00:49.396 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 46.8 FPS
+04-14 18:00:49.396 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 18:00:49.396 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 18:00:49.396 28700 28729 I LorieNative: 233 frames in 5.0 seconds = 46.6 FPS
+04-14 18:00:54.406 28700 28729 I LorieNative: choreographer callbacks in 5.0 seconds = 120.2 FPS
+04-14 18:00:54.406 28700 28729 I LorieNative: redraw wakeups in 5.0 seconds = 120.2 FPS
+04-14 18:00:54.406 28700 28729 I LorieNative: damage-triggered redraws in 5.0 seconds = 43.4 FPS
+04-14 18:00:54.406 28700 28729 I LorieNative: present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-14 18:00:54.406 28700 28729 I LorieNative: present after-flips in 5.0 seconds = 0.0 FPS
+04-14 18:00:54.406 28700 28729 I LorieNative: 217 frames in 5.0 seconds = 43.4 FPS
