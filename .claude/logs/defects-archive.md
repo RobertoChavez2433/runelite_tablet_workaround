@@ -4,6 +4,13 @@ Older/resolved defects rotated from per-feature files in `.claude/defects/`.
 
 ---
 
+## Shell (rotated 2026-04-14)
+
+### [SHELL] 2026-03-09: MESA_GLSL_VERSION_OVERRIDE missing for VirGL GPU plugin
+**Pattern**: `MESA_GL_VERSION_OVERRIDE=4.1COMPAT` overrides the GL version string but NOT the GLSL version. RuneLite GPU plugin requires GLSL 3.30 but VirGL stock Mesa reports GLSL 1.50 max. Plugin crashes with `GLSL 3.30 is not supported`.
+**Prevention**: Always set both `MESA_GL_VERSION_OVERRIDE` and `MESA_GLSL_VERSION_OVERRIDE` together.
+**Ref**: @runelite-tablet/app/src/main/assets/scripts/launch-runelite.sh
+
 ## Shell (rotated 2026-03-12, Session 53)
 
 ### [SHELL] 2026-03-09: lfdevs Mesa breaks virpipe on Mali (32-bit visual BadMatch)

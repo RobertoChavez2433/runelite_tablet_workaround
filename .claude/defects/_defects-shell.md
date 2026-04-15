@@ -4,6 +4,11 @@ Max 5 active. Oldest rotates to `.claude/logs/defects-archive.md`.
 
 ## Active Patterns
 
+### [SHELL] 2026-04-14: VirGL server dies silently mid-session causing black screen
+**Pattern**: VirGL server (`virgl_test_server_android`) can crash or exit after initial health check passes. No process monitors it. The Unix socket stays on disk briefly, so the client (Mesa virpipe) connects but gets no response → black screen with zero error output. Session health monitor only checks sentinel file, not VirGL PID.
+**Prevention**: Background watchdog subshell monitors VirGL PID, writes `virgl.status` marker on death with exit code + stderr dump. Kotlin SessionHealthMonitor reads `virgl.pid` and reports VirGL death alongside session status. Always redirect VirGL stderr to `~/virgl-server.log`.
+**Ref**: @runelite-tablet/app/src/main/assets/scripts/launch-runelite.sh (VIRGL_WATCHDOG block)
+
 ### [SHELL] 2026-03-12: sed CR stripping in nested shell quotes strips ALL 'r' characters
 **Pattern**: `sed -i s/\\r// file` in multi-layer shell quoting (Git Bash → adb → run-as → bash) reduces `\\r` to just `r`, stripping ALL 'r' characters from files. `export` becomes `expot`, `dirname` becomes `diname`.
 **Prevention**: Use `tr -d "\015"` for CR stripping (octal, no escaping issues). Or push a self-contained script to `/data/local/tmp/` and run it, avoiding nested quoting entirely.
@@ -24,8 +29,4 @@ Max 5 active. Oldest rotates to `.claude/logs/defects-archive.md`.
 **Prevention**: Remove GLES-unsupported tokens from query tables (GL_MAX_VARYING_FLOATS, GL_MAX_CLIP_DISTANCES, GL_DEPTH_BITS, GL_STENCIL_BITS, GL_SAMPLE_BUFFERS, GL_SAMPLES, GL_SUBPIXEL_BITS). Version-gate `glGetStringi` (verify GL >= 3.0 + test index 0 before loop). Add fflush before each query for crash bisection.
 **Ref**: @runelite-tablet/gl-tests/src/gl_test_log.h (log_gl_caps, int_queries[])
 
-### [SHELL] 2026-03-09: MESA_GLSL_VERSION_OVERRIDE missing for VirGL GPU plugin
-**Pattern**: `MESA_GL_VERSION_OVERRIDE=4.1COMPAT` overrides the GL version string but NOT the GLSL version. RuneLite GPU plugin requires GLSL 3.30 but VirGL stock Mesa reports GLSL 1.50 max. Plugin crashes with `GLSL 3.30 is not supported`.
-**Prevention**: Always set both `MESA_GL_VERSION_OVERRIDE` and `MESA_GLSL_VERSION_OVERRIDE` together. Community VirGL setups all use both (e.g., `MESA_GL_VERSION_OVERRIDE=4.3COMPAT MESA_GLSL_VERSION_OVERRIDE=430`).
-**Ref**: @runelite-tablet/app/src/main/assets/scripts/launch-runelite.sh (virpipe env block)
 
