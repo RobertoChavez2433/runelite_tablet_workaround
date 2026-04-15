@@ -46,4 +46,14 @@ proot-distro login ubuntu -- bash -c '
     echo "GPU_SETUP_COMPLETE"
 '
 
+# Phase 3C: Optional server-side Zink backend (behind feature flag)
+# If RLT_ZINK_BACKEND=1, install mesa-vulkan-icd-wrapper for Zink evaluation
+if [ "${RLT_ZINK_BACKEND:-0}" = "1" ]; then
+    echo "Installing mesa-vulkan-icd-wrapper for Zink evaluation..."
+    pkg install -y mesa-vulkan-icd-wrapper 2>&1 || {
+        echo "WARNING: Failed to install mesa-vulkan-icd-wrapper for Zink"
+    }
+    echo "ZINK_SETUP: Zink backend packages installed. Use test-server-zink.sh to evaluate."
+fi
+
 echo "=== setup-gpu-mali complete ==="

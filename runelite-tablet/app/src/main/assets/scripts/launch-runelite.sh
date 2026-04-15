@@ -309,8 +309,9 @@ cleanup_on_exit() {
     echo "" | tee -a "$LOGFILE"
     echo "=== Shutting down RuneLite session $(date) ===" | tee -a "$LOGFILE"
 
-    # Kill perf monitor
+    # Kill perf monitor and affinity monitor
     [ -n "${PERF_MONITOR_PID:-}" ] && kill "$PERF_MONITOR_PID" 2>/dev/null
+    [ -n "${AFFINITY_MONITOR_PID:-}" ] && kill "$AFFINITY_MONITOR_PID" 2>/dev/null
 
     # Kill Java/RuneLite
     pkill -f 'net.runelite.client.RuneLite' 2>/dev/null || true
@@ -544,7 +545,13 @@ elif [ "$GPU_VENDOR" = "mali" ]; then
 
         VIRGL_LOG="$HOME/virgl-server.log"
         echo "Starting VirGL server profile='$VIRGL_SERVER_PROFILE' ($VIRGL_SERVER_DESCRIPTION)..." | tee -a "$LOGFILE"
-        env -u LD_LIBRARY_PATH virgl_test_server_android $VIRGL_SERVER_ARGS > "$VIRGL_LOG" 2>&1 &
+        # Phase 3B: VirGL server-side tuning env vars (behind feature flag)
+        VIRGL_TUNE_ENVS=""
+        if [ "${RLT_VIRGL_TUNE:-0}" = "1" ]; then
+            VIRGL_TUNE_ENVS="VIRGL_RENDERER_THREAD=1 VIRGL_RENDERER_ASYNC=1"
+            echo "VIRGL_TUNE: server-side tuning enabled ($VIRGL_TUNE_ENVS)" | tee -a "$LOGFILE"
+        fi
+        env -u LD_LIBRARY_PATH $VIRGL_TUNE_ENVS virgl_test_server_android $VIRGL_SERVER_ARGS > "$VIRGL_LOG" 2>&1 &
         VIRGL_PID=$!
         echo "VirGL server forked PID=$VIRGL_PID args='$VIRGL_SERVER_ARGS' log=$VIRGL_LOG" | tee -a "$LOGFILE"
 
@@ -657,6 +664,28 @@ if [ -n "$VIRGL_PID" ]; then
     echo "VirGL watchdog started (background PID=$!)" | tee -a "$LOGFILE"
 fi
 
+# ── Phase 1: CPU core affinity pinning ──
+# Pin VirGL server to big/prime cores (CPU 4-7, bitmask 0xF0)
+BIG_PRIME_MASK="0xF0"
+PRIME_MASK="0x80"  # CPU 7 only (prime, 3.4 GHz)
+
+if [ -n "$VIRGL_PID" ]; then
+    if taskset -p "$BIG_PRIME_MASK" "$VIRGL_PID" 2>/dev/null; then
+        echo "AFFINITY: VirGL (PID=$VIRGL_PID) pinned to big/prime cores (mask=$BIG_PRIME_MASK)" | tee -a "$LOGFILE"
+    else
+        echo "AFFINITY: taskset failed for VirGL (PID=$VIRGL_PID), staying on default cores" | tee -a "$LOGFILE"
+    fi
+fi
+
+# Start CPU affinity monitor in background (Task 0B + 1B persistence watchdog)
+AFFINITY_MONITOR_SCRIPT="$HOME/scripts/monitor-cpu-affinity.sh"
+AFFINITY_MONITOR_PID=""
+if [ -f "$AFFINITY_MONITOR_SCRIPT" ] && [ -n "${VIRGL_PID:-}" ]; then
+    bash "$AFFINITY_MONITOR_SCRIPT" "$VIRGL_PID" >> "$LOGFILE" 2>&1 &
+    AFFINITY_MONITOR_PID=$!
+    echo "AFFINITY: monitor started (PID=$AFFINITY_MONITOR_PID) tracking VirGL=$VIRGL_PID" | tee -a "$LOGFILE"
+fi
+
 echo "Launching RuneLite..." | tee -a "$LOGFILE"
 echo "VirGL socket: $(ls -la "$PREFIX/tmp/.virgl_test" 2>&1)" | tee -a "$LOGFILE"
 echo "Outer preflight: proot-distro=$(command -v proot-distro || echo missing) bash=$(command -v bash || echo missing) HOME=$HOME PREFIX=$PREFIX" | tee -a "$LOGFILE"
@@ -745,6 +774,19 @@ elif [ "$PROOT_GPU_ENV" = "mali-angle" ] || [ "$PROOT_GPU_ENV" = "mali-native" ]
             export MESA_GLSL_VERSION_OVERRIDE="$GLSL_OVERRIDE"
             GPU_AVAILABLE=true
             echo "VIRGL_VALIDATION: PASS — GL=$OVERRIDE GLSL=$GLSL_OVERRIDE renderer=$GL_RENDERER" >&2
+
+            # Phase 3B: VirGL pipeline tuning (behind feature flag)
+            if [ "${RLT_VIRGL_TUNE:-0}" = "1" ]; then
+                export MESA_GLSL_CACHE_DISABLE=0
+                export MESA_SHADER_CACHE_MAX_SIZE=256M
+                echo "VIRGL_TUNE: shader cache enabled (MESA_GLSL_CACHE_DISABLE=0 MESA_SHADER_CACHE_MAX_SIZE=256M)" >&2
+            fi
+
+            # Phase 3D: GL call profiling (behind feature flag, diagnostic only)
+            if [ -n "${RLT_GALLIUM_HUD:-}" ]; then
+                export GALLIUM_HUD="$RLT_GALLIUM_HUD"
+                echo "GALLIUM_HUD: profiling enabled ($GALLIUM_HUD)" >&2
+            fi
         else
             echo "VIRGL_VALIDATION: FAIL — GL_RENDERER='$GL_RENDERER' does not contain 'virgl'" >&2
             echo "VIRGL_VALIDATION: Socket exists but rendering pipeline broken — check virgl-server.log" >&2
@@ -997,6 +1039,18 @@ echo running > "$SESSION_DIR_IN_PROOT/state"
 echo "$RUNELITE_LAUNCH_MODE" > "$SESSION_DIR_IN_PROOT/runelite.launch.mode"
 echo "RuneLite started with PID $JAVA_PID" >&2
 
+# Pin RuneLite Java process to big/prime cores (CPU 4-7)
+if taskset -p 0xF0 "$JAVA_PID" 2>/dev/null; then
+    echo "AFFINITY: RuneLite (PID=$JAVA_PID) pinned to big/prime cores" >&2
+else
+    echo "AFFINITY: taskset unavailable in proot for RuneLite (PID=$JAVA_PID)" >&2
+fi
+# Pin proot itself to prime core (CPU 7) — proot is single-threaded
+PROOT_PID=$(cat /proc/self/stat 2>/dev/null | awk '{print $4}')
+if [ -n "$PROOT_PID" ] && taskset -p 0x80 "$PROOT_PID" 2>/dev/null; then
+    echo "AFFINITY: proot (PID=$PROOT_PID) pinned to prime core" >&2
+fi
+
 wait $JAVA_PID
 JAVA_EXIT=$?
 if [ "$RUNELITE_LAUNCH_MODE" = "launcher" ]; then
@@ -1027,10 +1081,19 @@ fi
 if [ -n "$OUTER_DIRECT_CLASSPATH" ]; then
     echo "Resolved direct RuneLite classpath from Termux state" | tee -a "$LOGFILE"
 fi
+# Phase 4B: proot seccomp-bpf mode (behind feature flag)
+# Reduces ptrace overhead by filtering syscalls in kernel space (~5us vs ~50us)
+if [ "${RLT_PROOT_SECCOMP:-0}" = "1" ]; then
+    export PROOT_NO_SECCOMP=0
+    echo "PTRACE_OPT: seccomp-bpf mode enabled via PROOT_NO_SECCOMP=0" | tee -a "$LOGFILE"
+else
+    echo "PTRACE_OPT: seccomp-bpf disabled (set RLT_PROOT_SECCOMP=1 to enable)" | tee -a "$LOGFILE"
+fi
 proot-distro login ubuntu --shared-tmp $GPU_BIND -- env \
     RLT_SESSION_DIR_IN_PROOT="/tmp/rlt-session/$SESSION_ID" \
     RLT_PROOT_ENV_FILE="$PROOT_ENV_FILE" \
     RLT_PROOT_GPU_ENV="$PROOT_GPU_ENV" \
+    RLT_VIRGL_TUNE="${RLT_VIRGL_TUNE:-0}" \
     RLT_INNER_PERF_MONITOR_ENABLED="$PERF_MONITOR_ENABLED" \
     RLT_INNER_TARGET_FPS="${RLT_RUNELITE_TARGET_FPS:-120}" \
     RLT_INNER_UNLOCK_FPS="${RLT_RUNELITE_UNLOCK_FPS:-true}" \
