@@ -182,6 +182,41 @@ class X11AttachmentControllerTest {
         controller.cancelAttachLoop()
         assertTrue(controller.xConnectionAttached)
     }
+
+    @Test
+    fun `startAttachLoop skips when already connected`() = runTest {
+        connector.connected = true
+        controller.tryAttach() // sets xConnectionAttached = true
+        assertTrue(controller.xConnectionAttached)
+
+        connector.connectionRequestCount = 0
+        controller.startAttachLoop(this)
+        advanceTimeBy(1000)
+
+        // Loop should not have started — no connection requests
+        assertEquals(0, connector.connectionRequestCount)
+    }
+
+    @Test
+    fun `startAttachLoop runs when connected but bridge reconnect pending`() = runTest {
+        connector.connected = true
+        connector.serviceAvailable = true
+        connector.binderAlive = true
+        connector.xConnectionAvailable = true
+        controller.tryAttach()
+        assertTrue(controller.xConnectionAttached)
+
+        controller.notifyBridgeStateChanged()
+        assertTrue(controller.pendingBridgeReconnect)
+        assertFalse(controller.xConnectionAttached)
+
+        controller.startAttachLoop(this)
+        advanceTimeBy(300)
+
+        // Loop should have run and reconnected
+        assertTrue(controller.xConnectionAttached)
+        assertFalse(controller.pendingBridgeReconnect)
+    }
 }
 
 class FakeX11ServiceConnector : X11ServiceConnector {

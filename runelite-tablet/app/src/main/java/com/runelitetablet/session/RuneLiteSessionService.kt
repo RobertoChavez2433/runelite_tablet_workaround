@@ -85,7 +85,7 @@ class RuneLiteSessionService : Service() {
         _sessionStartTime.value = startTime
         prefs.edit().putBoolean(PREF_SESSION_ACTIVE, true).putLong(PREF_SESSION_START_TIME, startTime).apply()
         startForeground(SessionNotificationHelper.NOTIFICATION_ID, notificationHelper.buildNotification("Starting RuneLite..."))
-        healthMonitor.startPolling { handleHealthStateChange(it) }
+        healthMonitor.startPolling(::handleHealthStateChange, initialDelayMs = 30_000L)
     }
 
     private fun handleStopSession() {
@@ -116,7 +116,7 @@ class RuneLiteSessionService : Service() {
                     _sessionState.value = SessionState.Running
                     if (_sessionStartTime.value == 0L) _sessionStartTime.value = prefs.getLong(PREF_SESSION_START_TIME, System.currentTimeMillis())
                     notificationHelper.updateIfChanged("RuneLite is running")
-                    healthMonitor.startPolling { handleHealthStateChange(it) }
+                    healthMonitor.startPolling(::handleHealthStateChange)
                 }
                 else -> { _sessionState.value = SessionState.Idle; clearSessionState(); stopSelf() }
             }

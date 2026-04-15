@@ -38,11 +38,15 @@ class SessionHealthMonitor(
      * Start polling. Calls [onStateChanged] with the detected session state.
      * Returns the polling [Job] which can be cancelled to stop polling.
      */
-    fun startPolling(onStateChanged: (SessionState) -> Unit): Job {
+    fun startPolling(onStateChanged: (SessionState) -> Unit, initialDelayMs: Long = 0L): Job {
         stopPolling()
         consecutiveStoppedCount = 0
         consecutiveErrorCount = 0
         val job = scope.launch {
+            if (initialDelayMs > 0) {
+                AppLog.d("SESSION", "startPolling: waiting ${initialDelayMs}ms for launch sequence before first poll")
+                delay(initialDelayMs)
+            }
             while (isActive) {
                 val rawState = checkHealth()
                 val emittedState = debounce(rawState)

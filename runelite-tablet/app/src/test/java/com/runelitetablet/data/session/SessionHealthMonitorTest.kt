@@ -82,7 +82,7 @@ class SessionHealthMonitorTest {
         configureHealthResponse("session=no virgl=n/a")
         val emittedStates = mutableListOf<SessionState>()
 
-        val job = monitor.startPolling { emittedStates.add(it) }
+        val job = monitor.startPolling(onStateChanged = { emittedStates.add(it) })
 
         // First poll fires immediately (UnconfinedTestDispatcher), debounce suppresses STOPPED (count=1)
         // Advance through 2 more poll intervals (5_000ms each for non-running state)
@@ -100,7 +100,7 @@ class SessionHealthMonitorTest {
         configureHealthResponse("session=yes virgl=n/a")
         val emittedStates = mutableListOf<SessionState>()
 
-        val job = monitor.startPolling { emittedStates.add(it) }
+        val job = monitor.startPolling(onStateChanged = { emittedStates.add(it) })
 
         // Running is emitted immediately on first poll
         job.cancel()
@@ -115,7 +115,7 @@ class SessionHealthMonitorTest {
         configureHealthResponse("session=no virgl=n/a")
         val emittedStates = mutableListOf<SessionState>()
 
-        val job = monitor.startPolling { emittedStates.add(it) }
+        val job = monitor.startPolling(onStateChanged = { emittedStates.add(it) })
 
         // 1st poll: STOPPED (count=1, suppressed)
         advanceTimeBy(5_001L) // 2nd poll: STOPPED (count=2, suppressed)
@@ -140,7 +140,7 @@ class SessionHealthMonitorTest {
     fun `stopPolling resets counters`() = testScope.runTest {
         configureHealthResponse("session=no virgl=n/a")
         val firstStates = mutableListOf<SessionState>()
-        val job1 = monitor.startPolling { firstStates.add(it) }
+        val job1 = monitor.startPolling(onStateChanged = { firstStates.add(it) })
         advanceTimeBy(5_001L) // 2nd poll: count=2
         job1.cancel()
 
@@ -148,7 +148,7 @@ class SessionHealthMonitorTest {
 
         // New polling — needs 3 fresh STOPPED readings
         val secondStates = mutableListOf<SessionState>()
-        val job2 = monitor.startPolling { secondStates.add(it) }
+        val job2 = monitor.startPolling(onStateChanged = { secondStates.add(it) })
         // 1st poll: count=1 (suppressed)
         advanceTimeBy(5_001L) // 2nd poll: count=2 (suppressed)
         assertTrue("Expected no STOPPED after reset, got $secondStates", secondStates.isEmpty())
@@ -165,7 +165,7 @@ class SessionHealthMonitorTest {
         configureHealthResponse("GARBAGE_NO_SESSION_KEY")
         val emittedStates = mutableListOf<SessionState>()
 
-        val job = monitor.startPolling { emittedStates.add(it) }
+        val job = monitor.startPolling(onStateChanged = { emittedStates.add(it) })
 
         // 1st poll: Error (count=1, suppressed)
         advanceTimeBy(5_001L) // 2nd poll: Error (count=2, suppressed)
@@ -174,6 +174,37 @@ class SessionHealthMonitorTest {
         advanceTimeBy(5_001L) // 3rd poll: Error (count=3, emitted)
         assertEquals(1, emittedStates.size)
         assertTrue(emittedStates[0] is SessionState.Error)
+
+        job.cancel()
+    }
+
+    @Test
+    fun `startPolling with initialDelay delays first poll`() = testScope.runTest {
+        configureHealthResponse("session=yes virgl=n/a")
+        val emittedStates = mutableListOf<SessionState>()
+
+        val job = monitor.startPolling({ emittedStates.add(it) }, initialDelayMs = 10_000L)
+
+        // No poll yet — still in initial delay
+        assertTrue("Expected no emissions during initial delay", emittedStates.isEmpty())
+
+        advanceTimeBy(10_001L) // initial delay expires, first poll fires
+        assertTrue("Expected Running after initial delay", emittedStates.isNotEmpty())
+        assertEquals(SessionState.Running, emittedStates[0])
+
+        job.cancel()
+    }
+
+    @Test
+    fun `startPolling with zero initialDelay polls immediately`() = testScope.runTest {
+        configureHealthResponse("session=yes virgl=n/a")
+        val emittedStates = mutableListOf<SessionState>()
+
+        val job = monitor.startPolling({ emittedStates.add(it) }, initialDelayMs = 0L)
+
+        // First poll fires immediately with UnconfinedTestDispatcher
+        assertTrue("Expected immediate emission", emittedStates.isNotEmpty())
+        assertEquals(SessionState.Running, emittedStates[0])
 
         job.cancel()
     }

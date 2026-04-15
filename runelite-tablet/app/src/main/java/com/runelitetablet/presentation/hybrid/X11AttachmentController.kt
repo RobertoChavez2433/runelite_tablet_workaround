@@ -36,6 +36,10 @@ class X11AttachmentController(
     }
 
     fun startAttachLoop(scope: CoroutineScope) {
+        if (xConnectionAttached && !pendingBridgeReconnect) {
+            logger?.d("HYBRID_X11", "startAttachLoop: already connected, skipping")
+            return
+        }
         attachJob?.cancel()
         var attempt = 0
         attachJob = scope.launch {
@@ -80,8 +84,10 @@ class X11AttachmentController(
                 xConnectionAttached = true
                 onStatusUpdate("connected=true")
                 onStatusVisible(false)
-                attachJob?.cancel()
             }
+            // Always cancel the attach loop when connected — not just on first transition.
+            // Without this, the loop keeps running (attempt=600+) burning CPU.
+            attachJob?.cancel()
             return
         }
 

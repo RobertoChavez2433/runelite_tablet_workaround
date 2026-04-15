@@ -38,7 +38,17 @@ class TermuxX11StartReceiver : BroadcastReceiver() {
 
         val currentBinder = HybridX11Bridge.currentService()?.asBinder()
         if (currentBinder != null && currentBinder == binder && currentBinder.isBinderAlive) {
-            AppLog.d("HYBRID_X11", "TermuxX11StartReceiver: duplicate binder, skipping")
+            // Suppress log spam — only log the first duplicate and then every 30 seconds
+            val now = System.currentTimeMillis()
+            if (now - lastDuplicateLogTimeMs > DUPLICATE_LOG_INTERVAL_MS) {
+                val suppressed = duplicatesSinceLastLog
+                val suffix = if (suppressed > 0) " ($suppressed suppressed)" else ""
+                AppLog.d("HYBRID_X11", "TermuxX11StartReceiver: duplicate binder, skipping$suffix")
+                lastDuplicateLogTimeMs = now
+                duplicatesSinceLastLog = 0
+            } else {
+                duplicatesSinceLastLog++
+            }
             return
         }
 
@@ -67,8 +77,13 @@ class TermuxX11StartReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_START = "com.termux.x11.CmdEntryPoint.ACTION_START"
+        private const val DUPLICATE_LOG_INTERVAL_MS = 30_000L
 
         @Volatile
         private var lastIgnoredDeadBinderToken: Int = 0
+        @Volatile
+        private var lastDuplicateLogTimeMs: Long = 0L
+        @Volatile
+        private var duplicatesSinceLastLog: Int = 0
     }
 }

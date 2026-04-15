@@ -14,6 +14,8 @@ class TermuxResultService : Service() {
         get() = (application as RuneLiteTabletApp).container.termux.resultRegistry
 
     private val pendingResults get() = registry.pendingResults
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var pendingStopRunnable: Runnable? = null
 
     companion object {
         private const val EXTRA_EXECUTION_ID = "execution_id"
@@ -25,6 +27,7 @@ class TermuxResultService : Service() {
         private const val EXTRA_RESULT_BUNDLE = "result"
 
         private const val STDOUT_PREVIEW_LEN = 200
+        private const val STOP_DELAY_MS = 500L
 
         private val CREDENTIAL_PATTERNS = listOf(
             Regex("""(JX_SESSION_ID|JX_ACCESS_TOKEN|JX_REFRESH_TOKEN|JX_CHARACTER_ID)=[^\s]+"""),
@@ -113,10 +116,23 @@ class TermuxResultService : Service() {
         stopSelfIfIdle(startId)
     }
 
+    /**
+     * Delay stopSelf by 500ms to let multiple results batch through the same service instance.
+     * During script deployment, 12 commands fire in rapid succession — without this delay,
+     * the service does onCreate/onDestroy 12 times (~5-10ms overhead each).
+     */
     private fun stopSelfIfIdle(startId: Int) {
         if (pendingResults.isEmpty()) {
-            AppLog.lifecycle("TermuxResultService.stopSelfIfIdle: no pending results — stopSelf(startId=$startId)")
-            stopSelf(startId)
+            // Cancel any previously scheduled stop (a new result might arrive)
+            pendingStopRunnable?.let { handler.removeCallbacks(it) }
+            val runnable = Runnable {
+                if (pendingResults.isEmpty()) {
+                    AppLog.lifecycle("TermuxResultService.stopSelfIfIdle: no pending results — stopSelf(startId=$startId)")
+                    stopSelf(startId)
+                }
+            }
+            pendingStopRunnable = runnable
+            handler.postDelayed(runnable, STOP_DELAY_MS)
         } else {
             AppLog.lifecycle("TermuxResultService.stopSelfIfIdle: ${pendingResults.size} pending result(s) — staying alive " +
                 "pendingIds=${pendingResults.keys}")
@@ -126,6 +142,7 @@ class TermuxResultService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        pendingStopRunnable?.let { handler.removeCallbacks(it) }
         super.onDestroy()
         AppLog.lifecycle("TermuxResultService.onDestroy: pendingResults=${pendingResults.size} (not clearing — deferreds are static, outlive service instances)")
     }

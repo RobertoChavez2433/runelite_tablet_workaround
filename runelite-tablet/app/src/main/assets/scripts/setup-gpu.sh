@@ -77,4 +77,11 @@ else
     echo "GPU_SETUP_COMPLETE"
 fi
 
+# Write Termux-side marker so MarkerReconciler won't re-run GPU setup on every startup.
+# Other setup scripts (install-proot.sh, install-java.sh, download-runelite.sh) already do this;
+# the GPU scripts were missing it, causing a 16-second re-install on every app launch.
+MARKER_DIR="$HOME/.runelite-tablet/markers"
+mkdir -p "$MARKER_DIR"
+touch "$MARKER_DIR/step-gpu.done"
+
 echo "=== setup-gpu complete ==="
