@@ -2,6 +2,7 @@ package com.runelitetablet.di
 
 import com.runelitetablet.domain.logging.Logger
 import com.runelitetablet.perf.CpuAffinityMonitor
+import com.runelitetablet.perf.CpuBooster
 import com.runelitetablet.perf.PerfDashboard
 import com.runelitetablet.perf.PipelineBenchmark
 import com.runelitetablet.perf.PtraceOverheadEstimator
@@ -17,4 +18,5 @@ class PerfModule(logger: Logger) {
     val dashboard = PerfDashboard(logger, affinityMonitor, ptraceEstimator)
     val benchmark = PipelineBenchmark(logger)
     val virglProfiler = VirglEnvironmentProfiler(logger)
+    val cpuBooster = CpuBooster(logger)
 }

@@ -21,6 +21,8 @@ import com.runelitetablet.BuildConfig
 import com.runelitetablet.logging.AppLog
 import com.runelitetablet.logging.FdTracker
 import com.runelitetablet.logging.PerfSnapshots
+import com.runelitetablet.domain.command.CommandRunner
+import com.runelitetablet.perf.CpuBooster
 import com.runelitetablet.perf.PerfDashboard
 import com.termux.x11.LorieView
 import kotlinx.coroutines.flow.collectLatest
@@ -39,6 +41,9 @@ class HybridX11HostActivity : ComponentActivity() {
     private var lastStatusMessage: String? = null
     private var lifecycleActive = false
     private var perfDashboard: PerfDashboard? = null
+    private var cpuBooster: CpuBooster? = null
+    private var commandRunner: CommandRunner? = null
+    private var cpuBoostAttempted = false
     private val frameTracker = FrameTimingTracker()
     private var frameCount = 0L
     private var lastFrameLogCount = 0L
@@ -107,6 +112,8 @@ class HybridX11HostActivity : ComponentActivity() {
         observeBridgeState()
         val container = (application as com.runelitetablet.RuneLiteTabletApp).container
         perfDashboard = container.perf.dashboard
+        cpuBooster = container.perf.cpuBooster
+        commandRunner = container.termux.commandRunner
         // Wire native XloriePerf stats into the perf dashboard
         container.debugLogServer?.nativeLogListener = { msg ->
             PerfDashboard.parseXloriePerfLine(msg)?.let { stats ->
@@ -199,6 +206,34 @@ class HybridX11HostActivity : ComponentActivity() {
             com.termux.x11.MainActivity.getInstance()?.clientConnectedStateChanged()
         }
         perfDashboard?.start()
+        // Promote VirGL/proot from moderate cpuset (little cores 0-3) to top-app (big+prime 0-7)
+        if (!cpuBoostAttempted) {
+            cpuBoostAttempted = true
+            lifecycleScope.launch {
+                try {
+                    val runner = commandRunner ?: return@launch
+                    val result = runner.execute(
+                        commandPath = "${CommandRunner.TERMUX_BIN_PATH}/bash",
+                        arguments = arrayOf("-c", "SESSION_DIR=\$(cat \$PREFIX/tmp/rlt-session/current 2>/dev/null); " +
+                            "echo virgl=\$(cat \$SESSION_DIR/virgl.pid 2>/dev/null); " +
+                            "echo java=\$(cat \$SESSION_DIR/java.pid 2>/dev/null)"),
+                        timeoutMs = 10_000L
+                    )
+                    val stdout = result.stdout ?: ""
+                    val virglPid = Regex("""virgl=(\d+)""").find(stdout)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                    val javaPid = Regex("""java=(\d+)""").find(stdout)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                    if (virglPid > 0 || javaPid > 0) {
+                        cpuBooster?.boostFromSessionPids(virglPid, javaPid)
+                    } else {
+                        AppLog.w("CPU_BOOST", "No PIDs found in session: $stdout")
+                        cpuBoostAttempted = false // retry next resume
+                    }
+                } catch (e: Exception) {
+                    AppLog.w("CPU_BOOST", "PID discovery failed: ${e.message}")
+                    cpuBoostAttempted = false
+                }
+            }
+        }
         AppLog.lifecycle("HybridX11HostActivity.onResume: frame callback + attach loop + perf dashboard started, sessionId=$frameSessionId")
     }
 
