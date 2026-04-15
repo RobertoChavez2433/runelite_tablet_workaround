@@ -161,6 +161,11 @@ static struct {
     uint64_t maxSwapNs;
     uint64_t maxFrameNs;
     uint64_t maxInterFrameNs;
+    uint64_t contentStarved;    // vsync wakeups with no new content (drawRequested=false)
+    uint64_t vsyncWakeups;      // total vsync wakeups (content + starved)
+    uint64_t waitChoreographerNs; // time blocked by waitForNextFrame
+    uint64_t waitContentNs;       // time blocked waiting for drawRequested
+    uint64_t waitStateNs;         // time blocked on state/window/buffer changes
 } rendererPerfStats;
 
 GLuint g_texture_program = 0, gv_pos = 0, gv_coords = 0;
@@ -172,6 +177,28 @@ static uint64_t rendererNowNs(void) {
     struct timespec ts = {0};
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ((uint64_t) ts.tv_sec * 1000000000ULL) + (uint64_t) ts.tv_nsec;
+}
+
+typedef enum {
+    WAIT_NONE = 0,
+    WAIT_CHOREOGRAPHER,   // waitForNextFrame is true
+    WAIT_CONTENT,         // no drawRequested / cursor changes
+    WAIT_STATE,           // no state, no surface, waiting for buffers
+} WaitReason;
+
+WaitReason classifyWaitReason(bool hasState, bool surfaceAvailable, bool waitForNextFrame,
+                              bool waitingForBuffers, bool drawRequested, bool cursorMoved,
+                              bool cursorUpdated, bool stateChanged, bool windowChanged,
+                              bool buffersChanged) {
+    if (stateChanged || windowChanged || buffersChanged)
+        return WAIT_NONE;
+    if (!hasState || !surfaceAvailable || waitingForBuffers)
+        return WAIT_STATE;
+    if (waitForNextFrame)
+        return WAIT_CHOREOGRAPHER;
+    if (!drawRequested && !cursorMoved && !cursorUpdated)
+        return WAIT_CONTENT;
+    return WAIT_NONE;
 }
 
 static void rendererLogPerfSample(uint64_t frameStartNs, uint64_t lockNs, uint64_t fenceNs, uint64_t swapNs, uint64_t frameNs) {
@@ -210,20 +237,29 @@ static void rendererLogPerfSample(uint64_t frameStartNs, uint64_t lockNs, uint64
     double avgInterFrameMs = intervalCount > 0.0 ? (rendererPerfStats.totalInterFrameNs / 1000000.0 / intervalCount) : 0.0;
     double estimatedFps = avgInterFrameMs > 0.0 ? (1000.0 / avgInterFrameMs) : 0.0;
 
+    double contentUtil = rendererPerfStats.vsyncWakeups > 0
+        ? (100.0 * rendererPerfStats.frameCount / rendererPerfStats.vsyncWakeups)
+        : 0.0;
+    double waitChoreoMs = rendererPerfStats.waitChoreographerNs / 1000000.0;
+    double waitContentMs = rendererPerfStats.waitContentNs / 1000000.0;
+    double waitStateMs = rendererPerfStats.waitStateNs / 1000000.0;
+
     log(
-        "XloriePerf: frames=%llu avg_lock_ms=%.3f avg_fence_ms=%.3f avg_swap_ms=%.3f avg_frame_ms=%.3f avg_inter_frame_ms=%.3f estimated_fps=%.1f max_lock_ms=%.3f max_fence_ms=%.3f max_swap_ms=%.3f max_frame_ms=%.3f max_inter_frame_ms=%.3f",
+        "XloriePerf: frames=%llu avg_lock_ms=%.3f avg_fence_ms=%.3f avg_swap_ms=%.3f avg_frame_ms=%.3f avg_inter_frame_ms=%.3f estimated_fps=%.1f"
+        " content_util=%.0f%% starved=%llu vsyncs=%llu"
+        " max_lock_ms=%.3f max_fence_ms=%.3f max_swap_ms=%.3f max_frame_ms=%.3f max_inter_frame_ms=%.3f"
+        " wait_choreo=%.1fms wait_content=%.1fms wait_state=%.1fms",
         (unsigned long long) rendererPerfStats.frameCount,
-        avgLockMs,
-        avgFenceMs,
-        avgSwapMs,
-        avgFrameMs,
-        avgInterFrameMs,
-        estimatedFps,
+        avgLockMs, avgFenceMs, avgSwapMs, avgFrameMs, avgInterFrameMs, estimatedFps,
+        contentUtil,
+        (unsigned long long) rendererPerfStats.contentStarved,
+        (unsigned long long) rendererPerfStats.vsyncWakeups,
         rendererPerfStats.maxLockNs / 1000000.0,
         rendererPerfStats.maxFenceNs / 1000000.0,
         rendererPerfStats.maxSwapNs / 1000000.0,
         rendererPerfStats.maxFrameNs / 1000000.0,
-        rendererPerfStats.maxInterFrameNs / 1000000.0
+        rendererPerfStats.maxInterFrameNs / 1000000.0,
+        waitChoreoMs, waitContentMs, waitStateMs
     );
 
     rendererPerfStats.windowStartNs = frameStartNs;
@@ -237,7 +273,12 @@ static void rendererLogPerfSample(uint64_t frameStartNs, uint64_t lockNs, uint64
     rendererPerfStats.maxFenceNs = 0;
     rendererPerfStats.maxSwapNs = 0;
     rendererPerfStats.maxFrameNs = 0;
+    rendererPerfStats.contentStarved = 0;
+    rendererPerfStats.vsyncWakeups = 0;
     rendererPerfStats.maxInterFrameNs = 0;
+    rendererPerfStats.waitChoreographerNs = 0;
+    rendererPerfStats.waitContentNs = 0;
+    rendererPerfStats.waitStateNs = 0;
 }
 
 static void pthreadCondVarProxyInit(void);
@@ -530,8 +571,17 @@ retry_probe:
             log("Xlorie: GLES draws pixels unchanged, probably system does not support AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM. Forcing bgra.\n");
             *flip = 1;
         } else if (pixel[0] != 0xAADDCCBB) {
-            log("Xlorie: GLES receives broken pixels. Forcing legacy drawing. 0x%X\n", pixel[0]);
-            *legacy_drawing = 1;
+            // On RGBA fallback path (Mali/VirGL), accept pixel values where RGB channels
+            // are present even if alpha differs (VirGL/ANGLE may modify alpha).
+            uint8_t r = (pixel[0] >> 0) & 0xFF;
+            uint8_t g = (pixel[0] >> 8) & 0xFF;
+            uint8_t b = (pixel[0] >> 16) & 0xFF;
+            if (usingRgbaFallback && r == 0xDD && g == 0xCC && b == 0xBB) {
+                log("Xlorie: RGBA fallback pixel alpha differs (0x%X) but RGB correct, accepting.\n", pixel[0]);
+            } else {
+                log("Xlorie: GLES receives broken pixels. Forcing legacy drawing. 0x%X (rgba_fallback=%d)\n", pixel[0], usingRgbaFallback ? 1 : 0);
+                *legacy_drawing = 1;
+            }
         }
         eglMakeCurrent(egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
         eglDestroyContext(egl_display, testctx);
@@ -744,7 +794,8 @@ void rendererRedrawLocked(bool* waitingForBuffers) {
     eglClientWaitSyncKHR(egl_display, fence, 0, EGL_FOREVER);
     fenceNs = rendererNowNs() - fenceStartNs;
     eglDestroySyncKHR(egl_display, fence);
-    state->waitForNextFrame = true;
+    // Phase 2B: Removed waitForNextFrame=true — was capping FPS by forcing 2-vsync wait.
+    // Choreographer still clears the flag in lorieChoreographerFrameCallback().
     lorie_mutex_unlock(&state->lock, &state->lockingPid);
 
     swapStartNs = rendererNowNs();
@@ -789,8 +840,30 @@ __noreturn static void* rendererThread(void) {
     LorieBuffer* buf;
     bool waitingForBuffers = false;
     while (true) {
-        while (rendererShouldWait(&waitingForBuffers))
+        while (rendererShouldWait(&waitingForBuffers)) {
+            bool buffersChanged;
+            uint64_t waitStartNs = rendererNowNs();
             pthread_cond_wait(&stateCond, &stateLock);
+            uint64_t waitElapsedNs = rendererNowNs() - waitStartNs;
+            pthread_spin_lock(&bufferLock);
+            buffersChanged = !xorg_list_is_empty(&addedBuffers) || !xorg_list_is_empty(&removedBuffers);
+            pthread_spin_unlock(&bufferLock);
+            WaitReason reason = classifyWaitReason(
+                state != NULL,
+                state ? state->surfaceAvailable : false,
+                state ? state->waitForNextFrame : false,
+                waitingForBuffers,
+                state ? state->drawRequested : false,
+                state ? state->cursor.moved : false,
+                state ? state->cursor.updated : false,
+                stateChanged, windowChanged, buffersChanged);
+            switch (reason) {
+                case WAIT_CHOREOGRAPHER: rendererPerfStats.waitChoreographerNs += waitElapsedNs; break;
+                case WAIT_CONTENT:       rendererPerfStats.waitContentNs += waitElapsedNs; break;
+                case WAIT_STATE:         rendererPerfStats.waitStateNs += waitElapsedNs; break;
+                default: break;
+            }
+        }
 
         if (stateChanged) {
             struct lorie_shared_server_state* oldState = NULL;
@@ -831,8 +904,13 @@ __noreturn static void* rendererThread(void) {
         pthread_cond_signal(&stateChangeFinishCond);
         pthread_mutex_unlock(&stateLock);
 
-        if (state && state->surfaceAvailable && !state->waitForNextFrame && (state->drawRequested || state->cursor.moved || state->cursor.updated))
-            rendererRedrawLocked(&waitingForBuffers);
+        if (state && state->surfaceAvailable && !state->waitForNextFrame) {
+            rendererPerfStats.vsyncWakeups++;
+            if (state->drawRequested || state->cursor.moved || state->cursor.updated)
+                rendererRedrawLocked(&waitingForBuffers);
+            else
+                rendererPerfStats.contentStarved++;
+        }
 
         pthread_spin_lock(&bufferLock);
         // Remove all buffers which were attached to GL.

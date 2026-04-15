@@ -444,7 +444,8 @@ static Bool lorieRedraw(__unused ClientPtr pClient, __unused void *closure) {
     pvfb->current_msc++;
     loriePerformVblanks();
 
-    pvfb->state->waitForNextFrame = false;
+    // waitForNextFrame is now cleared in lorieChoreographerFrameCallback (Looper thread)
+    // to remove work-queue dispatch latency from the renderer's vsync gate.
 
     if (!lorieConnectionAlive() || !pvfb->state->surfaceAvailable)
         return TRUE;
@@ -682,6 +683,12 @@ void lorieChoreographerFrameCallback(__unused long t, AChoreographer* d) {
     __sync_fetch_and_add(&gChoreographerCallbacks, 1);
     AChoreographer_postFrameCallback(d, (AChoreographer_frameCallback) lorieChoreographerFrameCallback, d);
     if (pScreenPtr) {
+        // Clear waitForNextFrame here (on AChoreographer's Looper thread) instead of in
+        // lorieRedraw (X server work queue) to avoid adding work-queue dispatch latency
+        // to the renderer's vsync gate. The renderer thread can begin its next frame as
+        // soon as the choreographer fires, without waiting for lorieRedraw to process.
+        if (pvfb && pvfb->state)
+            pvfb->state->waitForNextFrame = false;
         QueueWorkProc(lorieRedraw, NULL, NULL);
         lorieWakeServer();
     }
