@@ -1,0 +1,42 @@
+# Slice 1: Hot PutImage/Composite Symbol Resolution
+
+**Date**: 2026-04-16 | **Session**: 72 | **Device**: R52X90378YB
+
+## Captured Evidence
+
+Workload: internal-hybrid variant, RuneLite GPU plugin active, idle in login/launcher UI.
+Logcat tag: `LorieNative`, source: extended `damageTraceOpWithBackend`/`damageTraceOpWithFunction` with dladdr offset logging.
+
+## Resolved Symbols (unstripped libXlorie.so, arm64-v8a)
+
+| fn_offset  | addr2line result                                | Site         |
+|------------|-------------------------------------------------|--------------|
+| 0x310874   | `exaPutImage` @ `xserver/exa/exa_accel.c:252`   | damagePutImage |
+| 0x3149ec   | `exaComposite` @ `xserver/exa/exa_render.c:887` | damageComposite + rare damagePutImage |
+
+## Workload Shape
+
+- PutImage rate: ~1600 calls/sec (measured via counter 95872 in ~60s)
+- Per-call geometry: full-width horizontal strip of 2898x22 pixels (~255 KiB)
+- Frame reconstruction: 84 PutImage slices per full window update (1848 / 22 ≈ 84)
+- Inferred full-frame rate: 1600 / 84 ≈ 19 scene-frames/sec before overhead
+  (matches ground-truth FpsPlugin ~10 FPS within overhead margin)
+- Target window: 2898x1848 (full RuneLite client, accounting for minor chrome)
+
+## Mechanism
+
+Both hot paths are in EXA (X server's 2D acceleration framework). `exaPutImage` is
+X server's wrapper for PutImage that tries GPU migration, then falls back to
+software (`fbPutImage`) when the destination pixmap is not in GPU memory. The
+symptom pattern — same function offset at ~1600 calls/sec, always 22-row stride
+— is the classic "EXA fell back to software pixmap" profile.
+
+## Implications for Slice 3 (branch A: EXA)
+
+Per plan: "Check whether exa_render.c / exa_accel.c is hitting the software
+fallback. EXA has a migration mechanism that punts to software when pixmap isn't
+in GPU memory. Force-GPU all WINDOW-backed pixmaps at allocation time."
+
+This is the expected Slice 3 intervention: make the destination WINDOW pixmap
+GPU-backed so exaPutImage's migration accepts GPU acceleration instead of
+falling through to software.
