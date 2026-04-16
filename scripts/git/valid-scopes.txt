@@ -1,0 +1,16 @@
+auth
+ci
+deps
+docs
+git
+installer
+logging
+native
+perf
+presentation
+scripts
+setup
+tests
+termux
+tooling
+ui

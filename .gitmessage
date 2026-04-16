@@ -1,0 +1,23 @@
+# <type>(<scope>): <subject - imperative mood, <=72 chars>
+#
+# Types: feat | fix | refactor | perf | test | docs | chore | ci | build
+# Scopes: see scripts/git/valid-scopes.txt
+#
+# --- NARRATIVE BODY ---
+# Required for feat/fix/refactor/perf.
+# Required for scoped test/docs/chore/ci/build commits.
+# Mechanical-only lightweight commits can stay unscoped and terse only when no meaningful decision was made.
+#
+# Problem: What forced this change?
+# Decision: What approach was chosen and why?
+# Tradeoff: What was rejected or accepted?
+# Evidence: What proves the change is credible? Tests, device proof, logs, review?
+#
+# --- TRAILERS ---
+# Reason: <one-line forcing function - required for narrative commits>
+# Decision: <optional one-line durable choice>
+# Tradeoff: <optional one-line accepted/rejected tradeoff>
+# Evidence: <optional test/device/review evidence>
+# Follow-up: <optional known remaining work>
+# Refs: #<issue> | ADR-<number>
+# BREAKING CHANGE: <if applicable>

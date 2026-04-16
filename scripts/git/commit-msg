@@ -1,0 +1,187 @@
+#!/bin/sh
+
+set -u
+
+message_file=$1
+valid_scopes_file="scripts/git/valid-scopes.txt"
+valid_types="feat fix refactor perf test docs chore ci build"
+substantive_types="feat fix refactor perf"
+lightweight_types="test docs chore ci build"
+
+fail() {
+  printf '%s\n' "commit-msg: $*" >&2
+  exit 1
+}
+
+warn() {
+  printf '%s\n' "commit-msg warning: $*" >&2
+}
+
+is_in_list() {
+  item=$1
+  list=$2
+
+  for candidate in $list; do
+    if [ "$candidate" = "$item" ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+first_non_comment_line() {
+  sed -n '/^[[:space:]]*#/d; /^[[:space:]]*$/d; p; q' "$message_file"
+}
+
+is_git_generated_revert() {
+  subject=$1
+
+  case "$subject" in
+    Revert\ \"*\")
+      grep -Eq '^This reverts commit [0-9a-f]{7,40}\.' "$message_file"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+subject=$(first_non_comment_line)
+
+if [ -z "$subject" ]; then
+  fail "empty commit message"
+fi
+
+case "$subject" in
+  Merge\ *)
+    exit 0
+    ;;
+  fixup!\ *|squash!\ *)
+    exit 0
+    ;;
+esac
+
+if is_git_generated_revert "$subject"; then
+  exit 0
+fi
+
+if [ ${#subject} -gt 72 ]; then
+  warn "subject is longer than 72 characters"
+fi
+
+case "$subject" in
+  *:\ *)
+    header=${subject%%: *}
+    description=${subject#*: }
+    ;;
+  *)
+    fail "subject must match '<type>(<scope>): <description>' or '<type>: <description>'"
+    ;;
+esac
+
+if [ -z "$description" ]; then
+  fail "subject description is required"
+fi
+
+case "$header" in
+  *\(*\))
+    type=${header%%(*}
+    scope=${header#*(}
+    scope=${scope%)}
+    ;;
+  *)
+    type=$header
+    scope=
+    ;;
+esac
+
+if ! is_in_list "$type" "$valid_types"; then
+  fail "invalid commit type '$type'; expected one of: $valid_types"
+fi
+
+if is_in_list "$type" "$substantive_types" && [ -z "$scope" ]; then
+  fail "$type commits require a scope"
+fi
+
+if [ -n "$scope" ]; then
+  if [ ! -f "$valid_scopes_file" ]; then
+    fail "missing scope allowlist: $valid_scopes_file"
+  fi
+
+  if ! grep -Fxq "$scope" "$valid_scopes_file"; then
+    fail "unknown scope '$scope'; add it to $valid_scopes_file if it is intentional"
+  fi
+fi
+
+narrative=false
+if is_in_list "$type" "$substantive_types"; then
+  narrative=true
+elif is_in_list "$type" "$lightweight_types" && [ -n "$scope" ]; then
+  narrative=true
+fi
+
+if [ "$narrative" != true ]; then
+  exit 0
+fi
+
+body_chars=$(
+  awk '
+    /^[[:space:]]*#/ { next }
+    { lines[++n] = $0 }
+    END {
+      while (n > 0 && lines[n] ~ /^[[:space:]]*$/) n--
+
+      for (i = 1; i <= n; i++) {
+        if (lines[i] !~ /^[[:space:]]*$/) {
+          subject = i
+          break
+        }
+      }
+
+      trailer_start = n + 1
+      for (i = n; i > subject; i--) {
+        if (lines[i] ~ /^[[:space:]]*$/) {
+          trailer_start = i + 1
+          break
+        }
+      }
+
+      if (trailer_start <= subject) trailer_start = n + 1
+
+      all_trailers = 1
+      for (i = trailer_start; i <= n; i++) {
+        if (lines[i] !~ /^([A-Za-z0-9-]+|BREAKING CHANGE):[[:space:]].+/) {
+          all_trailers = 0
+        }
+      }
+      if (!all_trailers) trailer_start = n + 1
+
+      chars = 0
+      for (i = subject + 1; i < trailer_start; i++) {
+        if (lines[i] !~ /^[[:space:]]*$/) {
+          line = lines[i]
+          gsub(/[[:space:]]/, "", line)
+          chars += length(line)
+        }
+      }
+
+      print chars + 0
+    }
+  ' "$message_file"
+)
+
+if [ "$body_chars" -lt 20 ]; then
+  fail "narrative commits require a body explaining WHY (at least 20 non-whitespace chars excluding trailers)"
+fi
+
+reason=$(
+  git interpret-trailers --parse < "$message_file" |
+    awk -F': ' 'tolower($1) == "reason" && length($2) > 0 { found = 1 } END { print found ? "yes" : "no" }'
+)
+
+if [ "$reason" != yes ]; then
+  fail "narrative commits require a Reason: trailer in the trailer block"
+fi
+
+exit 0
