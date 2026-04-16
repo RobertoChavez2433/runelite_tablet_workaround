@@ -27,21 +27,27 @@ class ScriptManager(
             "test-server-zink.sh", "test-user-ns.sh"
         )
         private val CONFIG_NAMES = listOf("openbox-rc.xml")
+
+        /** Process-wide cache so broadcast receivers don't re-deploy after activity setup did it. */
+        @Volatile private var scriptsDeployedGlobal = false
+        @Volatile private var configsDeployedGlobal = false
     }
 
-    /** Cache: once scripts are deployed successfully, skip re-deployment */
-    @Volatile private var scriptsDeployed = false
+    private var scriptsDeployed: Boolean
+        get() = scriptsDeployedGlobal
+        set(value) { scriptsDeployedGlobal = value }
 
-    /** Cache: once configs are deployed successfully, skip re-deployment */
-    @Volatile private var configsDeployed = false
+    private var configsDeployed: Boolean
+        get() = configsDeployedGlobal
+        set(value) { configsDeployedGlobal = value }
 
     /** Cache script content after first APK asset read to avoid repeated decompression */
     private val scriptContentCache = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     /** Reset deployment cache, e.g. after an error that may have left scripts in a bad state */
     override fun invalidateDeployCache() {
-        scriptsDeployed = false
-        configsDeployed = false
+        scriptsDeployedGlobal = false
+        configsDeployedGlobal = false
         scriptContentCache.clear()
         AppLog.script("invalidateDeployCache: deployment and content caches cleared")
     }
