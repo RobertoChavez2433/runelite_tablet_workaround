@@ -177,16 +177,22 @@ class DebugLogServer(private val port: Int = DEFAULT_PORT) {
         try {
             val process = Runtime.getRuntime().exec(arrayOf(
                 "logcat", "-v", "threadtime", "-s",
-                "LorieNative:V", "gles-renderer:V", "XlorieCaps:V", "Xlorie:V"
+                "LorieNative:V", "gles-renderer:V", "XlorieCaps:V", "Xlorie:V",
+                "RLClient:V"
             ))
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             while (running.get()) {
                 val line = reader.readLine() ?: break
                 val msg = parseLogcatMessage(line)
+                val tag = parseLogcatTag(line)
+                // RuneLite client.log lines arrive via launch-runelite.sh tailing into
+                // `log -t RLClient`. Route them under source="runelite" so the HTML
+                // viewer shows them as a distinct filter group.
+                val source = if (tag.startsWith("RL")) "runelite" else "native"
                 val json = buildLogJson(
-                    level = parseLogcatLevel(line), tag = parseLogcatTag(line),
+                    level = parseLogcatLevel(line), tag = tag,
                     msg = msg, thread = parseLogcatThread(line),
-                    source = "native", file = "", lineNum = 0, correlationId = null
+                    source = source, file = "", lineNum = 0, correlationId = null
                 )
                 broadcast(json)
                 if (msg.contains("XloriePerf:")) nativeLogListener?.invoke(msg)
@@ -283,13 +289,13 @@ body{background:#1a1a2e;color:#e0e0e0;font:12px/1.4 'Consolas','Courier New',mon
 .tag{color:#4ecdc4;min-width:80px;display:inline-block;font-weight:bold}
 .corr{color:#666;font-style:italic}
 .src-native{border-left:3px solid #f38181}.src-shell{border-left:3px solid #ffd93d}
-.src-kotlin{border-left:3px solid #4ecdc4}
+.src-kotlin{border-left:3px solid #4ecdc4}.src-runelite{border-left:3px solid #ffb86c}
 #status{color:#666;font-size:11px}
 </style></head><body>
 <div id="toolbar">
 <input id="filter" placeholder="Filter text..." oninput="applyFilters()">
 <select id="levelFilter" onchange="applyFilters()"><option value="">All levels</option><option>D</option><option>I</option><option>W</option><option>E</option></select>
-<select id="sourceFilter" onchange="applyFilters()"><option value="">All sources</option><option>kotlin</option><option>native</option><option>shell</option></select>
+<select id="sourceFilter" onchange="applyFilters()"><option value="">All sources</option><option>kotlin</option><option>native</option><option>shell</option><option>runelite</option></select>
 <input id="tagFilter" placeholder="Tag..." oninput="applyFilters()">
 <input id="corrFilter" placeholder="CorrelationId..." oninput="applyFilters()">
 <button id="pauseBtn" onclick="togglePause()">Pause</button>
