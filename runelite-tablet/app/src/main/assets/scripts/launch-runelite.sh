@@ -43,6 +43,7 @@ RUNELITE_LAUNCH_MODE_OVERRIDE=""
 # Initialize PIDs for cleanup trap (set -u requires these to exist)
 X11_PID=""
 PERF_MONITOR_PID=""
+RL_LOG_TAIL_PID=""
 mkdir -p "$TERMUX_RUNELITE_SETTINGS_DIR"
 echo "=== RuneLite launch $(date) ===" | tee -a "$LOGFILE"
 
@@ -187,6 +188,19 @@ clear_current_session_marker() {
 }
 
 parse_launcher_args "$@"
+
+# Test-harness sentinel: if $HOME/.rlt-virgl-profile-override exists and CLI
+# didn't pass --virgl-server-profile, use the sentinel's first line as the
+# profile. Lets session-level tests (H4/H5/H6) iterate without rebuilding.
+VIRGL_PROFILE_SENTINEL_FILE="$HOME/.rlt-virgl-profile-override"
+if [ -z "$VIRGL_SERVER_PROFILE_OVERRIDE" ] && [ -f "$VIRGL_PROFILE_SENTINEL_FILE" ]; then
+    SENTINEL_PROFILE="$(head -1 "$VIRGL_PROFILE_SENTINEL_FILE" 2>/dev/null | tr -d '[:space:]')"
+    if [ -n "$SENTINEL_PROFILE" ]; then
+        VIRGL_SERVER_PROFILE_OVERRIDE="$SENTINEL_PROFILE"
+        echo "VirGL profile sentinel active: override='$SENTINEL_PROFILE' (from $VIRGL_PROFILE_SENTINEL_FILE)" | tee -a "$LOGFILE"
+    fi
+fi
+
 acquire_launch_lock
 
 find_pids_by_cmdline() {
@@ -312,6 +326,8 @@ cleanup_on_exit() {
     # Kill perf monitor and affinity monitor
     [ -n "${PERF_MONITOR_PID:-}" ] && kill "$PERF_MONITOR_PID" 2>/dev/null
     [ -n "${AFFINITY_MONITOR_PID:-}" ] && kill "$AFFINITY_MONITOR_PID" 2>/dev/null
+    # Kill RuneLite client.log tail (feeds DebugLogServer via logcat tag RLClient)
+    [ -n "${RL_LOG_TAIL_PID:-}" ] && kill "$RL_LOG_TAIL_PID" 2>/dev/null
 
     # Kill Java/RuneLite
     pkill -f 'net.runelite.client.RuneLite' 2>/dev/null || true
@@ -368,6 +384,14 @@ if [ ! -x "$TERMUX_X11_BIN" ]; then
     echo "ERROR: Termux:X11 launcher missing at $TERMUX_X11_BIN" | tee -a "$LOGFILE"
     exit 1
 fi
+
+# Enable Present extension zero-copy flip for VirGL-imported FD buffers.
+# Without this, loriePresentFlip rejects imported buffers and every frame
+# goes through the slow damage-copy path (caps at ~50 FPS).
+# The rejection was added for Turnip (Adreno) — Mali + VirGL is unaffected.
+export TERMUX_X11_FORCE_FLIP=1
+echo "TERMUX_X11_FORCE_FLIP=$TERMUX_X11_FORCE_FLIP (Present flip enabled for VirGL)" | tee -a "$LOGFILE"
+
 mkdir -p "$X11_SOCKET_DIR"
 if [ -n "$X11_OVERRIDE_PACKAGE" ]; then
     export TERMUX_X11_OVERRIDE_PACKAGE="$X11_OVERRIDE_PACKAGE"
@@ -545,12 +569,11 @@ elif [ "$GPU_VENDOR" = "mali" ]; then
 
         VIRGL_LOG="$HOME/virgl-server.log"
         echo "Starting VirGL server profile='$VIRGL_SERVER_PROFILE' ($VIRGL_SERVER_DESCRIPTION)..." | tee -a "$LOGFILE"
-        # Phase 3B: VirGL server-side tuning env vars (behind feature flag)
-        VIRGL_TUNE_ENVS=""
-        if [ "${RLT_VIRGL_TUNE:-0}" = "1" ]; then
-            VIRGL_TUNE_ENVS="VIRGL_RENDERER_THREAD=1 VIRGL_RENDERER_ASYNC=1"
-            echo "VIRGL_TUNE: server-side tuning enabled ($VIRGL_TUNE_ENVS)" | tee -a "$LOGFILE"
-        fi
+        # VirGL server-side threading: pipeline command processing to reduce
+        # per-frame socket round-trip cost. Previously behind RLT_VIRGL_TUNE flag;
+        # now always enabled — no regressions observed, improves throughput.
+        VIRGL_TUNE_ENVS="VIRGL_RENDERER_THREAD=1 VIRGL_RENDERER_ASYNC=1"
+        echo "VirGL server tuning: $VIRGL_TUNE_ENVS" | tee -a "$LOGFILE"
         env -u LD_LIBRARY_PATH $VIRGL_TUNE_ENVS virgl_test_server_android $VIRGL_SERVER_ARGS > "$VIRGL_LOG" 2>&1 &
         VIRGL_PID=$!
         echo "VirGL server forked PID=$VIRGL_PID args='$VIRGL_SERVER_ARGS' log=$VIRGL_LOG" | tee -a "$LOGFILE"
@@ -1089,6 +1112,75 @@ if [ "${RLT_PROOT_SECCOMP:-0}" = "1" ]; then
 else
     echo "PTRACE_OPT: seccomp-bpf disabled (set RLT_PROOT_SECCOMP=1 to enable)" | tee -a "$LOGFILE"
 fi
+
+# ===================================================================
+# RuneLite observability
+# - Tail client.log → Android logcat tag 'RLClient' so DebugLogServer
+#   forwards GPU plugin / rlawt / FPS events to the debug viewer.
+# - OPT-IN FPS probe (RLT_DEBUG_FPS_PROBE=1): overwrites RuneLite
+#   profile keys gpu.fpsTarget / fpscontrol.maxFps / fpscontrol.drawFps
+#   to lift caps and show the on-screen FPS overlay. Default OFF so
+#   user-configured profiles are not clobbered on every launch.
+#   When the flag is OFF and a *.rlt-orig backup exists, the profile is
+#   restored from the backup (reverts any prior probe run).
+# All edits are to user config files RuneLite itself writes; nothing is
+# modified in the RuneLite binaries.
+# ===================================================================
+ROOTFS_PATH="$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu"
+RL_PROFILE_DIR="$ROOTFS_PATH/root/.runelite/profiles2"
+RL_CLIENT_LOG="$ROOTFS_PATH/root/.runelite/logs/client.log"
+
+if [ -d "$RL_PROFILE_DIR" ]; then
+    if [ "${RLT_DEBUG_FPS_PROBE:-0}" = "1" ]; then
+        for CFG in "$RL_PROFILE_DIR"/*.properties; do
+            [ -f "$CFG" ] || continue
+            [ -f "$CFG.rlt-orig" ] || cp "$CFG" "$CFG.rlt-orig"
+            sed -i \
+                -e 's/^gpu\.fpsTarget=.*/gpu.fpsTarget=0/' \
+                -e 's/^fpscontrol\.maxFps=.*/fpscontrol.maxFps=999/' \
+                -e 's/^fpscontrol\.drawFps=.*/fpscontrol.drawFps=true/' \
+                "$CFG"
+            grep -q '^gpu\.fpsTarget='       "$CFG" || echo 'gpu.fpsTarget=0'        >> "$CFG"
+            grep -q '^fpscontrol\.maxFps='   "$CFG" || echo 'fpscontrol.maxFps=999'   >> "$CFG"
+            grep -q '^fpscontrol\.drawFps='  "$CFG" || echo 'fpscontrol.drawFps=true' >> "$CFG"
+            echo "RL-CONFIG: probe-on — patched $(basename "$CFG") gpu.fpsTarget=0 maxFps=999 drawFps=true" | tee -a "$LOGFILE"
+        done
+    else
+        # Probe disabled — restore original profile if we previously clobbered it.
+        for BAK in "$RL_PROFILE_DIR"/*.properties.rlt-orig; do
+            [ -f "$BAK" ] || continue
+            CFG="${BAK%.rlt-orig}"
+            cp "$BAK" "$CFG"
+            echo "RL-CONFIG: probe-off — restored $(basename "$CFG") from .rlt-orig backup" | tee -a "$LOGFILE"
+        done
+    fi
+else
+    echo "RL-CONFIG: profile dir missing ($RL_PROFILE_DIR), skipping probe" | tee -a "$LOGFILE"
+fi
+
+if [ -x /system/bin/log ]; then
+    # Background tail: wait for client.log, then stream filtered lines to
+    # logcat under tag RLClient. DebugLogServer subscribes to this tag.
+    # tail -F handles file-not-yet-existing; grep --line-buffered keeps
+    # latency low. /system/bin/log truncates at ~4KB which is fine for
+    # SLF4J lines.
+    (
+        for _i in $(seq 1 120); do
+            [ -f "$RL_CLIENT_LOG" ] && break
+            sleep 1
+        done
+        tail -F -n 0 "$RL_CLIENT_LOG" 2>/dev/null | \
+            grep -E --line-buffered "GpuPlugin|VAOList|rlawt|FpsPlugin|OpenGL|FrameBuffer|ShaderGen|RuneLite -|ERROR|WARN" | \
+            while IFS= read -r _line; do
+                /system/bin/log -p i -t RLClient "$_line" 2>/dev/null || true
+            done
+    ) &
+    RL_LOG_TAIL_PID=$!
+    echo "RL-LOG-TAIL: started PID=$RL_LOG_TAIL_PID -> logcat tag RLClient ($RL_CLIENT_LOG)" | tee -a "$LOGFILE"
+else
+    echo "RL-LOG-TAIL: /system/bin/log unavailable, skipping client.log forwarding" | tee -a "$LOGFILE"
+fi
+
 proot-distro login ubuntu --shared-tmp $GPU_BIND -- env \
     RLT_SESSION_DIR_IN_PROOT="/tmp/rlt-session/$SESSION_ID" \
     RLT_PROOT_ENV_FILE="$PROOT_ENV_FILE" \
