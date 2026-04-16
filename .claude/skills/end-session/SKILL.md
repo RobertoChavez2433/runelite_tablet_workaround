@@ -19,7 +19,7 @@ Review the current conversation and collect:
 - Completed tasks
 - Decisions made
 - Next priorities
-- Defects discovered (mistakes, anti-patterns, bugs found)
+- Defects discovered (mistakes, anti-patterns, bugs found) — file these as GitHub issues via `tools/create-issue.ps1` per `.claude/specs/2026-04-16-issue-convention-spec.md`; do NOT write `.claude/defects/*`.
 
 Do NOT run git commands. Use only what you observed during the session.
 
@@ -39,20 +39,9 @@ If >5 sessions exist, run rotation:
 2. Append to `.claude/logs/state-archive.md` under appropriate month header
 3. Remove from _state.md
 
-### 3. Update Per-Feature Defects
-**Directory**: `.claude/defects/`
+### 3. File Defects as GitHub Issues
 
-For each defect discovered this session:
-1. Determine affected package
-2. Write to `defects/_defects-{package}.md` at the top
-3. Use format:
-```markdown
-### [CATEGORY] YYYY-MM-DD: Brief Title
-**Pattern**: What to avoid (1 line)
-**Prevention**: How to avoid (1-2 lines)
-**Ref**: @path/to/file (optional)
-```
-4. If >5 defects in a file, move oldest to `.claude/logs/defects-archive.md`
+For each defect discovered this session, file a GitHub issue via `tools/create-issue.ps1`. Follow `.claude/specs/2026-04-16-issue-convention-spec.md` for title grammar (`type(scope): subject`), body sections (Problem/Decision/Tradeoff/Evidence), and trailers (`Reason:` required). Do NOT write `.claude/defects/*`.
 
 ### 4. Update JSON State Files
 
@@ -71,4 +60,4 @@ Present:
 - **NO git commands** — not `git status`, not `git diff`, not any git operation
 - All analysis from conversation context only
 - Zero user input required
-- Max 5 active defects per file — oldest rotates to archive
+- Defects go to GitHub issues, not local files

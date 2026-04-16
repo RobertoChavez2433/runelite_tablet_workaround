@@ -19,7 +19,7 @@ Source root: `runelite-tablet/app/src/main/java/com/runelitetablet/`
 - **Execution IDs**: AtomicInteger for Termux IDs (not nanoTime)
 - Path-triggered rules in `rules/` auto-load when editing matching files
 - Hard constraints in `architecture-decisions/` loaded by agents on demand
-- Defect patterns in `defects/_defects-{package}.md` loaded by agents on demand
+- GitHub issues are the defect/work-item system of record. Do not create `.claude/defects/*`. Follow `.claude/specs/2026-04-16-issue-convention-spec.md` for title/body/labels and `.claude/specs/2026-04-16-commit-convention-spec.md` for commit grammar.
 
 ## When To Use
 
