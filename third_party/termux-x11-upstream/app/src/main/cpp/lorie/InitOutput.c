@@ -1020,12 +1020,68 @@ void lorieFinishAccess(PixmapPtr pPix, int index) {
     }
 }
 
+/*
+ * Bypass EXA's software fallback (ExaCheckPutImage → fbPutImage) by writing pixels
+ * directly into the pixmap's backing buffer. For WINDOW drawables this is the
+ * AHARDWAREBUFFER; for system pixmaps it's mmap'd anonymous memory. Rendering
+ * 2898x22 strips at ~1000/sec was the dominant FPS bottleneck in the software
+ * fallback path.
+ */
+static Bool
+lorieUploadToScreen(PixmapPtr pDst, int x, int y, int w, int h, char *src, int src_pitch) {
+    LoriePixmapPriv *priv = exaGetPixmapDriverPrivate(pDst);
+    const LorieBuffer_Desc *desc;
+    void *dst_base;
+    int dst_pitch;
+    int bytes_per_pixel;
+    int bpp = pDst->drawable.bitsPerPixel;
+    Bool wasLocked;
+    int err;
+
+    if (!priv || !priv->buffer)
+        return FALSE;
+    if (bpp < 8 || (bpp % 8) != 0)
+        return FALSE;
+
+    desc = LorieBuffer_description(priv->buffer);
+    if (!desc)
+        return FALSE;
+
+    wasLocked = (priv->locked != NULL);
+    if (!wasLocked) {
+        err = LorieBuffer_lock(priv->buffer, &priv->locked);
+        if (err || !priv->locked)
+            return FALSE;
+    }
+
+    dst_base = priv->locked;
+    dst_pitch = desc->stride * (bpp / 8);
+    bytes_per_pixel = bpp / 8;
+
+    char *dst_row = (char *)dst_base + (size_t)y * (size_t)dst_pitch + (size_t)x * (size_t)bytes_per_pixel;
+    char *src_row = src;
+    int copy_bytes = w * bytes_per_pixel;
+    for (int i = 0; i < h; i++) {
+        memcpy(dst_row, src_row, copy_bytes);
+        dst_row += dst_pitch;
+        src_row += src_pitch;
+    }
+
+    if (!wasLocked) {
+        LorieBuffer_unlock(priv->buffer);
+        priv->locked = NULL;
+    }
+
+    return TRUE;
+}
+
 static ExaDriverRec lorieExa = {
         .exa_major = EXA_VERSION_MAJOR, .exa_minor = EXA_VERSION_MINOR, .maxX = 32767, .maxY = 32767,
         .flags = EXA_OFFSCREEN_PIXMAPS | EXA_HANDLES_PIXMAPS, .pixmapPitchAlign = 32,
         .PrepareSolid = FalseNoop, .PrepareCopy = FalseNoop, .PrepareComposite = FalseNoop,
         .PixmapIsOffscreen = TrueNoop, .WaitMarker = VoidNoop,
         .PrepareAccess = loriePrepareAccess, .FinishAccess = lorieFinishAccess,
+        .UploadToScreen = lorieUploadToScreen,
         .CreatePixmap2 = lorieCreatePixmap, .DestroyPixmap = lorieExaDestroyPixmap,
         .ModifyPixmapHeader = lorieModifyPixmapHeader,
 };
