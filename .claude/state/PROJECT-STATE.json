@@ -3,14 +3,14 @@
     "app_name": "Runelite for Tablet",
     "app_version": "0.1.0",
     "description": "Android installer app that runs the real RuneLite client on Samsung Tab S10 Ultra via Termux + proot-distro",
-    "last_updated": "2026-04-14T23:59:00Z",
-    "session_notes": "Session 65: Completed clean architecture refactor — all implementable spec items done. 180 tests in ~4s. God classes ≤200 LoC. Singletons eliminated. CoroutineDispatcher injected. JagexOAuth2Manager decomposed (509→170). HybridX11HostActivity wired to X11AttachmentController. GeckoAuthActivity wired to OAuthFlowCoordinator. 18 new files, 25+ modified. Remaining: device verification, MockWebServer integration tests."
+    "last_updated": "2026-04-16T20:10:00Z",
+    "session_notes": "Session 72: Executed Slices 1-3 of direct-surface 120fps plan. Named the hot X server PutImage path (exaPutImage @ exa_accel.c:252) via dladdr, then discovered Xlorie's EXA driver had no UploadToScreen callback — every PutImage fell through to fbPutImage software. Implemented lorieUploadToScreen → 99.6% accel. damage-redraw rate 44-51 → 60-66 FPS. Prior 'VirGL is the ceiling' conclusion (session 70) REFUTED: VirGL was never the bottleneck; the X server was CPU-copying everything. Not at 120 FPS gate yet."
   },
   "current_phase": {
-    "phase_name": "Clean Architecture Refactor + Testing Pipeline",
-    "phase_status": "all_implementable_items_complete_need_device_verification",
-    "phase_started": "2026-04-14",
-    "progress_percentage": 90
+    "phase_name": "120 FPS Presentation — Slices 1-3 landed",
+    "phase_status": "slices_1_through_3_complete_fps_gate_not_hit",
+    "phase_started": "2026-04-16",
+    "progress_percentage": 50
   },
   "release_cycle": {
     "last_release": null,
@@ -20,28 +20,32 @@
   },
   "active_blockers": [
     {
-      "id": "device-verification-pending",
-      "description": "All clean architecture changes need verification on Samsung Tab S10 Ultra. App must boot, setup wizard must complete, auth flow must work, RuneLite must launch.",
-      "severity": "P0",
-      "discovered": "2026-04-14",
-      "session": 65
-    },
-    {
       "id": "real-runelite-sustained-fps-below-target",
-      "description": "Corrected internal-hybrid evidence still shows the real workload far below target after proving the runtime path.",
+      "description": "Session 72 measurably improved damage rate (44-51 → 60-66 FPS) via lorieUploadToScreen, but still far below the 120 FPS gate. Per-PutImage-strip overhead (~1500 calls/sec, 84 per frame) is now the visible bottleneck.",
       "severity": "P0",
       "discovered": "2026-03-15",
-      "session": 62
-    },
-    {
-      "id": "hot-putimage-implementation-unresolved",
-      "description": "DamageTraceV2 now proves the hot steady-state path is PutImage on WINDOW with backend=other, not fbPutImage or miPutImage.",
-      "severity": "P0",
-      "discovered": "2026-03-16",
       "session": 62
     }
   ],
   "resolved_blockers": [
+    {
+      "id": "hot-putimage-implementation-unresolved",
+      "description": "DamageTraceV2 proved the hot steady-state path is PutImage on WINDOW with backend=other, not fbPutImage or miPutImage.",
+      "resolved": "2026-04-16",
+      "resolution": "Session 72: extended DamageTraceV2 with dladdr offset logging and routed through __android_log_print. addr2line resolved the unknown backend to `exaPutImage` @ xserver/exa/exa_accel.c:252, and exaComposite @ xserver/exa/exa_render.c:887. Both sit inside the EXA acceleration framework. Follow-on Slice 3 fix (lorieUploadToScreen) made the path 99.6% accelerated."
+    },
+    {
+      "id": "virgl-vtest-socket-serialization-ceiling",
+      "description": "Session 70 concluded VirGL vtest socket serialization was the structural FPS ceiling (17-28ms inter-frame).",
+      "resolved": "2026-04-16",
+      "resolution": "Session 72 REFUTED this. VirGL throughput was never the bottleneck — the X server was software-copying every PutImage via ExaCheckPutImage → fbPutImage because lorieExa had no UploadToScreen callback. After implementing lorieUploadToScreen, accel went from 0% to 99.6% and FPS moved up 25-30%. Further FPS work targets per-strip overhead and presentation, not VirGL throughput."
+    },
+    {
+      "id": "device-verification-pending",
+      "description": "All clean architecture changes need verification on Samsung Tab S10 Ultra.",
+      "resolved": "2026-04-14",
+      "resolution": "Session 69: Full end-to-end verification on R52X90378YB. Boot → setup → auth → launch → rendering all pass. All logging layers verified."
+    },
     {
       "id": "clean-architecture-refactor",
       "description": "Zero tests, god classes >500 LoC, tight Android coupling, global mutable singletons, no CI.",
@@ -58,9 +62,14 @@
   "brainstorm_backlog": [],
   "completed_phases": [
     {
+      "phase_name": "Phase 9: Comprehensive Logging System",
+      "completed": "2026-04-14",
+      "notes": "Sessions 66-69: DebugLogServer with HTML/WebSocket viewer, 11 new Logger methods, 30+ files instrumented, native C instrumented. 210 tests. 127/128 spec items PASS. Device-verified on R52X90378YB."
+    },
+    {
       "phase_name": "Clean Architecture Refactor (Phases 1-8)",
       "completed": "2026-04-14",
-      "notes": "Sessions 63-65: Wrote spec (115 items), executed all implementable items. 180 tests, domain layer, DI container, god class decomposition, singleton elimination, dispatcher injection, CI pipeline. Device verification pending."
+      "notes": "Sessions 63-65: Wrote spec (115 items), executed all implementable items. 180 tests, domain layer, DI container, god class decomposition, singleton elimination, dispatcher injection, CI pipeline. Device-verified session 69."
     },
     {
       "phase_name": "Presentation Pipeline Runtime Path Proof",

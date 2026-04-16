@@ -24,3 +24,6 @@ glxinfo-full.txt
 
 # Local MCP config
 .mcp.json
+
+# Claude harness runtime locks
+.claude/scheduled_tasks.lock
