@@ -34,11 +34,12 @@
 #include <X11/fonts/fontstruct.h>
 #include "dixfontstr.h"
 #include "exa.h"
+#include <android/log.h>
 
 static unsigned long gExaPutImageTraceCount;
 static unsigned long gExaPutImageFallbackTraceCount;
 
-#define EXA_ACCEL_TRACE(...) ErrorF("ExaTrace: " __VA_ARGS__)
+#define EXA_ACCEL_TRACE(...) __android_log_print(ANDROID_LOG_INFO, "LorieNative", "ExaTrace: " __VA_ARGS__)
 #define EXA_ACCEL_TRACE_EVERY(counter, step, ...) \
     do { \
         (counter)++; \

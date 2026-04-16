@@ -41,6 +41,10 @@
 #include    "damage.h"
 #include    "damagestr.h"
 #include    <dlfcn.h>
+#include    <stdint.h>
+#include    <android/log.h>
+
+#define DAMAGE_TRACE_LOG(...) __android_log_print(ANDROID_LOG_INFO, "LorieNative", __VA_ARGS__)
 
 void fbPutImage(DrawablePtr pDrawable, GCPtr pGC, int depth, int x, int y,
                 int w, int h, int leftPad, int format, char *pImage);
@@ -99,32 +103,39 @@ damageDrawableTypeName(DrawablePtr pDrawable)
     }
 }
 
-static const char *
-damageFunctionSymbolName(void *fn)
+typedef struct {
+    const char *sym;
+    const char *so;
+    unsigned long offset;   /* fn - dli_fbase; 0 if unresolvable */
+    const void *fbase;      /* library base address */
+} DamageFnInfo;
+
+static void
+damageResolveFn(void *fn, DamageFnInfo *out)
 {
     Dl_info info = {0};
 
-    if (!fn)
-        return "null";
+    out->sym = "unknown";
+    out->so = "unknown";
+    out->offset = 0;
+    out->fbase = NULL;
 
-    if (dladdr(fn, &info) && info.dli_sname)
-        return info.dli_sname;
+    if (!fn) {
+        out->sym = "null";
+        out->so = "null";
+        return;
+    }
 
-    return "unknown";
-}
-
-static const char *
-damageFunctionLibraryName(void *fn)
-{
-    Dl_info info = {0};
-
-    if (!fn)
-        return "null";
-
-    if (dladdr(fn, &info) && info.dli_fname)
-        return info.dli_fname;
-
-    return "unknown";
+    if (dladdr(fn, &info)) {
+        if (info.dli_sname)
+            out->sym = info.dli_sname;
+        if (info.dli_fname)
+            out->so = info.dli_fname;
+        if (info.dli_fbase) {
+            out->fbase = info.dli_fbase;
+            out->offset = (unsigned long)((uintptr_t)fn - (uintptr_t)info.dli_fbase);
+        }
+    }
 }
 
 static void
@@ -159,6 +170,7 @@ damageTraceOpWithBackend(const char *op, DrawablePtr pDrawable, const BoxRec *bo
     unsigned count;
     PixmapPtr screenPixmap;
     Bool isScreenPixmap = FALSE;
+    DamageFnInfo finfo;
 
     if (!pDrawable || !box || !counter)
         return;
@@ -171,12 +183,14 @@ damageTraceOpWithBackend(const char *op, DrawablePtr pDrawable, const BoxRec *bo
     if (pDrawable->type == DRAWABLE_PIXMAP && screenPixmap)
         isScreenPixmap = ((PixmapPtr) pDrawable) == screenPixmap;
 
-    ErrorF("DamageTraceV2: %s count=%u drawableType=%s screenPixmap=%d drawable=%p geom=%dx%d box=%d,%d-%d,%d backend=%s fn=%p sym=%s so=%s\n",
+    damageResolveFn(fn, &finfo);
+
+    DAMAGE_TRACE_LOG("DamageTraceV2: %s count=%u drawableType=%s screenPixmap=%d drawable=%p geom=%dx%d box=%d,%d-%d,%d backend=%s fn=%p fn_offset=0x%lx fbase=%p sym=%s so=%s",
            op, count, damageDrawableTypeName(pDrawable), isScreenPixmap ? 1 : 0,
            pDrawable, pDrawable->width, pDrawable->height,
            box->x1, box->y1, box->x2, box->y2,
            backend ? backend : "null", fn,
-           damageFunctionSymbolName(fn), damageFunctionLibraryName(fn));
+           finfo.offset, finfo.fbase, finfo.sym, finfo.so);
 }
 
 static void
@@ -186,6 +200,7 @@ damageTraceOpWithFunction(const char *op, DrawablePtr pDrawable, const BoxRec *b
     unsigned count;
     PixmapPtr screenPixmap;
     Bool isScreenPixmap = FALSE;
+    DamageFnInfo finfo;
 
     if (!pDrawable || !box || !counter)
         return;
@@ -198,11 +213,13 @@ damageTraceOpWithFunction(const char *op, DrawablePtr pDrawable, const BoxRec *b
     if (pDrawable->type == DRAWABLE_PIXMAP && screenPixmap)
         isScreenPixmap = ((PixmapPtr) pDrawable) == screenPixmap;
 
-    ErrorF("DamageTraceV2: %s count=%u drawableType=%s screenPixmap=%d drawable=%p geom=%dx%d box=%d,%d-%d,%d fn=%p sym=%s so=%s\n",
+    damageResolveFn(fn, &finfo);
+
+    DAMAGE_TRACE_LOG("DamageTraceV2: %s count=%u drawableType=%s screenPixmap=%d drawable=%p geom=%dx%d box=%d,%d-%d,%d fn=%p fn_offset=0x%lx fbase=%p sym=%s so=%s",
            op, count, damageDrawableTypeName(pDrawable), isScreenPixmap ? 1 : 0,
            pDrawable, pDrawable->width, pDrawable->height,
            box->x1, box->y1, box->x2, box->y2, fn,
-           damageFunctionSymbolName(fn), damageFunctionLibraryName(fn));
+           finfo.offset, finfo.fbase, finfo.sym, finfo.so);
 }
 
 #define getPixmapDamageRef(pPixmap) ((DamagePtr *) \
