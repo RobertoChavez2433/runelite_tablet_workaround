@@ -6,6 +6,21 @@ Session history archive. See `.claude/autoload/_state.md` for current state (las
 
 ## April 2026
 
+### Session 71 (2026-04-16)
+**Work**: H4/H5/H6 VirGL-profile tests all rejected. Re-framed Session 70's conclusion — "44-51 FPS ceiling" was login-screen damage rate, not in-game scene FPS. Ground-truth in-game via FpsPlugin overlay: ~10 FPS. Built observability bridge: `RLClient` logcat tag → DebugLogServer source=runelite. Added opt-in FPS probe (`RLT_DEBUG_FPS_PROBE=1`). Audited `spike/direct-android-surface` state; iteration log had a sitting next-step (dladdr resolution) that was never actioned.
+**Decisions**: Resume direct-surface spike. Published per-slice plan (S0-S6) to reach 120 FPS. Stock VirGL+X11 path stays runnable as fallback. ANGLE variants permanently rejected.
+**Next**: Session 72 starts at Slice 1 of `.claude/plans/2026-04-16-direct-surface-path-to-120fps.md`.
+
+### Session 70 (2026-04-16)
+**Work**: Systematic FPS ceiling investigation. Tested 3 hypotheses: Present flip (REJECTED — 0 attempts), VirGL threading (REJECTED — no FPS change), VirGL structural ceiling (CONFIRMED — 17-28ms inter-frame). Verified P1 attach loop fixed (1 attempt), P1 session health fixed (debounce working), P2 triggerCallback confirmed (43ms, startup only). Added TERMUX_X11_FORCE_FLIP=1 and VirGL threading-always-on to launch script (harmless, well-documented). Saved full findings to docs/fps-ceiling-research-session70.md.
+**Decisions**: VirGL is the structural ceiling. No compositor-side fix possible. Next steps: Venus protocol, no-loop-or-fork test, llvmpipe baseline, or accept 40-50 FPS.
+**Next**: Decide approach for VirGL throughput (Venus? Accept ceiling? llvmpipe comparison?).
+
+### Session 69 (2026-04-14)
+**Work**: Device verification on Samsung Tab S10 Ultra. Built + deployed debug APK. Full end-to-end: boot → setup (29.7s) → auth (token expired → GeckoView → 2-step OAuth → valid) → launch (health check → env deploy → hybrid_x11) → rendering (120 FPS Kotlin, 42-54 FPS native). All logging layers verified: DI, setup, auth, correlation IDs (3 levels), surface lifecycle, binder bridge, fd tracking, buffer balance, native init/shaders/mmap, DebugLogServer HTML+WebSocket, session health. Saved device logs to docs/logs/.
+**Decisions**: Attach loop needs a connected-state guard (too chatty). Session health first-poll timing needs work. Frame timing reporting is accurate.
+**Next**: Fix native FPS ceiling (VirGL readback bottleneck).
+
 ### Session 68 (2026-04-14)
 **Work**: Three spec audit rounds closing ALL gaps. 127/128 spec items PASS. VirGL watchdog, FdTracker, deep correlation threading, ApkDownloaderTest. 11 layer-organized commits. 210 tests.
 **Decisions**: FdTracker as singleton. Logger injection with AppLog default. VirGL background watchdog.

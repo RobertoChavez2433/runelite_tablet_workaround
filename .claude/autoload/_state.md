@@ -1,92 +1,129 @@
 # Session State
 
-**Last Updated**: 2026-04-16 | **Session**: 73 (end — convention migration)
+**Last Updated**: 2026-04-17 | **Session**: 77 (ptrace diagnosis confirmed; Option B blocked on rlawt rebuild — see slice5-option-b-rlawt-blocker.md)
 
 ## Current Phase
-- **Phase**: `spike/direct-android-surface` — Slices 1-3 landed (FPS gain). Session 73 layered a commit/issue convention + GitHub-issue defect migration on top.
-- **Status**: EXA software fallback eliminated (session 72: `lorieUploadToScreen`, 0% → 99.6% accel, damage-redraws 44-51 → 60-66 FPS). Defect tracking moved off `.claude/defects/*` onto GitHub issues per `.claude/specs/2026-04-16-issue-convention-spec.md`; commit grammar enforced by `.claude/specs/2026-04-16-commit-convention-spec.md` + `scripts/git/commit-msg` hook.
+- **Phase**: `spike/direct-android-surface` — Slices 1-3 landed (S72). Slice 4 null (S74). Path A (bind-hoist) refuted (S76). S77: **proot ptrace syscall interception is the FPS bottleneck — diagnosed and confirmed by /proc sampling.** Cheap fix (`RLT_PROOT_SECCOMP=1`) is blocked by Samsung OneUI kernel's missing SECCOMP_RET_TRACE route. Option B (native-Termux JVM) chosen; blocked on rlawt Bionic rebuild.
+- **Status**: In-game FPS at Varrock East Bank: 12 (unchanged, baseline). Client render thread measured at 3945 nonvoluntary ctxt-switches/s — synchronous ptrace interception caps JVM throughput at ~2000 syscalls/s, which at ~164 syscalls/frame = exactly 12 FPS. System still ~70% idle across all 8 cores. Not cpu-bound, not virgl-bound, not Mesa-bound.
 
 ## HOT CONTEXT — Resume Here
 
-### ENTRY POINT FOR SESSION 74
+### ENTRY POINT FOR SESSION 78
 
-**FPS work**: start at Slice 4 of `.claude/plans/2026-04-16-direct-surface-path-to-120fps.md`. Recommended first move is the "sticky AHB lock" in `lorieUploadToScreen` (leave buffer locked across consecutive PutImage calls; compositor's `loriePrepareAccess` already handles already-locked). Expected 2-3x FPS. Then measure in-game via `RLT_DEBUG_FPS_PROBE=1` + user-triggered login. If still under 120, start Slice 5 (direct SurfaceView AHB attach).
+**Critical task**: `Task 21` — rebuild rlawt for Bionic via Android NDK. This is the unlock for every downstream phase (1.3 → 2.1 → 2.2 → 3 FPS measurement).
 
-**Convention now enforced**: every commit must be `type(scope): subject` + narrative body + `Reason:` trailer (see `scripts/git/commit-msg`). File defects via `tools/create-issue.ps1` — do NOT write `.claude/defects/*`.
+**What's staged**:
+- `scripts/jvm-wait-sampler.sh` + `scripts/jvm-wait-analyze.py` — reusable measurement pair. Works against any live JVM. `adb push` + `run-as com.termux cp` + `run-as com.termux sh` to execute. See reproduction block in `slice5-jvm-wait-analysis.md`.
+- Termux packages **already installed on device** (Task 12): `openjdk-21`, `openjdk-21-x`, `mesa 26.0.5`, `libx11`, `libxrandr`, `libxtst`, `libxext`, `libxrender`, `libxfixes`, `libxcomposite`, `libxdamage`, `libxi`, `libxcursor`, `libxinerama`, `xorg-xauth`, `patchelf`, `binutils`, `gnupg`. Also added `glibc-repo` (not used — glibc-openjdk doesn't exist).
+- `$HOME/rlawt-test/` on device has: `librlawt.so` (original, glibc-linked), `librlawt-patched.so`, `librlawt-stripped.so` (YOLO attempts that did NOT work), `MiniRlawtLoad.java` + `.class`. Keep for A/B once a Bionic-built librlawt is ready. Safe to rm if cleaning.
+- `$HOME/bionic-compat/` on device — symlinks from the YOLO attempt. Can be removed.
+- On-device `launch-runelite.sh` — **reverted** to `RLT_PROOT_SECCOMP:-0`. In repo, asset is unchanged. Nothing to revert.
 
-**Open issues carried forward**:
+**Critical knowledge — do NOT re-discover**:
+- Diagnosis is settled. The bottleneck IS proot ptrace. Do not propose measurement-only tasks; measurement is complete.
+- `RLT_PROOT_SECCOMP=1` will crash launch on this Samsung kernel. `execve` returns ENOSYS because the kernel doesn't deliver SECCOMP_RET_TRACE events to proot for path-translating syscalls. Proot 5.1.107-70 is latest in Termux-main — no upgrade path.
+- YOLO symlink/patchelf approaches to rlawt are dead. Bionic's linker enforces glibc rejection at 4 layers (NEEDED → namespace → VERNEED → VERSYM/vn_version). See `slice5-option-b-rlawt-blocker.md` for the full probe trail.
+- rlawt's actual symbol surface is 30 undefined, all Bionic-ABI-compatible (no pthread, no exotic glibc). Only metadata blocks us. Rebuild will work.
+
+**Rebuild plan (Task 21) — concrete next steps**:
+1. `git clone https://github.com/runelite/rlawt` on the host side. Inspect `build.gradle.kts` + CMakeLists.
+2. Configure an Android NDK build target (aarch64-linux-android, minSdk 31 or similar). NDK is at `C:\Users\rseba\AppData\Local\Android\Sdk\ndk\<version>`.
+3. Cross-compile: output `librlawt.so` linked against Bionic libc, with NEEDED set to `libjawt.so libGL.so libX11.so libc.so` (no `.6`, no `ld-linux-aarch64.so.1`), and no VERNEED/VERSYM sections.
+4. Verify against `MiniRlawtLoad.java` on device: `java MiniRlawtLoad /path/to/new-librlawt.so` must print "SUCCESS: librlawt.so loaded".
+5. Repackage `rlawt-1.8.jar` with the new .so at `net/runelite/rlawt/linux-aarch64/librlawt.so` (existing `AWTContext.class` loader picks it up under Termux because Termux IS linux-aarch64 with Bionic — no Java code changes).
+6. Proceed to Phase 2.1 (native-Termux launch script) once verified.
+
+**Task list snapshot (S77-end)**:
+- Completed: 6-13, 11, 12 (and sampler tasks 7-9)
+- Deferred: 10 (bake sampler into PERF_MONITOR)
+- Active / next: **21** (rebuild rlawt — BLOCKER for 14-18)
+- Pending: 14, 15, 16, 17, 18, 19
+- Fallback: 20 (fork proot, patch seccomp — only if Task 21 fails catastrophically)
+
+**Open issues carried forward (unchanged)**:
 - `#6` — P1, `security(auth)`: shellEscape missing `!` and does not strip CR/NL/NUL.
 - `#7` — P2, `needs-repro`: UnsafeHelper abstract-class allocation.
 - `#25` — P2, `needs-repro`: MESA_GL_VERSION_OVERRIDE does not unlock LWJGL OpenGL45 (LD_PRELOAD shim never shipped).
 - `#43` — P2, `needs-repro`: SetupOrchestrator isSuccess marker.
 
-### What Session 72 Shipped
+### Cpuset topology on R52X90378YB (verified S76, unchanged)
 
-- **Slice 1 complete**: extended `DamageTraceV2` in `damage.c` with dladdr offset
-  logging + routed through `__android_log_print` (was `ErrorF` which doesn't reach
-  logcat). Resolved hot path: `exaPutImage` @ `exa_accel.c:252`, hot Composite:
-  `exaComposite` @ `exa_render.c:887`. Both 100% in EXA framework. See
-  `docs/logs/slice1-putimage-symbols.txt`.
-- **Slice 2 complete**: damage attribution. 99.5% of PutImage events are 2898×22
-  horizontal strips reconstructing the RuneLite client window (84 strips per
-  frame). See `docs/logs/slice2-damage-attribution.md`.
-- **Slice 3 complete (landed, partial target)**: implemented `lorieUploadToScreen`
-  in `InitOutput.c` — directly writes pixel data into AHARDWAREBUFFER-backed pixmaps.
-  Before: 0 accel / all fallback. After: 99.6% accel (1837 accel / 8 fallback in
-  150s). Damage-redraw rate 44-51 → 60-66 FPS (+25-30%). Below plan target of 2.5×
-  because compositor polling rate (bounded by vsync) masks per-call improvement;
-  actual scene FPS gain not measured (requires interactive RuneLite login).
-- **Side fix landed**: `ScriptManager.scriptsDeployed` promoted to companion-object
-  so broadcast-receiver-created ScriptManager instances share the activity
-  setup-flow's deployment state. Without this, every launcher broadcast tried to
-  re-deploy all 18 scripts and timed out at 30s due to Termux BAL-denied service
-  start (Android 14+ FGS rules).
+| cpuset | cpus | readable as shell |
+|---|---|---|
+| `/` (root) | 0-7 | read-only |
+| `/top-app` | 0-7 (processes inside it show Cpus_allowed=0xff) | NO — empty read |
+| `/foreground` | 0-6 | yes |
+| `/background` | **0-3** | yes |
+| `/moderate` | **0-3** (same mask as background) | yes |
 
-### Session 71 shipped (still relevant)
+### Deployed artifacts on device (R52X90378YB, S77-end)
 
-- `launch-runelite.sh`: sentinel-file VirGL-profile override (opt-in via `$HOME/.rlt-virgl-profile-override`); RuneLite client.log tail → logcat tag `RLClient`; **opt-in** FPS probe gated by `RLT_DEBUG_FPS_PROBE=1` (default off, restores profile from `.rlt-orig` backup on launch).
-- `DebugLogServer.kt`: subscribes to `RLClient:V` logcat tag, routes `RL*` tags as `source="runelite"`, HTML viewer has new `runelite` filter pill.
-- H4/H5/H6 rejections documented in `runelite-tablet/docs/fps-ceiling-research-session71.md`.
-- Session-end findings + direction in `runelite-tablet/docs/session-71-findings-and-direction.md`.
-- Per-slice plan (S0-S6) in `.claude/plans/2026-04-16-direct-surface-path-to-120fps.md`.
+- RuneLiteTablet APK: unchanged since S76 (includes broken-asset `launch-runelite.sh`). Not rebuilt this session.
+- Termux:X11 fork APK: unchanged since S74.
+- On-device `launch-runelite.sh`: session-77 edit (`RLT_PROOT_SECCOMP:-1`) was REVERTED to `:-0` at session end. Will be overwritten by ScriptManager re-deploy on next fresh RLT process start regardless.
+- Termux-native JDK stack: **new** — openjdk-21, mesa, X11 libs (see list in ENTRY POINT block). Unused until Task 21 delivers a Bionic librlawt.
+- Pipeline processes: killed at S77-end (SIGTERM to `launch-runelite.sh` parent 16618 cascaded cleanly). No JVM, virgl, or proot running.
 
-### Device State at Session 71 End
+### Discovered-but-not-fixed bugs (carried forward)
 
-- APK: built + installed on R52X90378YB with all session-71 changes.
-- `com.termux.permission.RUN_COMMAND`: granted.
-- VirGL sentinel: absent (default native-gles).
-- FPS probe: disabled (profile restored from backup on next launch).
-- Stock launch path works normally.
+- **ScriptManager re-deploy bug** (S72 origin): `ScriptManager.scriptsDeployed` companion flag prevents script re-deploy after an APK update. New `launch-runelite.sh` in the APK never reaches Termux's `$HOME/scripts/` until the app is cleared + reinstalled. Workaround used in S74-S77: `adb push` + `cp` via `run-as com.termux`. Fix: add a checksum or asset-version check so updated assets trigger re-deploy. See memory `project_script_redeploy_vs_stale_apk.md`.
+- **Deploy-both-APKs**: `com.termux.x11` is a separately-installed fork APK that needs its own rebuild when Xlorie C code changes. New helper `scripts/deploy-native-to-device.sh` rebuilds + installs both + kills X server.
+- **Proot seccomp-bpf fails on Samsung OneUI kernel** (new, S77): `RLT_PROOT_SECCOMP=1` engages seccomp-bpf (log confirms) but Samsung's Android 16 kernel does not route SECCOMP_RET_TRACE events to proot. Path-translating syscalls (execve, getcwd) return ENOSYS → proot-distro Ubuntu login dies → no JVM. Proot 5.1.107-70 (latest in Termux main) has no workaround. See `slice5-seccomp-ab.md`.
+- **rlawt bundled linux-aarch64/librlawt.so is glibc-linked** (new, S77): blocks running RuneLite's JVM directly under Termux (Bionic libc). See `slice5-option-b-rlawt-blocker.md`. Fix = Task 21 rebuild.
 
-### Key Reframing
-
-- **`damage-triggered redraws FPS` is NOT scene FPS** when any per-frame overlay is active. It counts overlay redraws too.
-- **FpsPlugin overlay is the ground-truth** for user-visible FPS. Turn on via `RLT_DEBUG_FPS_PROBE=1`.
-- **Direct SurfaceView probe already hit 120 FPS** on this tablet. Hardware is not the limit. The limit is presentation chain.
-- **`present after-flips = 0`** in all captures — Present extension is entirely unused.
-
-### Side Findings (Parked)
-
-- `EnablePermissions` setup step marks Done without checking Android permission. Fix is trivial (~5 lines Kotlin) but not on the critical path.
-- Black-line-at-top cosmetic artifact — deferred per user direction.
-- Both side findings are in the plan's "Deferred" section.
+**Convention still enforced**: every commit must be `type(scope): subject` + narrative body + `Reason:` trailer (see `scripts/git/commit-msg`). File defects via `tools/create-issue.ps1` — do NOT write `.claude/defects/*`.
 
 ## Blockers
 
-**1. Per-PutImage overhead still dominates** (session 72: damage-rate vsync-capped around 60 FPS).
-- EXA accel wired up (session 72), but RuneLite still issues ~1500 XPutImage/sec across 84 strips per frame.
-- Next lever: sticky AHB lock (skip lock/unlock between consecutive strips).
-- Backup lever: Slice 5 direct SurfaceView AHB attach, but no scaffolding exists beyond `DirectSurfaceProbeActivity` (which just renders colored Canvas bands).
+**1. rlawt bundled native lib is glibc-linked, blocks native-Termux JVM** (S77 discovery).
+- `rlawt-1.8.jar` ships `net/runelite/rlawt/linux-aarch64/librlawt.so` as a glibc-linked ELF with full VERNEED/VERSYM metadata.
+- Termux is Bionic. Bionic's linker refuses glibc libs at 4 layers (NEEDED/namespace/VERNEED/VERSYM).
+- rlawt's actual symbol surface is Bionic-ABI-compatible (no pthread, no exotic glibc symbols). Only metadata blocks.
+- Unblocks when: Task 21 rebuilds rlawt against Android NDK.
 
-**Stale blockers removed (Session 72):**
-- ~~Xlorie EXA hot path unknown~~ — Resolved: `exaPutImage` / `exaComposite` named via dladdr + addr2line (session 72 Slice 1).
-- ~~VirGL vtest socket serialization is the structural FPS ceiling~~ — Refuted: bottleneck was 100% EXA software fallback, not VirGL throughput. VirGL is producing frames fine; the X server was just CPU-copying them via fbPutImage.
+**2. Proot ptrace syscall-interception caps producer throughput at ~2000 syscalls/s** (S77 diagnosis; upstream of blocker #1).
+- Measured via `/proc` sampler: RuneLite's `Client` render thread shows 3945 nonvoluntary ctxt-switches/s at ~12 FPS scene rate. 3945 ÷ 2 ≈ 1970 syscalls/s ÷ 164 syscalls/frame (GL-plugin cost) = 12 FPS ceiling.
+- `RLT_PROOT_SECCOMP=1` would drop ptrace overhead but fails on Samsung OneUI kernel (execve ENOSYS).
+- Unblocks when: Option B (native-Termux JVM, skipping proot) is fully wired — which depends on Blocker #1.
+- Fallback: Option A (fork + patch proot 5.1.107-70's seccomp filter) — Task 20.
 
-**Stale blockers removed (Session 70):**
-- ~~Xlorie legacy drawing active on Mali due to wrong format~~ — Device confirms `legacy_drawing=0`, BGRA AHARDWAREBUFFER path active.
-- ~~`waitForNextFrame` 2-vsync cap~~ — Dead code since Phase 2B, never set to true.
+**Stale blockers removed (Session 77):**
+- ~~"`/background` cpuset clamp on entire Termux subtree"~~ — Refuted in S76 (cpuset was never the FPS gate). Confirmed in S77 — the sink is proot ptrace, not cpuset.
 
 ## Recent Sessions
+
+### Session 77 (2026-04-17)
+**Work**: Wrote `scripts/jvm-wait-sampler.sh` + `scripts/jvm-wait-analyze.py`. 60s /proc capture at Varrock East Bank proved RuneLite's `Client` thread has 3945 nonvol-ctxt-switches/s — synchronous ptrace interception is the FPS bottleneck (not cpuset, not VirGL IPC, not Mesa). A/B'd `RLT_PROOT_SECCOMP=1`: engaged seccomp-bpf correctly but Samsung OneUI kernel doesn't route SECCOMP_RET_TRACE → execve ENOSYS → launch fails; reverted. Proot 5.1.107-70 is latest in Termux main. User widened scope (Termux is forkable, RLT-app editable; RL + Android off-limits). Chose Option B (native-Termux JVM). Installed openjdk-21, mesa, X11 libs, patchelf. rlawt's bundled `linux-aarch64/librlawt.so` confirmed glibc-linked (NEEDED libc.so.6 + ld-linux-aarch64.so.1 + VERNEED/VERSYM). Four YOLO workarounds probed: symlink→bionic paths, re-symlink to permitted namespace, `patchelf --remove-needed` + `--replace-needed`, `gobjcopy --remove-section=.gnu.version*`. Each got past one Bionic-linker layer and hit the next. Clean fix = rebuild rlawt via Android NDK (Task 21, 2-4h).
+**Decisions**: Proot ptrace is the confirmed bottleneck. Option B chosen over Option A. Rebuild rlawt from source is the only viable unlock. Option A (patch proot seccomp) deferred as fallback. Two durable memories added (`project_ptrace_is_the_fps_bottleneck.md`). Three new analysis docs under `runelite-tablet/docs/logs/` (jvm-wait-analysis, seccomp-ab, option-b-rlawt-blocker).
+**Next**: S78 = execute Task 21. Clone `github.com/runelite/rlawt`, NDK-build for aarch64-linux-android/Bionic, verify against `MiniRlawtLoad.java` on device, repackage jar. Then unblock Phases 1.3 → 2.1 → 2.2 → Phase 3 FPS measurement.
+
+### Session 76 (2026-04-17)
+**Work**: Re-launched RLT with S75's `TermuxProcessPin` Path A after recovering from the ScriptManager re-deploy bug (APK shipped the broken pre-fix `launch-runelite.sh`; fresh process → re-deploy from APK → on-device script was broken again → 1st launch attempt silently crashed at the `set -u` multi-assign line). Re-pushed the fix, then got two device attempts:
+- Attempt 2: `cpuset=/moderate` (0-3 CPU mask, same as /background) — RLT activity wasn't foreground when bind fired; Samsung placed BOUND_TOP in /moderate.
+- Attempt 3: `cpuset=/top-app` on all three markers (launch-script-entry, virgl-ready, java-started). JVM main + virgl `Cpus_allowed_list: 4-7`. JVM sub-threads `0-7`. Perfect scheduler state.
+
+60s FpsPlugin capture at Varrock East Bank: **12-15 FPS** (S74 baseline was 13). Zero meaningful gain. Per-core CPU delta under live gameplay: ~27% utilization across all 8 cores — no core pegged, system 70%+ idle. **The pipeline is not CPU-bound, and cpuset was never the FPS gate.**
+
+**Decisions**: Path A is **refuted** as an FPS fix. Further scheduler/cpuset work is explicitly off the table. Future sessions must measure where the JVM actually waits before proposing any larger refactor — see `runelite-tablet/docs/logs/slice5-pathA-results.md` for full A/B + Path B recommendation ranking. Memory updated with two durable learnings (`project_cpuset_is_not_the_fps_bottleneck.md`, `project_script_redeploy_vs_stale_apk.md`).
+
+**Next**: S77 does NOT start writing code. First step is profiling — `strace -c`, `/proc/$JVM_PID/schedstat`, or similar — to find the top syscall-wait sink. Cheap try: `RLT_PROOT_SECCOMP=1` env flag (~1 LoC). All files from S75 remain uncommitted on the spike branch.
+
+### Session 75 (2026-04-16, paused mid-measurement)
+**Work**: Chose Path A (Termux bind-hoist) over Path B (bundle virgl+proot into RLT service) on cost grounds — ~50 LoC vs 200+. Wrote `TermuxProcessPin` (new) + wired into `RuneLiteSessionService` lifecycle (pin after startForeground, unpin on stop/destroy/health-stopped). Added cpuset instrumentation to `launch-runelite.sh` (entry, virgl-ready, java-started). Built + deployed RLT APK; pushed updated script into Termux home via adb workaround. First launch: `bindService` succeeded (flags=0x1041, onServiceConnected with real binder). Android AMS confirmed Termux entered `PROCESS_STATE_BOUND_TOP` under our bind — encouraging first signal. But launch script silently crashed at line 24 before writing any log because `local a="$1" b="$2" c="/proc/$b/cpuset"` under `set -u` failed on unbound `$b` during `c`'s RHS expansion. Fixed by splitting into separate `local` lines; deployed fix; cleaned device for S76.
+**Decisions**: Path A first (cheap, directly tests cpuset hypothesis). If S76 shows cpuset still `/background`, Path B is the only remaining option. Gate: primary signal is the new `CPUSET launch-script-entry` log line, secondary is FpsPlugin overlay vs S74's 13 FPS baseline.
+**Next**: S76 relaunches RLT, verifies `CPUSET launch-script-entry pid=… cpuset=/top-app` (or `/foreground`) in `runelite-launch.log`, captures scene FPS at Varrock East Bank, decides Path A-ship vs Path B-pivot.
+
+### Session 74 (2026-04-16, paused mid-arc)
+**Work**: Executed Slice 4 sticky-AHB-lock per plan + discovered session 72's "99.6% accel claim" was in the pre-S74 state because the running X server was loading `libXlorie.so` from a separately-installed `com.termux.x11` fork APK — not RuneLiteTablet's bundled copy. First half of the session was misrouted: installed RLT APK, X server ran stale code, no AhbLockTrace lines in logcat. Fixed by rebuilding `third_party/termux-x11-upstream` and installing `app-arm64-v8a-debug.apk` as `com.termux.x11`. Authored `scripts/deploy-native-to-device.sh` so the two-APK build is repeatable. Implemented Slice 4 (counters + `RLT_STICKY_AHB_LOCK` flag gated by `$HOME/.rlt-sticky-ahb` sentinel). A/B on device (Varrock East Bank, FpsPlugin overlay):
+- Baseline (sticky=0): lock_calls=~240/5s, sticky_hits=~4800/5s, damage-redraws=47 FPS, scene=13 FPS.
+- Sticky (sticky=1): lock_calls=0, flush_skipped=~234/5s, damage-redraws=47 FPS, scene=13 FPS.
+- **Delta: 0.** Sticky lock works correctly, has zero FPS impact. The compositor is already sticky-by-default via CreatePixmap's initial lock.
+
+Pivoted to root cause: `/background` cpuset clamp on Termux subtree. Proved by spawning virgl via `run-as com.termux` (cpuset `/`) + taskset 0xF0 → Cpus_allowed_list: 4-7. Added `.rlt-external-virgl` sentinel to launch-runelite.sh that skips its own virgl spawn and adopts the pre-spawned pinned one. Second A/B: scene FPS still 13. Conclusion: virgl CPU isn't the gate — the JVM (inside proot inside Termux `/background`) is. JVM can't be moved without spawning proot from `/top-app`.
+
+**Decisions**: Slice 4 **landed but measured null**; default-OFF sentinel left in place as opt-in. The plan's slice sequence (S5 direct SurfaceView next) was based on "compositor is the bottleneck" premise — now refuted. Cpuset is the architectural block. Script-deployment cache bug (ScriptManager's `scriptsDeployed` companion) discovered: APK install doesn't re-deploy scripts to Termux home, worked around via `adb push + run-as cp` in S74.
+
+**Next**: Session 75 decides between (a) foreground-service-hosted pipeline (~200+ LoC to unlock big/prime cores for JVM+virgl), (b) confirm 13 FPS ceiling with one more ptrace/seccomp test, or (c) document ceiling and accept.
 
 ### Session 73 (2026-04-16)
 **Work**: Ported Field Guide's commit convention + authored a parallel issue convention. Installed `scripts/git/commit-msg`, `scripts/git/valid-scopes.txt`, `.gitmessage`, `tools/create-issue.ps1`, and `tools/migrate-defects-to-issues.sh`. Three parallel audit agents classified all 56 local defects (1 OPEN, 51 RESOLVED, 2 STALE, 3 UNKNOWN). Created 54 GitHub issues on `RobertoChavez2433/tablite` (50 closed as historical, 4 open: #6 security + #7/#25/#43 needs-repro). Deleted `.claude/defects/` + archive; updated `CLAUDE.md` and `end-session` skill.
@@ -96,33 +133,19 @@
 ### Session 72 (2026-04-16)
 **Work**: Executed Slice 1-3 of direct-surface plan on R52X90378YB. Extended `DamageTraceV2` with dladdr offset + rerouted to `__android_log_print` (ErrorF isn't captured in this build). Named hot path: `exaPutImage` @ `exa_accel.c:252`, `exaComposite` @ `exa_render.c:887`. Discovered `lorieExa` has no `UploadToScreen` → 100% software fallback. Implemented `lorieUploadToScreen` (direct AHB writes) → 99.6% accel. Damage-redraw rate 44-51 → 60-66 FPS. Also fixed `ScriptManager` re-deploy timeout (promoted cache flag to companion-object so broadcast-created instances share state).
 **Decisions**: 120 FPS gate not hit; ~25% improvement over session 71 baseline. Prior "VirGL ceiling" framing was wrong — root cause was software PutImage, not VirGL. Sticky-lock in `UploadToScreen` is the next cheap lever (~20 LoC, expected 2-3×).
-**Next**: Session 73 adds sticky AHB lock + measures in-game FPS via RuneLite FpsPlugin overlay (needs interactive login). If still under 120, pivot to Slice 5 (direct SurfaceView AHB attach).
-
-### Session 71 (2026-04-16)
-**Work**: H4/H5/H6 VirGL-profile tests all rejected. Re-framed Session 70's conclusion — "44-51 FPS ceiling" was login-screen damage rate, not in-game scene FPS. Ground-truth in-game via FpsPlugin overlay: ~10 FPS. Built observability bridge: `RLClient` logcat tag → DebugLogServer source=runelite. Added opt-in FPS probe (`RLT_DEBUG_FPS_PROBE=1`). Audited `spike/direct-android-surface` state; iteration log had a sitting next-step (dladdr resolution) that was never actioned.
-**Decisions**: Resume direct-surface spike. Published per-slice plan (S0-S6) to reach 120 FPS. Stock VirGL+X11 path stays runnable as fallback. ANGLE variants permanently rejected.
-**Next**: Session 72 starts at Slice 1 of `.claude/plans/2026-04-16-direct-surface-path-to-120fps.md`.
-
-### Session 70 (2026-04-16)
-**Work**: Systematic FPS ceiling investigation. Tested 3 hypotheses: Present flip (REJECTED — 0 attempts), VirGL threading (REJECTED — no FPS change), VirGL structural ceiling (CONFIRMED — 17-28ms inter-frame). Verified P1 attach loop fixed (1 attempt), P1 session health fixed (debounce working), P2 triggerCallback confirmed (43ms, startup only). Added TERMUX_X11_FORCE_FLIP=1 and VirGL threading-always-on to launch script (harmless, well-documented). Saved full findings to docs/fps-ceiling-research-session70.md.
-**Decisions**: VirGL is the structural ceiling. No compositor-side fix possible. Next steps: Venus protocol, no-loop-or-fork test, llvmpipe baseline, or accept 40-50 FPS.
-**Next**: Decide approach for VirGL throughput (Venus? Accept ceiling? llvmpipe comparison?).
-
-### Session 69 (2026-04-14)
-**Work**: Device verification on Samsung Tab S10 Ultra. Built + deployed debug APK. Full end-to-end: boot → setup (29.7s) → auth (token expired → GeckoView → 2-step OAuth → valid) → launch (health check → env deploy → hybrid_x11) → rendering (120 FPS Kotlin, 42-54 FPS native). All logging layers verified: DI, setup, auth, correlation IDs (3 levels), surface lifecycle, binder bridge, fd tracking, buffer balance, native init/shaders/mmap, DebugLogServer HTML+WebSocket, session health. Saved device logs to docs/logs/.
-**Decisions**: Attach loop needs a connected-state guard (too chatty). Session health first-poll timing needs work. Frame timing reporting is accurate.
-**Next**: Fix native FPS ceiling (VirGL readback bottleneck).
+**Next**: Session 73 adds sticky AHB lock + measures in-game FPS via RuneLite FpsPlugin overlay (needs interactive login).
 
 ## Active Plans
 
 - **Phase 9: Comprehensive Logging System** — **COMPLETE + DEVICE-VERIFIED**. 127/128 spec items. 210 tests. All layers verified on device.
 - **Clean Architecture Refactor (Phases 1-8)** — **COMPLETE**.
-- **Presentation Pipeline 120 FPS** — **IN PROGRESS** (`.claude/plans/2026-04-16-direct-surface-path-to-120fps.md`). Slices 1-3 complete. Slice 3 landed `lorieUploadToScreen`; damage-redraw rate 44-51 → 60-66 FPS. Slice 4 (DRI3 Present) deferred as low-yield — PutImage is the hot path, not Present. Next: sticky AHB lock, then Slice 5 (direct SurfaceView). Prior "VirGL is the ceiling" framing (`docs/fps-ceiling-research-session70.md`) is refuted by session 72 evidence.
+- **Presentation Pipeline 120 FPS** — **IN PROGRESS** (`.claude/plans/2026-04-16-direct-surface-path-to-120fps.md`). Slices 1-3 complete. Slice 4 null. Path A (S75-S76) refuted. **S77 diagnosed proot ptrace as the actual bottleneck.** Option B (native-Termux JVM) chosen; blocked on rlawt Bionic rebuild (Task 21). Old plan's slice sequence is effectively superseded by Option B's phases 1-4; update the plan doc once Task 21 lands.
 
 ## Reference
 - **Source code**: `runelite-tablet/app/src/main/java/com/runelitetablet/`
 - **Test code**: `runelite-tablet/app/src/test/java/com/runelitetablet/`
 - **Native code**: `third_party/termux-x11-upstream/app/src/main/cpp/lorie/`
 - **Debug docs**: `runelite-tablet/docs/debug-logging.md`
+- **FPS diagnosis (session 77)**: `runelite-tablet/docs/logs/slice5-jvm-wait-analysis.md`, `slice5-seccomp-ab.md`, `slice5-option-b-rlawt-blocker.md`
 - **FPS research (session 70)**: `runelite-tablet/docs/fps-ceiling-research-session70.md`
 - **Device logs (session 69)**: `runelite-tablet/docs/logs/2026-04-14-device-verification-rlt.log` (10K lines), `*-native.log` (1.4K lines), `*-full.log` (149K lines)

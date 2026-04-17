@@ -3,14 +3,14 @@
     "app_name": "Runelite for Tablet",
     "app_version": "0.1.0",
     "description": "Android installer app that runs the real RuneLite client on Samsung Tab S10 Ultra via Termux + proot-distro",
-    "last_updated": "2026-04-16T20:10:00Z",
-    "session_notes": "Session 72: Executed Slices 1-3 of direct-surface 120fps plan. Named the hot X server PutImage path (exaPutImage @ exa_accel.c:252) via dladdr, then discovered Xlorie's EXA driver had no UploadToScreen callback — every PutImage fell through to fbPutImage software. Implemented lorieUploadToScreen → 99.6% accel. damage-redraw rate 44-51 → 60-66 FPS. Prior 'VirGL is the ceiling' conclusion (session 70) REFUTED: VirGL was never the bottleneck; the X server was CPU-copying everything. Not at 120 FPS gate yet."
+    "last_updated": "2026-04-17T10:00:00Z",
+    "session_notes": "Session 77: Diagnosed proot ptrace syscall interception as the confirmed FPS bottleneck. Built /proc off-CPU sampler (scripts/jvm-wait-sampler.sh + jvm-wait-analyze.py) and captured 60s at Varrock East Bank: Client thread shows 3945 nonvol ctxt-switches/s, math works out to exactly 12 FPS ceiling (1970 syscalls/s ÷ 164 per frame). A/B'd RLT_PROOT_SECCOMP=1 — seccomp-bpf engages but Samsung OneUI kernel doesn't route SECCOMP_RET_TRACE; execve ENOSYS → launch fails. Proot 5.1.107-70 latest in Termux main, no upgrade path. User widened scope (Termux + RLT app forkable; RL + Android off-limits). Chose Option B: native-Termux JVM, skip proot-distro Ubuntu entirely. Installed openjdk-21, mesa, X11 libs, patchelf via Termux apt. rlawt-1.8.jar's bundled linux-aarch64/librlawt.so is glibc-linked with full VERNEED/VERSYM metadata. 4 YOLO workarounds (symlink → bionic paths, symlink → permitted namespace paths, patchelf --remove-needed/--replace-needed, gobjcopy --remove-section=.gnu.version_r) all failed at successive Bionic-linker glibc-rejection layers. Clean fix is rebuilding rlawt via Android NDK (Task 21, 2-4h). Three new analysis docs under runelite-tablet/docs/logs/. New memory: project_ptrace_is_the_fps_bottleneck.md."
   },
   "current_phase": {
-    "phase_name": "120 FPS Presentation — Slices 1-3 landed",
-    "phase_status": "slices_1_through_3_complete_fps_gate_not_hit",
+    "phase_name": "120 FPS Presentation — S77 diagnosed proot ptrace bottleneck; Option B (native-Termux JVM) chosen, blocked on rlawt Bionic rebuild",
+    "phase_status": "ptrace_bottleneck_confirmed_option_b_blocked_on_rlawt_rebuild",
     "phase_started": "2026-04-16",
-    "progress_percentage": 50
+    "progress_percentage": 65
   },
   "release_cycle": {
     "last_release": null,
@@ -20,14 +20,33 @@
   },
   "active_blockers": [
     {
-      "id": "real-runelite-sustained-fps-below-target",
-      "description": "Session 72 measurably improved damage rate (44-51 → 60-66 FPS) via lorieUploadToScreen, but still far below the 120 FPS gate. Per-PutImage-strip overhead (~1500 calls/sec, 84 per frame) is now the visible bottleneck.",
+      "id": "rlawt-native-lib-glibc-linked-blocks-native-termux-jvm",
+      "description": "rlawt-1.8.jar ships net/runelite/rlawt/linux-aarch64/librlawt.so as a glibc-linked ELF (NEEDED libc.so.6 + ld-linux-aarch64.so.1, full VERNEED/VERSYM sections). Termux's JVM is Bionic. Bionic's linker rejects glibc libs at 4 layers (NEEDED / namespace / VERNEED / VERSYM / vn_version). 4 YOLO workarounds in S77 hit successive rejections — the clean path is rebuild via Android NDK. rlawt's symbol surface is small and Bionic-ABI-compatible (no pthread, no exotic glibc); only metadata blocks. Task 21.",
       "severity": "P0",
-      "discovered": "2026-03-15",
-      "session": 62
+      "discovered": "2026-04-17",
+      "session": 77
+    },
+    {
+      "id": "proot-ptrace-syscall-interception-caps-fps-at-12",
+      "description": "Upstream of rlawt blocker. S77 /proc-sampler measurement: RuneLite Client thread 3945 nonvoluntary ctxt-switches/s under default proot ptrace mode = synchronous syscall interception = ~2000 syscalls/s throughput ceiling = 12 FPS at 164 syscalls/frame (GL plugin). Cheap fix (RLT_PROOT_SECCOMP=1 seccomp-bpf) fails on Samsung OneUI kernel: kernel doesn't deliver SECCOMP_RET_TRACE events to proot, execve gets ENOSYS, proot-distro login dies. Proot 5.1.107-70 is latest in Termux main. Unblocks when Option B (native-Termux JVM, removes proot from hot path) is wired — which depends on the rlawt blocker above. Fallback: Task 20 (fork + patch proot seccomp filter).",
+      "severity": "P0",
+      "discovered": "2026-04-17",
+      "session": 77
     }
   ],
   "resolved_blockers": [
+    {
+      "id": "background-cpuset-clamps-producer-pipeline",
+      "description": "S74 theorized Samsung OneUI's /background cpuset (CPUs 0-3) was clamping Termux subtree and thus FPS. S75-S76 landed Path A (bindService hoist to /top-app) with perfect scheduler landing (JVM+virgl on cpus 4-7). S76 measured FPS at 12-15 (vs 13 baseline). Scene FPS did not move. S77 /proc sampler showed system is 70%+ idle — pipeline is not CPU-bound. Cpuset was never the gate.",
+      "resolved": "2026-04-17",
+      "resolution": "Session 76: Path A measured null. Session 77: /proc sampler confirmed sink is proot ptrace (3945 nonvol/s on Client), not CPU contention."
+    },
+    {
+      "id": "real-runelite-sustained-fps-below-target",
+      "description": "Originally 'per-PutImage-strip overhead'. Reframed in S74: compositor has 2.5x idle headroom, real bottleneck is upstream. Reframed again in S77: the real sink is proot ptrace interception of JVM syscalls.",
+      "resolved": "2026-04-17",
+      "resolution": "Session 77: Bottleneck definitively identified as proot ptrace syscall interception. Tracked now as proot-ptrace-syscall-interception-caps-fps-at-12."
+    },
     {
       "id": "hot-putimage-implementation-unresolved",
       "description": "DamageTraceV2 proved the hot steady-state path is PutImage on WINDOW with backend=other, not fbPutImage or miPutImage.",
@@ -38,7 +57,7 @@
       "id": "virgl-vtest-socket-serialization-ceiling",
       "description": "Session 70 concluded VirGL vtest socket serialization was the structural FPS ceiling (17-28ms inter-frame).",
       "resolved": "2026-04-16",
-      "resolution": "Session 72 REFUTED this. VirGL throughput was never the bottleneck — the X server was software-copying every PutImage via ExaCheckPutImage → fbPutImage because lorieExa had no UploadToScreen callback. After implementing lorieUploadToScreen, accel went from 0% to 99.6% and FPS moved up 25-30%. Further FPS work targets per-strip overhead and presentation, not VirGL throughput."
+      "resolution": "Session 72 REFUTED this. VirGL throughput was never the bottleneck. S77 also confirmed — virgl main thread vol_rate 270/s matches current FPS × msg/frame, not elevated."
     },
     {
       "id": "device-verification-pending",
