@@ -175,9 +175,10 @@ class LaunchCoordinator(
             val bashPath = "${CommandRunner.TERMUX_BIN_PATH}/bash"
             val envFileArg = envFilePath?.let { " \"$it\"" } ?: ""
             val uiScale = computeUiScale()
-            logger?.state("launchInternal: computed UI scale=$uiScale from displayMetrics ${context.resources.displayMetrics.widthPixels}x${context.resources.displayMetrics.heightPixels}", correlationId = correlationId)
-            val cmdLine = "RLT_NATIVE_TERMUX=1 RLT_UI_SCALE=$uiScale exec \"$scriptPath\"$envFileArg"
-            logger?.state("launchInternal: dispatching native-path command scriptPath=$scriptPath envFile=$envFilePath uiScale=$uiScale backend=${presentationBackend.id}", correlationId = correlationId)
+            val (gameW, gameH) = computeGameSize(uiScale)
+            logger?.state("launchInternal: computed UI scale=$uiScale gameSize=${gameW}x${gameH} from displayMetrics ${context.resources.displayMetrics.widthPixels}x${context.resources.displayMetrics.heightPixels}", correlationId = correlationId)
+            val cmdLine = "RLT_NATIVE_TERMUX=1 RLT_UI_SCALE=$uiScale RLT_GAME_SIZE_W=$gameW RLT_GAME_SIZE_H=$gameH exec \"$scriptPath\"$envFileArg"
+            logger?.state("launchInternal: dispatching native-path command scriptPath=$scriptPath envFile=$envFilePath uiScale=$uiScale gameSize=${gameW}x${gameH} backend=${presentationBackend.id}", correlationId = correlationId)
             commandRunner.launchBackground(commandPath = bashPath, arguments = arrayOf("-c", cmdLine))
         } else {
             val arguments = if (envFilePath != null) arrayOf(envFilePath) else null
@@ -279,5 +280,25 @@ class LaunchCoordinator(
             bigger >= 1800 -> "1.5"
             else -> "1"
         }
+    }
+
+    /**
+     * Compute RuneLite's `runelite.gameSize` in Java2D units from the live display
+     * metrics and the already-chosen uiScale. gameSize sizes the game CANVAS only —
+     * RuneLite's Frame adds the sidebar icon strip (SIDEBAR_WIDTH = 41 units) plus
+     * the plugin panel when open (PANEL_WIDTH = 232 units), so a naive
+     * displayMetrics / uiScale value would push the panel offscreen. We budget for
+     * the sidebar open so users can reach plugins without resizing the Frame.
+     * Landscape is assumed since OSRS forces landscape in-app.
+     */
+    private fun computeGameSize(uiScale: String): Pair<Int, Int> {
+        val m = context.resources.displayMetrics
+        val scale = uiScale.toDoubleOrNull() ?: 1.0
+        val widthPx = maxOf(m.widthPixels, m.heightPixels)
+        val heightPx = minOf(m.widthPixels, m.heightPixels)
+        val frameWidth = (widthPx / scale).toInt()
+        val frameHeight = (heightPx / scale).toInt()
+        val sidebarReserve = 273
+        return (frameWidth - sidebarReserve) to frameHeight
     }
 }

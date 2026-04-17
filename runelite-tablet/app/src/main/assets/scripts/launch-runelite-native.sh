@@ -401,6 +401,57 @@ echo "=== DIAG end ===" | tee -a "$LOGFILE"
 rlt_log_cpuset "virgl-ready" "${VIRGL_PID:-$$}"
 
 # ===================================================================
+# Profile-patching: rewrite runelite.gameSize + enable RESIZE_WINDOW +
+# enable stretched mode so the AWT Frame fills the Termux:X11 canvas
+# instead of rendering at the last cached "postcard" size (typ 765×503).
+#
+# Values come from the Kotlin side — RLT_GAME_SIZE_W/H are computed from
+# context.resources.displayMetrics / uiScale, since run-as com.termux
+# can't query WindowManagerService. The shell must not hardcode sizes
+# (see memory/feedback_no_hardcoded_ui_sizes.md).
+#
+# Backup is taken to .rlt-orig-native once (distinct from the proot
+# probe's .rlt-orig suffix) so the two launch paths don't step on
+# each other's backups.
+# ===================================================================
+if [ -d "$ROOTFS_PATH/root/.runelite/profiles2" ] \
+   && [ -n "${RLT_GAME_SIZE_W:-}" ] \
+   && [ -n "${RLT_GAME_SIZE_H:-}" ]; then
+    for CFG in "$ROOTFS_PATH/root/.runelite/profiles2"/*.properties; do
+        [ -f "$CFG" ] || continue
+        case "$(basename "$CFG")" in
+            *rsprofile*) continue ;;
+        esac
+        [ -f "$CFG.rlt-orig-native" ] || cp "$CFG" "$CFG.rlt-orig-native"
+        if grep -q '^runelite\.gameSize=' "$CFG"; then
+            sed -i "s/^runelite\.gameSize=.*/runelite.gameSize=${RLT_GAME_SIZE_W}x${RLT_GAME_SIZE_H}/" "$CFG"
+        else
+            printf 'runelite.gameSize=%dx%d\n' "$RLT_GAME_SIZE_W" "$RLT_GAME_SIZE_H" >> "$CFG"
+        fi
+        if grep -q '^runelite\.automaticResizeType=' "$CFG"; then
+            sed -i 's/^runelite\.automaticResizeType=.*/runelite.automaticResizeType=RESIZE_WINDOW/' "$CFG"
+        else
+            echo 'runelite.automaticResizeType=RESIZE_WINDOW' >> "$CFG"
+        fi
+        if grep -q '^stretchedmode\.scalingFactor=' "$CFG"; then
+            sed -i 's/^stretchedmode\.scalingFactor=.*/stretchedmode.scalingFactor=100/' "$CFG"
+        else
+            echo 'stretchedmode.scalingFactor=100' >> "$CFG"
+        fi
+        if grep -q '^stretchedmode\.keepAspectRatio=' "$CFG"; then
+            sed -i 's/^stretchedmode\.keepAspectRatio=.*/stretchedmode.keepAspectRatio=true/' "$CFG"
+        else
+            echo 'stretchedmode.keepAspectRatio=true' >> "$CFG"
+        fi
+        echo "RL-CONFIG native: patched $(basename "$CFG") gameSize=${RLT_GAME_SIZE_W}x${RLT_GAME_SIZE_H} resize=RESIZE_WINDOW stretched=100 keepAspect=true" | tee -a "$LOGFILE"
+    done
+else
+    if [ -z "${RLT_GAME_SIZE_W:-}" ] || [ -z "${RLT_GAME_SIZE_H:-}" ]; then
+        echo "RL-CONFIG native: RLT_GAME_SIZE_W/H not provided — profile patch skipped" | tee -a "$LOGFILE"
+    fi
+fi
+
+# ===================================================================
 # Build RuneLite classpath at runtime
 # ===================================================================
 # Scan repository2/ live — the stored direct-classpath.txt is stale (points
