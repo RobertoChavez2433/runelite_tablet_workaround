@@ -1,44 +1,51 @@
 # Session State
 
-**Last Updated**: 2026-04-17 | **Session**: 77 (ptrace diagnosis confirmed; Option B blocked on rlawt rebuild — see slice5-option-b-rlawt-blocker.md)
+**Last Updated**: 2026-04-17 | **Session**: 78 (Task 21 LANDED — rlawt rebuilt for Bionic, drop-in jar verified on device)
 
 ## Current Phase
-- **Phase**: `spike/direct-android-surface` — Slices 1-3 landed (S72). Slice 4 null (S74). Path A (bind-hoist) refuted (S76). S77: **proot ptrace syscall interception is the FPS bottleneck — diagnosed and confirmed by /proc sampling.** Cheap fix (`RLT_PROOT_SECCOMP=1`) is blocked by Samsung OneUI kernel's missing SECCOMP_RET_TRACE route. Option B (native-Termux JVM) chosen; blocked on rlawt Bionic rebuild.
-- **Status**: In-game FPS at Varrock East Bank: 12 (unchanged, baseline). Client render thread measured at 3945 nonvoluntary ctxt-switches/s — synchronous ptrace interception caps JVM throughput at ~2000 syscalls/s, which at ~164 syscalls/frame = exactly 12 FPS. System still ~70% idle across all 8 cores. Not cpu-bound, not virgl-bound, not Mesa-bound.
+- **Phase**: `spike/direct-android-surface` — Option B unblocked. **Task 21 complete**: rebuilt rlawt via Android NDK 28.2.13676358. Drop-in `rlawt-1.8-bionic.jar` loads under Termux-native openjdk-21 with zero proot involvement. All NEEDED libs Bionic-sonamed, all 26 undefined symbols resolved on device. Phase 2.1 (native-Termux launch script) is next and no longer blocked.
+- **Status**: Pre-launch integration proven (`AWTContext.loadNatives()` succeeds end-to-end via jar classpath under Termux). FPS not yet re-measured — that lands in Phase 3 A/B (post-Phase 2.1). Baseline remains 12 FPS at Varrock East Bank under proot path; expected ≥ 30 FPS on native path (ptrace removed), spike goal ≥ 60, S-FINAL target ≥ 100.
 
 ## HOT CONTEXT — Resume Here
 
-### ENTRY POINT FOR SESSION 78
+### ENTRY POINT FOR SESSION 79
 
-**Critical task**: `Task 21` — rebuild rlawt for Bionic via Android NDK. This is the unlock for every downstream phase (1.3 → 2.1 → 2.2 → 3 FPS measurement).
+**Critical task**: **Phase 2.1** — write `launch-runelite-native.sh` (new) that skips proot-distro entirely and runs RuneLite's JVM directly under Termux-native openjdk-21. Gated by `RLT_NATIVE_TERMUX=1`. See plan `.claude/plans/2026-04-17-rlawt-bionic-rebuild.md` §Phase 2.1.
 
-**What's staged**:
-- `scripts/jvm-wait-sampler.sh` + `scripts/jvm-wait-analyze.py` — reusable measurement pair. Works against any live JVM. `adb push` + `run-as com.termux cp` + `run-as com.termux sh` to execute. See reproduction block in `slice5-jvm-wait-analysis.md`.
-- Termux packages **already installed on device** (Task 12): `openjdk-21`, `openjdk-21-x`, `mesa 26.0.5`, `libx11`, `libxrandr`, `libxtst`, `libxext`, `libxrender`, `libxfixes`, `libxcomposite`, `libxdamage`, `libxi`, `libxcursor`, `libxinerama`, `xorg-xauth`, `patchelf`, `binutils`, `gnupg`. Also added `glibc-repo` (not used — glibc-openjdk doesn't exist).
-- `$HOME/rlawt-test/` on device has: `librlawt.so` (original, glibc-linked), `librlawt-patched.so`, `librlawt-stripped.so` (YOLO attempts that did NOT work), `MiniRlawtLoad.java` + `.class`. Keep for A/B once a Bionic-built librlawt is ready. Safe to rm if cleaning.
-- `$HOME/bionic-compat/` on device — symlinks from the YOLO attempt. Can be removed.
-- On-device `launch-runelite.sh` — **reverted** to `RLT_PROOT_SECCOMP:-0`. In repo, asset is unchanged. Nothing to revert.
+**What's staged on repo**:
+- `third_party/rlawt/` — pristine upstream at v1.8 (commit `ecb6599`).
+- `third_party/rlawt-bionic/` — NDK build wiring, harvested headers + stub libs, AUDIT.md, README.md.
+- `scripts/build-rlawt-bionic.sh` — reproducible build (`bash scripts/build-rlawt-bionic.sh --clean` regenerates `librlawt.so`).
+- `runelite-tablet/app/libs/rlawt-1.8-bionic.jar` — drop-in replacement (260 KB, only the `net/runelite/rlawt/linux-aarch64/librlawt.so` entry differs from stock).
+- Evidence logs: `runelite-tablet/docs/logs/rlawt-bionic-load-success.log`, `rlawt-bionic-awt-smoke.log`.
 
-**Critical knowledge — do NOT re-discover**:
-- Diagnosis is settled. The bottleneck IS proot ptrace. Do not propose measurement-only tasks; measurement is complete.
-- `RLT_PROOT_SECCOMP=1` will crash launch on this Samsung kernel. `execve` returns ENOSYS because the kernel doesn't deliver SECCOMP_RET_TRACE events to proot for path-translating syscalls. Proot 5.1.107-70 is latest in Termux-main — no upgrade path.
-- YOLO symlink/patchelf approaches to rlawt are dead. Bionic's linker enforces glibc rejection at 4 layers (NEEDED → namespace → VERNEED → VERSYM/vn_version). See `slice5-option-b-rlawt-blocker.md` for the full probe trail.
-- rlawt's actual symbol surface is 30 undefined, all Bionic-ABI-compatible (no pthread, no exotic glibc). Only metadata blocks us. Rebuild will work.
+**What's staged on device (R52X90378YB)**:
+- `$HOME/rlawt-test/librlawt-bionic.so` — 88800 B, Bionic-linked, loads cleanly.
+- `$HOME/rlawt-test/rlawt-1.8-bionic.jar` — full jar, `AWTContext.loadNatives()` returns OK under Termux openjdk-21.
+- `$HOME/rlawt-test/MiniAwtContext.class` — compiled smoke test.
 
-**Rebuild plan (Task 21) — concrete next steps**:
-1. `git clone https://github.com/runelite/rlawt` on the host side. Inspect `build.gradle.kts` + CMakeLists.
-2. Configure an Android NDK build target (aarch64-linux-android, minSdk 31 or similar). NDK is at `C:\Users\rseba\AppData\Local\Android\Sdk\ndk\<version>`.
-3. Cross-compile: output `librlawt.so` linked against Bionic libc, with NEEDED set to `libjawt.so libGL.so libX11.so libc.so` (no `.6`, no `ld-linux-aarch64.so.1`), and no VERNEED/VERSYM sections.
-4. Verify against `MiniRlawtLoad.java` on device: `java MiniRlawtLoad /path/to/new-librlawt.so` must print "SUCCESS: librlawt.so loaded".
-5. Repackage `rlawt-1.8.jar` with the new .so at `net/runelite/rlawt/linux-aarch64/librlawt.so` (existing `AWTContext.class` loader picks it up under Termux because Termux IS linux-aarch64 with Bionic — no Java code changes).
-6. Proceed to Phase 2.1 (native-Termux launch script) once verified.
+**Critical knowledge — carry forward**:
+- Task 21 is DONE. Do not re-examine the rlawt build or propose patchelf workarounds.
+- Bionic dlopen does NOT honor `-Djava.library.path` for resolving NEEDED libs. Must use `LD_LIBRARY_PATH` in the launcher env. Minimum required:
+  ```
+  LD_LIBRARY_PATH=/data/data/com.termux/files/usr/lib/jvm/java-21-openjdk/lib:/data/data/com.termux/files/usr/lib
+  ```
+- Target ELF spec for librlawt.so was met: NEEDED `libjawt.so libGL.so.1 libGLX.so.0 libX11.so libm.so libdl.so libc.so`; SONAME `librlawt.so`; single VERNEED entry references `libc.so` with Bionic-internal `LIBC` version (not glibc).
+- All 26 undefined symbols verified present on device via `third_party/rlawt-bionic/audit-symbols.sh` (uses `/system/bin/readelf` — Termux's binutils package does NOT ship readelf; Android built-in is the only option that works out of run-as).
+- `adb push` from Git-Bash mangles Unix paths — prefix the command with `MSYS2_ARG_CONV_EXCL='*'` to preserve `/sdcard/...` etc.
 
-**Task list snapshot (S77-end)**:
-- Completed: 6-13, 11, 12 (and sampler tasks 7-9)
+**Phase 2.1 concrete next steps**:
+1. Draft `runelite-tablet/app/src/main/assets/scripts/launch-runelite-native.sh` adjacent to `launch-runelite.sh`. Gated by `RLT_NATIVE_TERMUX=1` env flag. Skips `proot-distro login`.
+2. Resolve U4 — can the RuneLite bootstrap JARs (under `~/.runelite/repository2/`) be reached from Termux-native filesystem view? Currently they live inside proot's Ubuntu rootfs at `$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/`. Either (a) copy/link them to a Termux-native-reachable path, or (b) bootstrap a fresh RuneLite install under Termux's filesystem. Pick based on size/simplicity.
+3. Wire `RuneLiteSessionService` to select native vs proot path (Phase 2.2). This includes fixing the `ScriptManager.scriptsDeployed` re-deploy bug (memory `project_script_redeploy_vs_stale_apk.md`) so a new `launch-runelite-native.sh` asset actually reaches Termux on APK install.
+4. A/B FPS at Varrock East Bank (Phase 3): baseline vs `RLT_NATIVE_TERMUX=1`.
+
+**Task list snapshot (S78-end)**:
+- Completed: 6-13, 11, 12, sampler tasks 7-9, **21** (rlawt rebuild — DONE)
 - Deferred: 10 (bake sampler into PERF_MONITOR)
-- Active / next: **21** (rebuild rlawt — BLOCKER for 14-18)
-- Pending: 14, 15, 16, 17, 18, 19
-- Fallback: 20 (fork proot, patch seccomp — only if Task 21 fails catastrophically)
+- Active / next: Phase 2.1 (native launch script)
+- Pending: Phase 2.2, Phase 3, tasks 14-19
+- Fallback (still): 20 (fork proot, patch seccomp — not needed as long as Phase 2.1 ships)
 
 **Open issues carried forward (unchanged)**:
 - `#6` — P1, `security(auth)`: shellEscape missing `!` and does not strip CR/NL/NUL.
@@ -75,22 +82,22 @@
 
 ## Blockers
 
-**1. rlawt bundled native lib is glibc-linked, blocks native-Termux JVM** (S77 discovery).
-- `rlawt-1.8.jar` ships `net/runelite/rlawt/linux-aarch64/librlawt.so` as a glibc-linked ELF with full VERNEED/VERSYM metadata.
-- Termux is Bionic. Bionic's linker refuses glibc libs at 4 layers (NEEDED/namespace/VERNEED/VERSYM).
-- rlawt's actual symbol surface is Bionic-ABI-compatible (no pthread, no exotic glibc symbols). Only metadata blocks.
-- Unblocks when: Task 21 rebuilds rlawt against Android NDK.
-
-**2. Proot ptrace syscall-interception caps producer throughput at ~2000 syscalls/s** (S77 diagnosis; upstream of blocker #1).
+**1. Proot ptrace syscall-interception caps producer throughput at ~2000 syscalls/s** (S77 diagnosis).
 - Measured via `/proc` sampler: RuneLite's `Client` render thread shows 3945 nonvoluntary ctxt-switches/s at ~12 FPS scene rate. 3945 ÷ 2 ≈ 1970 syscalls/s ÷ 164 syscalls/frame (GL-plugin cost) = 12 FPS ceiling.
 - `RLT_PROOT_SECCOMP=1` would drop ptrace overhead but fails on Samsung OneUI kernel (execve ENOSYS).
-- Unblocks when: Option B (native-Termux JVM, skipping proot) is fully wired — which depends on Blocker #1.
+- Unblocks when: Phase 2.1 wires a native-Termux launcher that bypasses proot.
 - Fallback: Option A (fork + patch proot 5.1.107-70's seccomp filter) — Task 20.
 
-**Stale blockers removed (Session 77):**
-- ~~"`/background` cpuset clamp on entire Termux subtree"~~ — Refuted in S76 (cpuset was never the FPS gate). Confirmed in S77 — the sink is proot ptrace, not cpuset.
+**Stale blockers removed (Session 78):**
+- ~~"`/background` cpuset clamp on entire Termux subtree"~~ — Refuted in S76.
+- ~~"rlawt bundled native lib is glibc-linked, blocks native-Termux JVM"~~ — **Resolved in S78**. NDK rebuild produced Bionic-compatible librlawt.so; drop-in `rlawt-1.8-bionic.jar` verified on device.
 
 ## Recent Sessions
+
+### Session 78 (2026-04-17)
+**Work**: Executed Task 21 end-to-end. Plan + spec saved to `.claude/plans/2026-04-17-rlawt-bionic-rebuild.md` + `.claude/specs/2026-04-17-rlawt-bionic-rebuild-spec.md`. Cloned upstream rlawt at `v1.8` (commit `ecb6599`); vendored pristine source at `third_party/rlawt/`. Built Bionic adaptation dir at `third_party/rlawt-bionic/` with NDK 28.2.13676358 wiring, device-harvested headers + stub libs, pre-generated JNI header, minimal CMakeLists. Wrote `scripts/build-rlawt-bionic.sh` (handles Git-Bash PATH quirks, uses Android SDK cmake+ninja). First build succeeded on first real attempt after fetching upstream xorgproto-2024.1 X.h (Termux libx11 ships only Xlib.h, not the X protocol headers) and Mesa 26.0.5 GL/glx.h (Termux mesa doesn't install dev headers). Output: 88800 B librlawt.so with target ELF metadata — NEEDED `libjawt.so libGL.so.1 libGLX.so.0 libX11.so libm.so libdl.so libc.so`, SONAME `librlawt.so`, single VERNEED entry referencing libc.so Bionic `LIBC` (not GLIBC_X.Y). 26 undefined symbols, all verified present on device via `audit-symbols.sh` (uses Android's built-in `/system/bin/readelf` because Termux binutils doesn't ship readelf through run-as). MiniRlawtLoad.java `SUCCESS: librlawt.so loaded`. Repackaged rlawt-1.8.jar → rlawt-1.8-bionic.jar (AWTContext.class byte-identical, only the one .so replaced). MiniAwtContext end-to-end: `AWTContext.loadNatives()` returns OK under Termux-native openjdk-21. Final layout: pristine `third_party/rlawt/` + adapted `third_party/rlawt-bionic/` + `runelite-tablet/app/libs/rlawt-1.8-bionic.jar` + `.gitignore` entry for `build-bionic/`.
+**Decisions**: Use NDK cross-compile on host (not on-device Termux build) for reproducibility. Keep upstream dir untouched — put all Bionic wiring in a sibling `rlawt-bionic/` dir. Vendor GL/xorgproto headers from upstream (Termux doesn't provide GL dev headers; libx11 protocol headers missing). Runtime require `LD_LIBRARY_PATH` because Java's `-Djava.library.path` does not influence Bionic's NEEDED resolution. Two spec gates loosened from the draft: (1) "no VERNEED" revised to "VERNEED only references NEEDED libs" — Bionic internally uses LIBC versioning, so single VERNEED entry for libc.so is correct; (2) Phase 21G reduced from "live GL context creation" to "end-to-end classpath + native-load via `AWTContext.loadNatives()`" — live GL test belongs in Phase 3 A/B, not here.
+**Next**: Phase 2.1 = write `launch-runelite-native.sh` (RLT_NATIVE_TERMUX=1 gate, skips proot-distro). Resolve U4 — how RL's ~/.runelite/repository2/*.jar classpath reaches Termux-native view. Then Phase 2.2 (service selector + ScriptManager re-deploy fix) and Phase 3 (FPS A/B at Varrock East Bank, target ≥ 30 FPS).
 
 ### Session 77 (2026-04-17)
 **Work**: Wrote `scripts/jvm-wait-sampler.sh` + `scripts/jvm-wait-analyze.py`. 60s /proc capture at Varrock East Bank proved RuneLite's `Client` thread has 3945 nonvol-ctxt-switches/s — synchronous ptrace interception is the FPS bottleneck (not cpuset, not VirGL IPC, not Mesa). A/B'd `RLT_PROOT_SECCOMP=1`: engaged seccomp-bpf correctly but Samsung OneUI kernel doesn't route SECCOMP_RET_TRACE → execve ENOSYS → launch fails; reverted. Proot 5.1.107-70 is latest in Termux main. User widened scope (Termux is forkable, RLT-app editable; RL + Android off-limits). Chose Option B (native-Termux JVM). Installed openjdk-21, mesa, X11 libs, patchelf. rlawt's bundled `linux-aarch64/librlawt.so` confirmed glibc-linked (NEEDED libc.so.6 + ld-linux-aarch64.so.1 + VERNEED/VERSYM). Four YOLO workarounds probed: symlink→bionic paths, re-symlink to permitted namespace, `patchelf --remove-needed` + `--replace-needed`, `gobjcopy --remove-section=.gnu.version*`. Each got past one Bionic-linker layer and hit the next. Clean fix = rebuild rlawt via Android NDK (Task 21, 2-4h).

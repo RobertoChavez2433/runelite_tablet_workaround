@@ -1,0 +1,47 @@
+Session 78 — rlawt Bionic rebuild on-device load verification
+Date: 2026-04-17
+Device: R52X90378YB (Samsung Tab S10 Ultra)
+
+Build output:
+  third_party/rlawt-bionic/build-bionic/librlawt.so
+  88800 bytes
+  Toolchain: Android NDK 28.2.13676358, clang 19.0.1
+  Target: aarch64-none-linux-android31
+
+readelf -d:
+  NEEDED libjawt.so libGL.so.1 libGLX.so.0 libX11.so libm.so libdl.so libc.so
+  SONAME librlawt.so
+  VERNEED 1 entry (libc.so / LIBC — Bionic-internal versioning, not GLIBC_X.Y)
+
+nm -u:
+  26 undefined symbols (8 libc + 11 glX/GL + 6 X11 + 1 JAWT). All resolved
+  on device (see third_party/rlawt-bionic/build-bionic/symbol-resolution-map.md).
+
+On-device load test command:
+
+  adb -s R52X90378YB shell "run-as com.termux sh -c '
+    cd /data/data/com.termux/files/home/rlawt-test &&
+    export LD_LIBRARY_PATH=/data/data/com.termux/files/usr/lib/jvm/java-21-openjdk/lib:/data/data/com.termux/files/usr/lib &&
+    /data/data/com.termux/files/usr/lib/jvm/java-21-openjdk/bin/java MiniRlawtLoad \
+      /data/data/com.termux/files/home/rlawt-test/librlawt-bionic.so'"
+
+Output:
+
+  Attempting System.load: /data/data/com.termux/files/home/rlawt-test/librlawt-bionic.so
+  SUCCESS: librlawt.so loaded
+
+Proof: Termux-native openjdk-21 successfully dlopened our Bionic-rebuilt
+librlawt.so. The four-layer Bionic linker rejection observed against the
+stock glibc-built librlawt.so in session 77 no longer applies — the NEEDED
+sonames are Bionic-compatible (no .6 glibc suffix, no ld-linux-aarch64.so.1),
+the VERNEED entry references libc.so with Bionic LIBC version (not GLIBC_X.Y),
+and every undefined symbol is satisfied by Termux-resident .so files.
+
+Key discovery — runtime:
+  Java's -Djava.library.path is NOT honored by Bionic's dlopen when resolving
+  NEEDED libs of a System.load()ed native lib. Must use LD_LIBRARY_PATH
+  for the Termux lib dirs. (Java's path only covers System.loadLibrary
+  lookup; NEEDED library resolution is Bionic linker territory.)
+
+Next steps: Phase 21F (repackage JAR), Phase 21G (MiniAwtContext real-GL
+test), Phase 21H (commit).

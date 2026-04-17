@@ -1,0 +1,7 @@
+Java: 21.0.10
+OS:   Linux aarch64
+Classpath entries: rlawt-1.8-bionic.jar:.
+Library path:      /data/data/com.termux/files/usr/lib/jvm/java-21-openjdk/lib:/data/data/com.termux/files/usr/lib:/usr/java/packages/lib:/usr/lib64:/lib64:/lib:/usr/lib
+
+Calling AWTContext.loadNatives()... OK
+AWTContext natives loaded via rlawt-1.8-bionic.jar
