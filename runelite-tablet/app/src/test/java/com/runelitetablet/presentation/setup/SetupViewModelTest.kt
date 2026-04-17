@@ -89,6 +89,7 @@ class SetupViewModelTest {
             oAuth2Manager = UnsafeHelper.allocate(JagexOAuth2Manager::class.java),
             orchestrator = orchestrator,
             displayPreferences = UnsafeHelper.allocate(DisplayPreferences::class.java),
+            launchPreferences = UnsafeHelper.allocate(com.runelitetablet.ui.LaunchPreferences::class.java),
             presentationBackend = com.runelitetablet.presentation.PresentationBackends.stable,
             authCoordinator = authCoordinator,
             scope = TestScope(testDispatcher),

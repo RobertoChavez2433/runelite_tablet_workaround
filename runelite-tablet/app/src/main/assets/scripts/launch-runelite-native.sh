@@ -42,6 +42,22 @@ LOGFILE="$HOME/runelite-native.log"
 CLASSLOAD_LOG="$HOME/native-launch-classload.log"
 echo "=== Native RuneLite launch $(date) ===" | tee "$LOGFILE"
 
+# Optional env-file argument (parity with launch-runelite.sh). LaunchCoordinator
+# writes Jagex auth env to $HOME/.rlt-launch-env.sh and passes its path as $1.
+# We source it and then delete it to avoid leaving credentials on disk.
+NATIVE_ENV_FILE="${1:-}"
+if [ -n "$NATIVE_ENV_FILE" ] && [ -f "$NATIVE_ENV_FILE" ]; then
+    echo "Sourcing credentials from env file..." | tee -a "$LOGFILE"
+    # shellcheck disable=SC1090
+    source "$NATIVE_ENV_FILE"
+    rm -f "$NATIVE_ENV_FILE"
+    [ -n "${JX_SESSION_ID:-}" ] && echo "  JX_SESSION_ID=***" | tee -a "$LOGFILE"
+    [ -n "${JX_CHARACTER_ID:-}" ] && echo "  JX_CHARACTER_ID=***" | tee -a "$LOGFILE"
+    [ -n "${JX_DISPLAY_NAME:-}" ] && echo "  JX_DISPLAY_NAME=***" | tee -a "$LOGFILE"
+else
+    echo "No credentials env file provided — RuneLite will show its own login" | tee -a "$LOGFILE"
+fi
+
 # Same cpuset-at-entry logging as the proot launcher, so we can diff.
 rlt_log_cpuset() {
     local label="$1" pid="$2"
@@ -215,6 +231,22 @@ if [ ! -x "$TERMUX_X11_BIN" ]; then
 fi
 export TERMUX_X11_OVERRIDE_PACKAGE="$X11_OVERRIDE_PACKAGE"
 mkdir -p "$X11_SOCKET_DIR"
+
+# IMPORTANT: the Termux:X11 server reads its resolution pref ONCE at startup; changing
+# `displayResolutionMode` after the server is up does nothing. A prior proot-software
+# run (which sets 1480x924 half-res) leaves the custom-mode pref behind, so the native
+# launcher MUST reset to `native` BEFORE forking the X server. Otherwise RuneLite's
+# AWT screen bounds report 1480x924 and the whole frame renders small.
+# `adjustResolution:true` asks Termux:X11 to resize the X canvas to the surface size
+# whenever the activity's window changes — without it, `native` mode falls back to a
+# DP-based half-res on HiDPI displays (2960×1848 physical ⇒ 1480×924 DP).
+if [ -x "$TERMUX_X11_PREF_BIN" ]; then
+    timeout 5 "$TERMUX_X11_PREF_BIN" displayResolutionMode:native 2>&1 | tee -a "$LOGFILE" || true
+    timeout 5 "$TERMUX_X11_PREF_BIN" adjustResolution:true 2>&1 | tee -a "$LOGFILE" || true
+    timeout 5 "$TERMUX_X11_PREF_BIN" fullscreen:true 2>&1 | tee -a "$LOGFILE" || true
+    timeout 5 "$TERMUX_X11_PREF_BIN" showAdditionalKbd:false 2>&1 | tee -a "$LOGFILE" || true
+fi
+
 "$TERMUX_X11_BIN" :0 &
 X11_PID=$!
 echo "X11 launch pid=$X11_PID" | tee -a "$LOGFILE"
@@ -236,12 +268,8 @@ echo "X11 socket ready" | tee -a "$LOGFILE"
 export DISPLAY=:0
 
 # Launch hybrid X11 host activity (undecorated frame). Mirrors proot launcher.
+# Resolution/fullscreen prefs already set above; nothing else to do here.
 am start --activity-single-top --activity-clear-top -n "$X11_HOST_COMPONENT" >/dev/null 2>&1 || true
-if [ -x "$TERMUX_X11_PREF_BIN" ]; then
-    timeout 5 "$TERMUX_X11_PREF_BIN" fullscreen:true 2>&1 | tee -a "$LOGFILE" || true
-    timeout 5 "$TERMUX_X11_PREF_BIN" showAdditionalKbd:false 2>&1 | tee -a "$LOGFILE" || true
-    timeout 5 "$TERMUX_X11_PREF_BIN" displayResolutionMode:native 2>&1 | tee -a "$LOGFILE" || true
-fi
 
 # ===================================================================
 # Start VirGL server (Termux-native already — no change from proot path)
@@ -271,12 +299,25 @@ if command -v virgl_test_server_android >/dev/null 2>&1; then
             echo "VirGL socket ready" | tee -a "$LOGFILE"
         fi
     fi
-    # Env for Mesa virpipe backend (same as proot path, Termux-native)
+    # Env for Mesa virpipe backend (mirrors proot launcher's post-validation block).
+    # MESA_EXTENSION_OVERRIDE disables a depth-clamp pair that virgl's front-end
+    # advertises but the Turnip/Mali driver behind it can't actually honor; leaving
+    # them enabled causes RuneLite's GPU plugin to request features and then segfault.
+    # The MESA_GLSL_CACHE path keeps the shader cache on-disk so cold-start re-compiles
+    # are skipped between launches.
     export GALLIUM_DRIVER=virpipe
     export VTEST_SOCKET_NAME="$PREFIX/tmp/.virgl_test"
     export MESA_NO_ERROR=1
+    export MESA_EXTENSION_OVERRIDE=-GL_ARB_depth_clamp,-GL_EXT_depth_clamp
     export MESA_GL_VERSION_OVERRIDE=4.3COMPAT
     export MESA_GLSL_VERSION_OVERRIDE=430
+    export MESA_GLSL_CACHE_DISABLE=0
+    # Brief settle: virgl_test_server can accept the socket connection before its
+    # internal FBConfig enumeration completes, which makes glXChooseFBConfig return
+    # zero configs when RuneLite queries them (producing the "unable to find a fb
+    # config" RuntimeException from rlawt). 500ms after socket-ready is enough on
+    # the Samsung Tab S10 Ultra to let virgl finish initializing.
+    sleep 0.5
 else
     echo "virgl_test_server_android not installed — software rendering" | tee -a "$LOGFILE"
 fi
@@ -326,7 +367,24 @@ echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" | tee -a "$LOGFILE"
 echo "JAVA_HOME=$JAVA_HOME" | tee -a "$LOGFILE"
 
 MAIN_CLASS="net.runelite.client.RuneLite"
+# `--scale` is a flag on the RuneLite *launcher* (`java -jar RuneLite.jar`), NOT on the
+# RuneLite client main class — joptsimple rejects it with UnrecognizedOptionException.
+# Since we invoke the client main class directly (we're not going through the launcher),
+# we use the equivalent AWT system property instead. -Dsun.java2d.uiScale controls AWT
+# HiDPI scaling for the Frame + fonts without needing the launcher wrapper.
 CLIENT_ARGS="--insecure-write-credentials --debug"
+
+# UI scale is computed by LaunchCoordinator from context.resources.displayMetrics (the
+# Android WindowManager Binder service isn't callable from run-as com.termux, so the
+# Kotlin side is the only place with reliable access to the real display size). Falls
+# back to 1.0 here if the env var is somehow missing (direct on-device shell invocation
+# for testing) — never hardcode a specific scale.
+UI_SCALE="${RLT_UI_SCALE:-1}"
+if [ -n "${RLT_UI_SCALE:-}" ]; then
+    echo "UI scale: $UI_SCALE (source=Kotlin-computed)" | tee -a "$LOGFILE"
+else
+    echo "UI scale: $UI_SCALE (source=fallback, set RLT_UI_SCALE to override)" | tee -a "$LOGFILE"
+fi
 # -Xss2m: Bionic default thread stack is ~1MB, JVM threads want more.
 # -Xmx2g: matches device-memory budget used in proot path for small bench.
 # -Duser.home points at the proot rootfs .runelite dir so native JVM sees
@@ -339,8 +397,19 @@ JVM_ARGS=(
     -XX:+UseG1GC
     -XX:MaxGCPauseMillis=50
     "-Duser.home=$ROOTFS_PATH/root"
+    # Java2D HiDPI scale — equivalent of the proot launcher's RuneLite-launcher `--scale`
+    # flag but applied at the JVM level since we invoke the client main class directly.
+    # Value comes from detect_ui_scale() above which reads the real display size; never
+    # hardcode a specific scale here.
+    "-Dsun.java2d.uiScale=$UI_SCALE"
     "-Xlog:class+load=info:file=$CLASSLOAD_LOG:time,uptime,level,tags:filecount=2,filesize=5M"
 )
+# Forward Jagex credentials from the env-file (if any) as system properties —
+# RuneLite's auth layer reads these when sessionId / characterId are present,
+# matching the proot path's env-based forwarding.
+[ -n "${JX_SESSION_ID:-}" ]   && JVM_ARGS+=("-DJX_SESSION_ID=$JX_SESSION_ID")
+[ -n "${JX_CHARACTER_ID:-}" ] && JVM_ARGS+=("-DJX_CHARACTER_ID=$JX_CHARACTER_ID")
+[ -n "${JX_DISPLAY_NAME:-}" ] && JVM_ARGS+=("-DJX_DISPLAY_NAME=$JX_DISPLAY_NAME")
 
 echo "=== Invoking JVM ===" | tee -a "$LOGFILE"
 echo "  cmd: $JAVA_BIN ${JVM_ARGS[*]} -cp <classpath> $MAIN_CLASS $CLIENT_ARGS" | tee -a "$LOGFILE"

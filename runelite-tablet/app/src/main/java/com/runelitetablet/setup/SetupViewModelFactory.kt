@@ -43,6 +43,7 @@ class SetupViewModelFactory(activity: Activity) : ViewModelProvider.Factory {
             oAuth2Manager = container.auth.oauthManager,
             orchestrator = orchestrator,
             displayPreferences = container.displayPreferences,
+            launchPreferences = container.launchPreferences,
             presentationBackend = container.presentationBackend,
             authCoordinator = authCoordinator,
             scope = MainScope(),

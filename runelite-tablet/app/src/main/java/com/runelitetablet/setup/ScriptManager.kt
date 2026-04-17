@@ -1,6 +1,7 @@
 package com.runelitetablet.setup
 
 import android.content.Context
+import com.runelitetablet.BuildConfig
 import com.runelitetablet.domain.setup.ScriptDeployer
 import com.runelitetablet.logging.AppLog
 import com.runelitetablet.termux.TermuxCommandRunner
@@ -17,9 +18,12 @@ class ScriptManager(
     companion object {
         private const val SCRIPTS_DIR = "${TermuxCommandRunner.TERMUX_HOME_PATH}/scripts"
         private const val CONFIGS_DIR = "${TermuxCommandRunner.TERMUX_HOME_PATH}/scripts/configs"
+        private const val JARS_DIR = "${TermuxCommandRunner.TERMUX_HOME_PATH}/.rlt"
+        private const val VERSION_MARKER = "$JARS_DIR/deployed-version"
         private val SCRIPT_NAMES = listOf(
             "install-proot.sh", "install-java.sh", "download-runelite.sh",
             "check-markers.sh", "check-x11-socket.sh", "launch-runelite.sh",
+            "launch-runelite-native.sh",
             "update-runelite.sh", "health-check.sh", "shutdown-session.sh",
             "detect-gpu.sh", "setup-gpu.sh", "setup-gpu-mali.sh",
             "monitor-cpu-affinity.sh", "benchmark-pipeline.sh",
@@ -27,34 +31,92 @@ class ScriptManager(
             "test-server-zink.sh", "test-user-ns.sh"
         )
         private val CONFIG_NAMES = listOf("openbox-rc.xml")
+        private val JAR_NAMES = listOf("rlawt-1.8-bionic.jar")
 
-        /** Process-wide cache so broadcast receivers don't re-deploy after activity setup did it. */
-        @Volatile private var scriptsDeployedGlobal = false
-        @Volatile private var configsDeployedGlobal = false
+        // Process-wide caches keyed by the APK's VERSION_CODE. On APK update, VERSION_CODE
+        // changes, so we compare against the on-device marker file and re-deploy when they
+        // differ. Fixes session 72+ re-deploy bug where a stale @Volatile Boolean blocked
+        // new assets from reaching $HOME/scripts/. See project memory
+        // project_script_redeploy_vs_stale_apk.md.
+        @Volatile private var scriptsDeployedVersion: Int = -1
+        @Volatile private var configsDeployedVersion: Int = -1
+        @Volatile private var jarsDeployedVersion: Int = -1
+        /** Set once per process after reading the device-side version marker. */
+        @Volatile private var deviceMarkerChecked: Boolean = false
     }
 
-    private var scriptsDeployed: Boolean
-        get() = scriptsDeployedGlobal
-        set(value) { scriptsDeployedGlobal = value }
-
-    private var configsDeployed: Boolean
-        get() = configsDeployedGlobal
-        set(value) { configsDeployedGlobal = value }
+    /** Current APK VERSION_CODE — the single source of truth for "are deployed assets fresh?" */
+    private val currentVersion: Int = BuildConfig.VERSION_CODE
 
     /** Cache script content after first APK asset read to avoid repeated decompression */
     private val scriptContentCache = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     /** Reset deployment cache, e.g. after an error that may have left scripts in a bad state */
     override fun invalidateDeployCache() {
-        scriptsDeployedGlobal = false
-        configsDeployedGlobal = false
+        scriptsDeployedVersion = -1
+        configsDeployedVersion = -1
+        jarsDeployedVersion = -1
+        deviceMarkerChecked = false
         scriptContentCache.clear()
         AppLog.script("invalidateDeployCache: deployment and content caches cleared")
     }
 
+    /**
+     * On first deploy call after process start, read the on-device version marker. If the
+     * marker's VERSION_CODE differs from our BuildConfig.VERSION_CODE (i.e. an APK update
+     * happened between the last run and now), invalidate the in-memory cache so we force a
+     * re-deploy of every asset category. Writes the fresh marker after the first successful
+     * deploy (see writeVersionMarker).
+     */
+    private suspend fun ensureMarkerChecked() {
+        if (deviceMarkerChecked) return
+        val result = commandRunner.execute(
+            commandPath = "${TermuxCommandRunner.TERMUX_BIN_PATH}/bash",
+            arguments = arrayOf("-c", "cat $VERSION_MARKER 2>/dev/null || echo MISSING"),
+            background = true,
+            timeoutMs = TermuxCommandRunner.TIMEOUT_VERIFY_MS
+        )
+        val marker = result.stdout?.trim().orEmpty()
+        val onDeviceVersion = marker.toIntOrNull() ?: -1
+        if (onDeviceVersion != currentVersion) {
+            AppLog.script(
+                "ensureMarkerChecked: APK version drift detected (onDevice=$onDeviceVersion " +
+                    "current=$currentVersion) — forcing re-deploy of scripts/configs/jars"
+            )
+            scriptsDeployedVersion = -1
+            configsDeployedVersion = -1
+            jarsDeployedVersion = -1
+        } else {
+            AppLog.script("ensureMarkerChecked: on-device version $onDeviceVersion matches APK $currentVersion")
+        }
+        deviceMarkerChecked = true
+    }
+
+    /**
+     * Write the on-device version marker. Called only after all three deploy categories
+     * (scripts, configs, jars) have completed for the current VERSION_CODE in this process,
+     * so a partial deploy (e.g. scripts succeeded but jars failed) doesn't falsely mark the
+     * device as up-to-date.
+     */
+    private suspend fun maybeWriteVersionMarker() {
+        if (scriptsDeployedVersion == currentVersion &&
+            configsDeployedVersion == currentVersion &&
+            jarsDeployedVersion == currentVersion) {
+            val cmd = "mkdir -p $JARS_DIR && printf '%s' $currentVersion > $VERSION_MARKER"
+            commandRunner.execute(
+                commandPath = "${TermuxCommandRunner.TERMUX_BIN_PATH}/bash",
+                arguments = arrayOf("-c", cmd),
+                background = true,
+                timeoutMs = TermuxCommandRunner.TIMEOUT_VERIFY_MS
+            )
+            AppLog.script("maybeWriteVersionMarker: marker written version=$currentVersion")
+        }
+    }
+
     override suspend fun deployScripts(): Boolean {
-        if (scriptsDeployed) {
-            AppLog.script("deployScripts: skipping — already deployed (cached)")
+        ensureMarkerChecked()
+        if (scriptsDeployedVersion == currentVersion) {
+            AppLog.script("deployScripts: skipping — already deployed for version $currentVersion")
             return true
         }
         AppLog.script("deployScripts: starting scriptCount=${SCRIPT_NAMES.size} scripts=${SCRIPT_NAMES}")
@@ -73,8 +135,9 @@ class ScriptManager(
             }
         }
 
-        AppLog.script("deployScripts: all scripts deployed successfully")
-        scriptsDeployed = true
+        AppLog.script("deployScripts: all scripts deployed successfully version=$currentVersion")
+        scriptsDeployedVersion = currentVersion
+        maybeWriteVersionMarker()
         return true
     }
 
@@ -132,8 +195,9 @@ class ScriptManager(
     }
 
     override suspend fun deployConfigs(): Boolean {
-        if (configsDeployed) {
-            AppLog.script("deployConfigs: skipping — already deployed (cached)")
+        ensureMarkerChecked()
+        if (configsDeployedVersion == currentVersion) {
+            AppLog.script("deployConfigs: skipping — already deployed for version $currentVersion")
             return true
         }
         AppLog.script("deployConfigs: starting configCount=${CONFIG_NAMES.size} configs=${CONFIG_NAMES}")
@@ -144,12 +208,84 @@ class ScriptManager(
                 return false
             }
         }
-        AppLog.script("deployConfigs: all configs deployed successfully")
-        configsDeployed = true
+        AppLog.script("deployConfigs: all configs deployed successfully version=$currentVersion")
+        configsDeployedVersion = currentVersion
+        maybeWriteVersionMarker()
         return true
     }
 
+    /**
+     * Deploy JAR assets under $JARS_DIR. JARs are binary and typically larger than scripts;
+     * we read bytes, base64-encode, and stream via stdin — same shape as deployScriptsBatched
+     * but one jar per IPC call because each file is ~260KB and individual base64 transfers fit
+     * comfortably inside Termux's RUN_COMMAND Bundle while multi-file batches risk the 1MB cap.
+     */
+    override suspend fun deployJars(): Boolean {
+        ensureMarkerChecked()
+        if (jarsDeployedVersion == currentVersion) {
+            AppLog.script("deployJars: skipping — already deployed for version $currentVersion")
+            return true
+        }
+        AppLog.script("deployJars: starting jarCount=${JAR_NAMES.size} jars=${JAR_NAMES}")
+        for (jarName in JAR_NAMES) {
+            if (!deployJar(jarName)) {
+                AppLog.script("deployJars: halting — deployment failed for $jarName")
+                return false
+            }
+        }
+        AppLog.script("deployJars: all jars deployed successfully version=$currentVersion")
+        jarsDeployedVersion = currentVersion
+        maybeWriteVersionMarker()
+        return true
+    }
+
+    /**
+     * Deploy a single JAR asset by instructing Termux to extract it from our APK via
+     * `unzip -p "$APK" assets/libs/<jar>`. APKs are world-readable at /data/app/ on Android
+     * 10+, so Termux (UID u0_a164) can read our APK (UID u0_aXXX) without any permission
+     * grant. This avoids Binder transaction size limits that would apply if we tried to
+     * stream the ~260KB jar through the RUN_COMMAND intent extras.
+     */
+    private suspend fun deployJar(jarName: String): Boolean {
+        val packageName = context.packageName
+        // `pm path` emits `package:/path/to/base.apk` (and possibly split APKs — we only need
+        // base.apk since assets live there). Strip the prefix and take the first entry.
+        val deployCommand = buildString {
+            append("set -e && ")
+            append("APK=\$(pm path ").append(packageName).append(" | head -1 | sed 's/^package://') && ")
+            append("mkdir -p ").append(JARS_DIR).append(" && ")
+            // -o overwrites without prompting; -p pipes to stdout so we can redirect
+            append("unzip -p \"\$APK\" assets/libs/").append(jarName)
+            append(" > ").append(JARS_DIR).append("/").append(jarName)
+        }
+        AppLog.script("deployJar: name=$jarName cmd='$deployCommand'")
+
+        val deployStartMs = System.currentTimeMillis()
+        val result = commandRunner.execute(
+            commandPath = "${TermuxCommandRunner.TERMUX_BIN_PATH}/bash",
+            arguments = arrayOf("-c", deployCommand),
+            background = true,
+            timeoutMs = TermuxCommandRunner.TIMEOUT_VERIFY_MS
+        )
+        val deployDurationMs = System.currentTimeMillis() - deployStartMs
+
+        return if (result.isSuccess) {
+            AppLog.script("deployJar: success name=$jarName durationMs=$deployDurationMs")
+            true
+        } else {
+            AppLog.e(
+                "SCRIPT",
+                "deployJar: FAILED name=$jarName durationMs=$deployDurationMs " +
+                    "exitCode=${result.exitCode} error=${result.error} " +
+                    "stdout=${result.stdout} stderr=${result.stderr}"
+            )
+            false
+        }
+    }
+
     override fun getScriptPath(name: String): String = "$SCRIPTS_DIR/$name"
+
+    override fun getJarPath(name: String): String = "$JARS_DIR/$name"
 
     private suspend fun deployScript(scriptName: String): Boolean {
         val assetReadStartMs = System.currentTimeMillis()

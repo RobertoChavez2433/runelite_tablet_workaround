@@ -16,6 +16,7 @@ import com.runelitetablet.presentation.PresentationBackend
 import com.runelitetablet.session.RuneLiteSessionService
 import com.runelitetablet.session.SessionState
 import com.runelitetablet.ui.DisplayPreferences
+import com.runelitetablet.ui.LaunchPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -38,6 +39,7 @@ class LaunchCoordinator(
     private val oAuth2Manager: JagexOAuth2Manager,
     private val orchestrator: SetupOrchestrator,
     private val displayPreferences: DisplayPreferences,
+    private val launchPreferences: LaunchPreferences,
     private val presentationBackend: PresentationBackend,
     private val authCoordinator: AuthCoordinator,
     private val scope: CoroutineScope,
@@ -126,11 +128,20 @@ class LaunchCoordinator(
             }
         }
         _launchState.value = LaunchState.Launching
-        logger?.state("LaunchCoordinator: deploying env file backend=${presentationBackend.id}", correlationId = correlationId)
+        val useNative = launchPreferences.useNativeTermux
+        if (useNative) {
+            logger?.state("LaunchCoordinator: native-Termux mode enabled, deploying Bionic rlawt jar", correlationId = correlationId)
+            if (!scriptDeployer.deployJars()) {
+                logger?.e("LAUNCH", "LaunchCoordinator: deployJars failed — cannot run native path without bionic rlawt jar", correlationId = correlationId)
+                _launchState.value = LaunchState.Failed("Failed to deploy Bionic rlawt jar for native launch")
+                return
+            }
+        }
+        logger?.state("LaunchCoordinator: deploying env file backend=${presentationBackend.id} useNative=$useNative", correlationId = correlationId)
         val envFilePath = LaunchEnvDeployer.deployToTermuxHome(credentialStore, commandRunner)
         logger?.state("LaunchCoordinator: envFilePath=$envFilePath hasEnvFile=${envFilePath != null}", correlationId = correlationId)
         logger?.d("LAUNCH", "LaunchCoordinator: env contents=[tokens redacted] backend=${presentationBackend.id}", correlationId = correlationId)
-        val success = launchInternal(envFilePath, correlationId)
+        val success = launchInternal(envFilePath, correlationId, useNative)
         if (success) {
             logger?.state("LaunchCoordinator: launch succeeded, starting session service", correlationId = correlationId)
             _launchState.value = LaunchState.Idle
@@ -141,7 +152,7 @@ class LaunchCoordinator(
         }
     }
 
-    private suspend fun launchInternal(envFilePath: String? = null, correlationId: String? = null): Boolean {
+    private suspend fun launchInternal(envFilePath: String? = null, correlationId: String? = null, useNative: Boolean = false): Boolean {
         if (!presentationBackend.isInstalled(packageChecker)) {
             logger?.w("LAUNCH", "launchInternal: backend ${presentationBackend.id} not installed", correlationId = correlationId)
             return false
@@ -152,11 +163,28 @@ class LaunchCoordinator(
             logger?.d("LAUNCH", "launchInternal: foregrounding ${presentationBackend.id} before bootstrap", correlationId = correlationId)
             orchestrator.actions?.launchIntent(presentationIntent); delay(700)
         }
-        val scriptPath = scriptDeployer.getScriptPath("launch-runelite.sh")
-        val arguments = if (envFilePath != null) arrayOf(envFilePath) else null
-        logger?.state("launchInternal: dispatching command scriptPath=$scriptPath envFile=$envFilePath backend=${presentationBackend.id}", correlationId = correlationId)
-        val success = commandRunner.launchBackground(commandPath = scriptPath, arguments = arguments)
-        logger?.state("launchInternal: command dispatched success=$success", correlationId = correlationId)
+        val scriptName = if (useNative) "launch-runelite-native.sh" else "launch-runelite.sh"
+        val scriptPath = scriptDeployer.getScriptPath(scriptName)
+        val success = if (useNative) {
+            // Native path needs RLT_NATIVE_TERMUX=1 in the launcher's env (the script exits
+            // with code 2 otherwise). We also hand the script the live screen-derived UI
+            // scale because `wm size` / `xdpyinfo` aren't callable from run-as com.termux
+            // (WindowManagerService refuses Binder calls and mesa-demos isn't in the base
+            // Termux install). Hardcoding a scale in the shell breaks non-tablet devices —
+            // see memory/feedback_no_hardcoded_ui_sizes.md.
+            val bashPath = "${CommandRunner.TERMUX_BIN_PATH}/bash"
+            val envFileArg = envFilePath?.let { " \"$it\"" } ?: ""
+            val uiScale = computeUiScale()
+            logger?.state("launchInternal: computed UI scale=$uiScale from displayMetrics ${context.resources.displayMetrics.widthPixels}x${context.resources.displayMetrics.heightPixels}", correlationId = correlationId)
+            val cmdLine = "RLT_NATIVE_TERMUX=1 RLT_UI_SCALE=$uiScale exec \"$scriptPath\"$envFileArg"
+            logger?.state("launchInternal: dispatching native-path command scriptPath=$scriptPath envFile=$envFilePath uiScale=$uiScale backend=${presentationBackend.id}", correlationId = correlationId)
+            commandRunner.launchBackground(commandPath = bashPath, arguments = arrayOf("-c", cmdLine))
+        } else {
+            val arguments = if (envFilePath != null) arrayOf(envFilePath) else null
+            logger?.state("launchInternal: dispatching proot-path command scriptPath=$scriptPath envFile=$envFilePath backend=${presentationBackend.id}", correlationId = correlationId)
+            commandRunner.launchBackground(commandPath = scriptPath, arguments = arguments)
+        }
+        logger?.state("launchInternal: command dispatched success=$success useNative=$useNative", correlationId = correlationId)
         if (success && presentationIntent != null && presentationBackend.shouldWaitForReadySignal()) {
             waitForDisplayReadyAndSwitch(presentationIntent)
         }
@@ -235,4 +263,21 @@ class LaunchCoordinator(
 
     fun dismissHealthDialog() { _showHealthDialog.value = null }
     fun launchAnyway() { _showHealthDialog.value = null; scope.launch { performLaunch() } }
+
+    /**
+     * Compute an AWT ui-scale factor from the device's real display metrics. We pick
+     * integer-or-half steps (not a smooth multiplier) because RuneLite's AWT-drawn UI
+     * text looks worst on fractional scales like 1.7. Buckets match the proot path's
+     * --scale 2 default for phones/tablets ~2400px and ups for 4K+ panels.
+     */
+    private fun computeUiScale(): String {
+        val m = context.resources.displayMetrics
+        val bigger = maxOf(m.widthPixels, m.heightPixels)
+        return when {
+            bigger >= 3200 -> "2.5"
+            bigger >= 2400 -> "2"
+            bigger >= 1800 -> "1.5"
+            else -> "1"
+        }
+    }
 }

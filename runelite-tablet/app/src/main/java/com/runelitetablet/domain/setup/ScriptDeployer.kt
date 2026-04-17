@@ -8,6 +8,8 @@ package com.runelitetablet.domain.setup
 interface ScriptDeployer {
     suspend fun deployScripts(): Boolean
     suspend fun deployConfigs(): Boolean
+    suspend fun deployJars(): Boolean
     fun getScriptPath(name: String): String
+    fun getJarPath(name: String): String
     fun invalidateDeployCache()
 }

@@ -1,0 +1,98 @@
+=== Native RuneLite launch Fri Apr 17 12:02:28 EDT 2026 ===
+Preflight OK:
+  rlawt-bionic-jar=/data/data/com.termux/files/home/.rlt/rlawt-1.8-bionic.jar (260465 bytes)
+VirGL socket ready
+Classpath assembled:
+  bionic-rlawt-jar=/data/data/com.termux/files/home/.rlt/rlawt-1.8-bionic.jar
+  skipped-stock-rlawt=/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/rlawt-1.8.jar
+  repo-jar-count=32
+LD_LIBRARY_PATH=/data/data/com.termux/files/usr/lib/jvm/java-21-openjdk/lib:/data/data/com.termux/files/usr/lib
+JAVA_HOME=/data/data/com.termux/files/usr/lib/jvm/java-21-openjdk
+UI scale: 2 (source=Kotlin-computed)
+=== Invoking JVM ===
+CPUSET java-started pid=16777 cpuset=/moderate
+2026-04-17 16:03:00 GMT [main] DEBUG n.r.client.plugins.PluginManager - Loaded plugin GpuPlugin
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin BlastMinePlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin ImplingsPlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin BarbarianAssaultPlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin RunecraftPlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin PuzzleSolverPlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin RunepouchPlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin PestControlPlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin GroundMarkerPlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin InstanceMapPlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin CombatLevelPlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin BoostsPlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin ChatHistoryPlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin ItemChargePlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin BlastFurnacePlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin RunEnergyPlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin SlayerPlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin WorldHopperPlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin NightmareZonePlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin DiaryRequirementsPlugin is now running
+2026-04-17 16:03:01 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin ChatChannelPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin ConfigPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin LootTrackerPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin FairyRingPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin PlayerIndicatorsPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin InfoPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin WikiPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin BankTagsPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin ItemStatPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin XteaPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin PrayerPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin QuestListPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin TearsOfGuthixPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin ScreenshotPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin WorldMapPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin TitheFarmPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin PohPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin DailyTasksPlugin is now running
+2026-04-17 16:03:02 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin CrowdsourcingPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin ScreenMarkerPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin LoginScreenPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin GrandExchangePlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin MusicPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin RaidsPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin KourendLibraryPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin MinimapPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin CorpPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin AccountPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin WintertodtPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin RegenMeterPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin DefaultWorldPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin NpcIndicatorsPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin BossTimersPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin OpponentInfoPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin ClueScrollPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin XpTrackerPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin AgilityPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin SmeltingPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin FishingPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin CookingPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin GroundItemsPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin HerbiboarPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin HunterPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin BankPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin CannonPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin TimersAndBuffsPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin FpsPlugin is now running
+2026-04-17 16:03:03 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin HiscorePlugin is now running
+2026-04-17 16:03:04 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin TimeTrackingPlugin is now running
+2026-04-17 16:03:04 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin BarrowsPlugin is now running
+2026-04-17 16:03:04 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin SkillCalculatorPlugin is now running
+2026-04-17 16:03:04 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin FriendListPlugin is now running
+2026-04-17 16:03:04 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin MouseHighlightPlugin is now running
+2026-04-17 16:03:04 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin ExaminePlugin is now running
+2026-04-17 16:03:04 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin XpDropPlugin is now running
+2026-04-17 16:03:04 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin PoisonPlugin is now running
+2026-04-17 16:03:04 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin DiscordPlugin is now running
+2026-04-17 16:03:04 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin ReportButtonPlugin is now running
+2026-04-17 16:03:04 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin NotesPlugin is now running
+2026-04-17 16:03:04 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin SpellbookPlugin is now running
+2026-04-17 16:03:04 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin ChatCommandsPlugin is now running
+2026-04-17 16:03:04 GMT [AWT-EventQueue-0] DEBUG n.r.client.plugins.PluginManager - Plugin FriendNotesPlugin is now running
+2026-04-17 16:03:04 GMT [main] DEBUG net.runelite.client.ui.ClientUI - Graphics device X11GraphicsDevice[screen=0]: bounds java.awt.Rectangle[x=0,y=0,width=1480,height=924] transform: AffineTransform[[2.0, 0.0, 0.0], [0.0, 2.0, 0.0]]
+2026-04-17 16:03:04 GMT [main] INFO  net.runelite.client.RuneLite - Client initialization took 8568ms. Uptime: 10290ms
+2026-04-17 16:03:04 GMT [AWT-EventQueue-0] DEBUG net.runelite.client.ui.ClientUI - Showing frame net.runelite.client.ui.ContainableFrame[frame0,342,211,796x503,invalid,layout=java.awt.BorderLayout,title=RuneLite,resizable,normal,defaultCloseOperation=DO_NOTHING_ON_CLOSE,rootPane=javax.swing.JRootPane[,0,0,796x503,layout=javax.swing.JRootPane$RootLayout,alignmentX=0.0,alignmentY=0.0,border=,flags=16777673,maximumSize=,minimumSize=,preferredSize=],rootPaneCheckingEnabled=true]

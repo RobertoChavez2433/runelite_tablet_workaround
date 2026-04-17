@@ -8,6 +8,7 @@ import com.runelitetablet.logging.DebugLogServer
 import com.runelitetablet.presentation.PresentationBackends
 import com.runelitetablet.presentation.hybrid.ExternalXlorieLoader
 import com.runelitetablet.ui.DisplayPreferences
+import com.runelitetablet.ui.LaunchPreferences
 
 class AppContainer(context: Context) {
     private val creationStart = SystemClock.elapsedRealtime()
@@ -38,6 +39,7 @@ class AppContainer(context: Context) {
         AppLog.d("DI", "AppContainer: PerfModule instantiated")
     }
     val displayPreferences = DisplayPreferences(context)
+    val launchPreferences = LaunchPreferences(context)
     val presentationBackend = PresentationBackends.stable
     val xlorieLoader = ExternalXlorieLoader()
 

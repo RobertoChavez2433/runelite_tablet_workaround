@@ -1,26 +1,35 @@
 # Session State
 
-**Last Updated**: 2026-04-17 | **Session**: 78 (Task 21 + Phase 2.1 LANDED — native-Termux JVM path proven end-to-end)
+**Last Updated**: 2026-04-17 | **Session**: 78 (Task 21 + Phase 2.1 + Phase 2.2 + Phase 3-partial LANDED — native-Termux RL login screen reached via Kotlin pref toggle)
 
 ## Current Phase
-- **Phase**: `spike/direct-android-surface` — Option B unblocked. **Task 21 complete**: rebuilt rlawt via Android NDK 28.2.13676358. **Phase 2.1 complete**: `launch-runelite-native.sh` runs the JVM directly under Termux openjdk-21 with zero proot involvement. RL 1.12.24 main() banner prints with our bionic jar on classpath; zero UnsatisfiedLinkError / dlopen failures. Phase 2.2 (Kotlin service selector + ScriptManager fix) is next.
-- **Status**: Full pre-rendering path proven end-to-end on device R52X90378YB. FPS not yet re-measured — that lands in Phase 3 A/B. Baseline remains 12 FPS at Varrock East Bank under proot path; expected ≥ 30 FPS on native path (ptrace removed), spike goal ≥ 60, S-FINAL target ≥ 100. Known Phase 3 prep work: install Termux `fontconfig` + a TTF font (RL's FontManager crashes without them), and triage LWJGL glibc native libs.
+- **Phase**: `spike/direct-android-surface` — Option B proven end-to-end through the UI. **Task 21 done**: Bionic librlawt.so. **Phase 2.1 done**: native launcher. **Phase 2.2 done**: Kotlin service selector via `LaunchPreferences.useNativeTermux`, ScriptManager APK-version-aware cache (fixes the S72 re-deploy bug), `rlawt-1.8-bionic.jar` ships in APK assets and deploys via on-device `unzip -p` from our APK in 141ms, adaptive UI scale computed from `displayMetrics`. **Phase 3 partial**: fontconfig + DejaVu installed; `launch-runelite-native.sh` drives RL to the login screen (Robey Wan character visible) under the native path with `RLT_NATIVE_TERMUX=1` + `RLT_UI_SCALE=2` env. **Remaining Phase 3 blocker**: GpuPlugin fails `glXChooseFBConfig` → `unable to find a fb config` → software rendering → meaningful FPS A/B is blocked until that's debugged.
+- **Status**: RL renders playably under native path (software). `-Dsun.java2d.uiScale=2` + `adjustResolution:true` makes the AWT frame fill the Termux:X11 canvas at effective 2960×1848. Baseline remains 12 FPS at Varrock East Bank under proot path. Next session: diagnose the fb-config issue on Termux Mesa+virgl (needs `pkg install mesa-demos` + `glxinfo -B`).
 
 ## HOT CONTEXT — Resume Here
 
 ### ENTRY POINT FOR SESSION 79
 
-**Critical task**: **Phase 2.2** — wire `RuneLiteSessionService` to select `launch-runelite-native.sh` vs `launch-runelite.sh` based on an `RLT_NATIVE_TERMUX` feature flag, and fix the `ScriptManager.scriptsDeployed` re-deploy bug (see memory `project_script_redeploy_vs_stale_apk.md`) so the new native launch script actually reaches `$HOME/scripts/` on APK updates. See plan `.claude/plans/2026-04-17-rlawt-bionic-rebuild.md` §Phase 2.2.
+**Critical task**: **diagnose GpuPlugin fb-config failure on Termux Mesa+virgl**. rlawt calls `glXChooseFBConfig` with RGBA8/depth24/stencil8/doublebuffer attrs; virgl returns zero matches on Termux-native even though proot-path finds them. This is the only remaining blocker between "RL renders" and "Phase 3 A/B FPS numbers". Proposed approach:
+1. `pkg install mesa-demos` in Termux (user-approved step — was interrupted during S78).
+2. Under Termux-native with VirGL running: `DISPLAY=:0 glxinfo -B` and `glxinfo | grep -A 30 'GLX Visuals'` to enumerate what FBConfigs virgl exposes.
+3. Compare against rlawt's attr list in `third_party/rlawt/rlawt_nix.c:111–125`. Likely culprits: RGBA10 / ALPHA_SIZE / STENCIL_SIZE mismatch, or a missing `GLX_DRAWABLE_TYPE = GLX_WINDOW_BIT` config.
+4. Either patch rlawt to relax its picker OR add env vars that make Mesa expose the required configs.
+5. Once GPU plugin works, run Phase 3 A/B: 60s FpsPlugin capture at Varrock East Bank with `useNativeTermux` OFF (baseline, ≈12 FPS) vs ON (native, target ≥30 FPS).
 
 **What's staged on repo**:
 - Task 21: `third_party/rlawt/` (pristine upstream), `third_party/rlawt-bionic/` (NDK wiring), `scripts/build-rlawt-bionic.sh`, `runelite-tablet/app/libs/rlawt-1.8-bionic.jar`, Task 21 spec + plan, evidence logs.
-- Phase 2.1: `runelite-tablet/app/src/main/assets/scripts/launch-runelite-native.sh` (new), `scripts/native-launcher-wrapper.sh` (ad-hoc on-device test wrapper — to remove when Phase 2.2 lands), spec `.claude/specs/2026-04-17-phase-2.1-native-launch-spec.md`, evidence `runelite-tablet/docs/logs/phase-2.1-native-launch-*.log`.
+- Phase 2.1: `runelite-tablet/app/src/main/assets/scripts/launch-runelite-native.sh`, spec `.claude/specs/2026-04-17-phase-2.1-native-launch-spec.md`, evidence `runelite-tablet/docs/logs/phase-2.1-native-launch-*.log`.
+- Phase 2.2 Kotlin: `ui/LaunchPreferences.kt` (new), `ScriptDeployer.kt` (deployJars/getJarPath), `ScriptManager.kt` (version-aware cache + APK-unzip jar deploy), `LaunchCoordinator.kt` (script selector + computeUiScale), `AppContainer.kt` + `SetupViewModelFactory.kt` (DI wiring), tests updated.
+- Phase 2.2 asset: `runelite-tablet/app/src/main/assets/libs/rlawt-1.8-bionic.jar`.
+- Phase 2.2 spec + evidence: `.claude/specs/2026-04-17-phase-2.2-and-3-spec.md`, `runelite-tablet/docs/logs/phase-2.2-native-launch-evidence.log`, gitignored `phase-2.2-native-login-screen.png`.
 
 **What's staged on device (R52X90378YB)**:
-- `$HOME/.rlt/rlawt-1.8-bionic.jar` — 260465 B, SHA `5d7e882f...`.
-- `$HOME/scripts/launch-runelite-native.sh` — the Phase 2.1 launcher.
-- `$HOME/native-bg.sh` — the double-fork test wrapper for ad-hoc on-device verification.
-- `$HOME/rlawt-test/` — retained from Task 21 (MiniRlawtLoad + MiniAwtContext smoke tests).
+- `$HOME/.rlt/rlawt-1.8-bionic.jar` (auto-deployed by ScriptManager from APK on each launch if marker-vs-APK version differs).
+- `$HOME/.rlt/deployed-version` = current APK VERSION_CODE.
+- `$HOME/scripts/launch-runelite-native.sh` (auto-deployed).
+- SharedPreferences: `launch_prefs.xml` has `use_native_termux=true` (manually written for testing; toggle via UI pending).
+- Termux packages: fontconfig 2.17.1, ttf-dejavu 2.37 — install persists across APK updates.
 
 **Critical knowledge — carry forward**:
 - Task 21 DONE. Phase 2.1 DONE. Do not re-examine the rlawt build, the launcher script, or classpath assembly.
@@ -36,17 +45,17 @@
 - LWJGL native jars (`lwjgl-3.3.2-natives-linux-arm64.jar`) still hold glibc-linked .so files; expected Phase 3 blocker (plan Risk R4).
 - `adb push` from Git-Bash mangles Unix paths — prefix with `MSYS2_ARG_CONV_EXCL='*'`.
 
-**Phase 2.2 concrete next steps**:
-1. Add `RLT_NATIVE_TERMUX` env flag plumbing to `RuneLiteSessionService` so it selects `launch-runelite-native.sh` vs `launch-runelite.sh` based on a user toggle or build flag.
-2. Fix `ScriptManager.scriptsDeployed` re-deploy bug (memory `project_script_redeploy_vs_stale_apk.md`) — checksum or asset-version check so new scripts reach `$HOME/scripts/` on APK update. Without this, `launch-runelite-native.sh` only lives on device via manual `adb push`.
-3. Deploy `rlawt-1.8-bionic.jar` as part of the same flow. Either copy from APK assets to `$HOME/.rlt/rlawt-1.8-bionic.jar` on service start, or add to the ScriptManager deploy manifest. (Currently pushed manually in Session 78.)
-4. Phase 3 prep: `pkg install fontconfig` + a TTF font in Termux; triage LWJGL glibc natives; A/B FPS at Varrock East Bank.
+**Remaining Phase 3 / follow-up work**:
+1. **Diagnose GpuPlugin fb-config on Termux Mesa+virgl** — primary Phase 3 unblock. `glxinfo -B` probe + rlawt attr-list analysis (see ENTRY POINT above).
+2. **LWJGL native-lib triage** — `lwjgl-3.3.2-natives-linux-arm64.jar` ships glibc-linked `.so`s; will fail Bionic dlopen if the GpuPlugin path gets them to load. Likely needs LWJGL rebuild (similar approach to rlawt Task 21).
+3. **User-facing `useNativeTermux` toggle** — today the pref is flipped via `adb shell` XML write. Add a SettingsScreen checkbox when Phase 3 FPS numbers validate the native path.
+4. **Remove `scripts/native-launcher-wrapper.sh`** — it was an ad-hoc Phase 2.1 test wrapper; Phase 2.2's Kotlin dispatch supersedes it. Clean up next commit.
 
 **Task list snapshot (S78-end)**:
-- Completed: **21** (rlawt rebuild — DONE), **Phase 2.1** (native launcher — DONE)
-- Active / next: **Phase 2.2** (service selector + ScriptManager fix)
-- Pending: Phase 3 A/B, tasks 14-19
-- Fallback (still): 20 (fork proot, patch seccomp — not needed as long as Phase 2.2 ships Phase 2.1's gate into production)
+- Completed: **21** (rlawt rebuild), **Phase 2.1** (native launcher), **Phase 2.2** (Kotlin service selector + ScriptManager fix + jar deploy + adaptive UI scale), **Phase 3 R1+R2** (reachability proven, RL renders login screen).
+- Active / next: **Phase 3 R3** (FPS A/B) — blocked on GpuPlugin fb-config.
+- Pending: LWJGL triage, user-facing toggle, wrapper cleanup.
+- Fallback (still): 20 (fork proot, patch seccomp — not needed).
 
 **Open issues carried forward (unchanged)**:
 - `#6` — P1, `security(auth)`: shellEscape missing `!` and does not strip CR/NL/NUL.
