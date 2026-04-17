@@ -10,6 +10,7 @@ import com.runelitetablet.domain.command.CommandRunner
 import com.runelitetablet.logging.AppLog
 import com.runelitetablet.presentation.PresentationBackends
 import com.runelitetablet.termux.TermuxCommandRunner
+import com.runelitetablet.termux.TermuxProcessPin
 import com.runelitetablet.setup.ScriptManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -45,6 +46,7 @@ class RuneLiteSessionService : Service() {
     private lateinit var scriptManager: ScriptManager
     private lateinit var prefs: SharedPreferences
     private lateinit var notificationHelper: SessionNotificationHelper
+    private lateinit var termuxPin: TermuxProcessPin
     private val presentationBackend = PresentationBackends.stable
 
     override fun onCreate() {
@@ -54,6 +56,7 @@ class RuneLiteSessionService : Service() {
         healthMonitor = SessionHealthMonitor(commandRunner, serviceScope)
         prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         notificationHelper = SessionNotificationHelper(this)
+        termuxPin = TermuxProcessPin(applicationContext)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -73,6 +76,7 @@ class RuneLiteSessionService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        termuxPin.unpin()
         healthMonitor.stopPolling(); serviceScope.cancel()
     }
 
@@ -85,12 +89,16 @@ class RuneLiteSessionService : Service() {
         _sessionStartTime.value = startTime
         prefs.edit().putBoolean(PREF_SESSION_ACTIVE, true).putLong(PREF_SESSION_START_TIME, startTime).apply()
         startForeground(SessionNotificationHelper.NOTIFICATION_ID, notificationHelper.buildNotification("Starting RuneLite..."))
+        // S75 Path A: pin Termux to our FGS's cpuset so proot/JVM/virgl inherit
+        // /top-app (CPUs 0-7) instead of /background (CPUs 0-3). Must happen
+        // AFTER startForeground() so this process is already PROCESS_STATE_TOP.
+        termuxPin.pin()
         healthMonitor.startPolling(::handleHealthStateChange, initialDelayMs = 30_000L)
     }
 
     private fun handleStopSession() {
         AppLog.state("RuneLiteSessionService: ${_sessionState.value} -> Stopped")
-        _sessionState.value = SessionState.Stopped; healthMonitor.stopPolling()
+        _sessionState.value = SessionState.Stopped; healthMonitor.stopPolling(); termuxPin.unpin()
         serviceScope.launch {
             try {
                 if (scriptManager.deployScripts()) {
@@ -132,7 +140,7 @@ class RuneLiteSessionService : Service() {
             }
             is SessionState.Stopped, is SessionState.Error -> {
                 _sessionState.value = state
-                healthMonitor.stopPolling(); clearSessionState(); stopSelf()
+                healthMonitor.stopPolling(); termuxPin.unpin(); clearSessionState(); stopSelf()
             }
             else -> {}
         }
