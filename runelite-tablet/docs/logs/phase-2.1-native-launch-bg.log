@@ -1,0 +1,36 @@
+=== Native RuneLite launch Fri Apr 17 11:04:11 EDT 2026 ===
+CPUSET native-launch-entry pid=18737 cpuset=/
+Cleaning up previous native-launch state...
+Broadcasting: Intent { act=com.termux.x11.ACTION_STOP }
+Broadcast sent without waiting for result
+Preflight OK:
+  java=/data/data/com.termux/files/usr/lib/jvm/java-21-openjdk/bin/java
+  rlawt-bionic-jar=/data/data/com.termux/files/home/.rlt/rlawt-1.8-bionic.jar (260465 bytes)
+  rl-repo=/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2 (32 jars)
+X11 launch pid=18821
+X11 socket ready
+DamageTrace: CopyArea count=1 drawableType=PIXMAP screenPixmap=1 drawable=0xb40000745ffe3430 geom=2960x1848 box=0,0-1280,1024
+VirGL server forked PID=19008 log=/data/data/com.termux/files/home/virgl-server.log
+VirGL socket ready
+CPUSET virgl-ready pid=19008 cpuset=/
+Classpath assembled:
+  bionic-rlawt-jar=/data/data/com.termux/files/home/.rlt/rlawt-1.8-bionic.jar
+  skipped-stock-rlawt=/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/rlawt-1.8.jar
+  repo-jar-count=32
+  classpath=/data/data/com.termux/files/home/.rlt/rlawt-1.8-bionic.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/aopalliance-1.0.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/client-1.12.24.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/commons-lang3-3.7.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/commons-text-1.2.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/discord-1.4.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/flatlaf-3.2.5-rl4.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/gson-2.8.5.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/guava-23.2-jre.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/guice-4.1.0-no_aop.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/http-api-1.2.22.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/injected-client-1.12.24.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/javax.inject-1.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/jna-5.9.0.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/jna-platform-5.9.0.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/jopt-simple-5.0.1.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/json-20090211.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/jsr305-3.0.2.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/logback-classic-1.2.9.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/logback-core-1.2.9.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/lwjgl-3.3.2-natives-linux-arm64.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/lwjgl-3.3.2-natives-linux.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/lwjgl-3.3.2.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/lwjgl-opencl-3.3.2.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/lwjgl-opengl-3.3.2-natives-linux-arm64.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/lwjgl-opengl-3.3.2-natives-linux.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/lwjgl-opengl-3.3.2.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/okhttp-3.14.9.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/okio-1.17.2.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/protobuf-javalite-3.21.12.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/runelite-api-1.12.24-runtime.jar:/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/slf4j-api-1.7.25.jar
+LD_LIBRARY_PATH=/data/data/com.termux/files/usr/lib/jvm/java-21-openjdk/lib:/data/data/com.termux/files/usr/lib
+JAVA_HOME=/data/data/com.termux/files/usr/lib/jvm/java-21-openjdk
+=== Invoking JVM ===
+  cmd: /data/data/com.termux/files/usr/lib/jvm/java-21-openjdk/bin/java -Xss2m -Xmx2g -XX:+UseG1GC -XX:MaxGCPauseMillis=50 -Duser.home=/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root -Xlog:class+load=info:file=/data/data/com.termux/files/home/native-launch-classload.log:time,uptime,level,tags:filecount=2,filesize=5M -cp <classpath> net.runelite.client.RuneLite --insecure-write-credentials --debug
+CPUSET java-started pid=19041 cpuset=/
+JVM PID=19041 (log /data/data/com.termux/files/home/runelite-native.log, classload /data/data/com.termux/files/home/native-launch-classload.log)
+pid 19041's current affinity mask: ff
+pid 19041's new affinity mask: f0
+AFFINITY: JVM (PID=19041) pinned to big/prime cores
+FbTrace: putImage count=1 drawableType=1 drawableId=0x200017 geom=16x16 size=16x16 format=1 depth=1
+RenderTrace: CompositePicture count=1 op=1 dstType=0 dstId=0x20001a geom=200x274 srcDrawable=1 maskDrawable=0 size=200x14
+ExaTrace: composite count=1 op=1 dstType=0 dstId=0x20001a geom=200x274 srcDrawable=1 maskDrawable=0 size=200x14
+RenderTrace: CompositePicture count=2 op=1 dstType=0 dstId=0x20001a geom=200x274 srcDrawable=1 maskDrawable=0 size=200x14
+ExaTrace: composite count=2 op=1 dstType=0 dstId=0x20001a geom=200x274 srcDrawable=1 maskDrawable=0 size=200x14
+RenderTrace: CompositePicture count=3 op=1 dstType=0 dstId=0x20001a geom=200x274 srcDrawable=1 maskDrawable=0 size=200x14
+ExaTrace: composite count=3 op=1 dstType=0 dstId=0x20001a geom=200x274 srcDrawable=1 maskDrawable=0 size=200x14

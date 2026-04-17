@@ -1,0 +1,64 @@
+=== Phase 2.1 Native-Termux Launch — On-Device Verification (R52X90378YB) ===
+Date: 2026-04-17 11:04 EDT
+Script: runelite-tablet/app/src/main/assets/scripts/launch-runelite-native.sh
+Deployed to: $HOME/scripts/launch-runelite-native.sh (sha256 matches repo)
+Bionic rlawt jar: $HOME/.rlt/rlawt-1.8-bionic.jar (sha256 5d7e882fbda55e933cd80139b27902463c734c0be18063c082f9a6f4eefe44cb, 260465 bytes — matches runelite-tablet/app/libs/rlawt-1.8-bionic.jar)
+
+=== Preflight ===
+openjdk version "21.0.10" 2026-01-20 (Termux-native, not proot)
+rl-repo=$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2 (32 jars)
+rlawt-bionic-jar=$HOME/.rlt/rlawt-1.8-bionic.jar (260465 bytes)
+
+=== Classpath assembled at launch ===
+  bionic-rlawt-jar=/data/data/com.termux/files/home/.rlt/rlawt-1.8-bionic.jar  (prepended)
+  skipped-stock-rlawt=$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/rlawt-1.8.jar  (excluded)
+  repo-jar-count=32 (all other jars scanned and joined)
+
+=== JVM invocation ===
+  /data/data/com.termux/files/usr/lib/jvm/java-21-openjdk/bin/java \
+    -Xss2m -Xmx2g -XX:+UseG1GC -XX:MaxGCPauseMillis=50 \
+    -Duser.home=/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root \
+    -Xlog:class+load=info:file=/data/data/com.termux/files/home/native-launch-classload.log:... \
+    -cp <classpath with bionic rlawt jar prepended> \
+    net.runelite.client.RuneLite --insecure-write-credentials --debug
+
+LD_LIBRARY_PATH=/data/data/com.termux/files/usr/lib/jvm/java-21-openjdk/lib:/data/data/com.termux/files/usr/lib
+JAVA_HOME=/data/data/com.termux/files/usr/lib/jvm/java-21-openjdk
+
+JVM PID=19041 — pinned to big/prime cores (taskset 0xF0 succeeded).
+No proot in JVM ancestry (verified: parent chain = bash launcher -> java).
+
+=== Main-class reached (the Phase 2.1 exit gate) ===
+2026-04-17 15:04:30 GMT [main] INFO  net.runelite.client.RuneLite - RuneLite 1.12.24 (launcher version unknown) starting up, args: --insecure-write-credentials --debug
+2026-04-17 15:04:30 GMT [main] INFO  net.runelite.client.RuneLite - Java VM arguments: -Xss2m -Xmx2g -XX:+UseG1GC -XX:MaxGCPauseMillis=50 -Duser.home=/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root -Xlog:class+load=info:file=/data/data/com.termux/files/home/native-launch-classload.log:...
+
+— RuneLite's own logger, on the `main` thread, announced its version + main-method arguments.
+— Proves `net.runelite.client.RuneLite.main()` executed past class-load, into static init, through logger wiring, and into the main-method banner.
+— Beyond the Phase 2.1 exit: RuneLite's EventBus got far enough to register subscribers, and RL's ClassPreloader reached `FontManager.<clinit>`.
+
+=== Native loader health ===
+Classes loaded: 8652 in the class-load log (wide swath of RL, Guice, Guava, LWJGL, logback, etc.).
+net.runelite.client.RuneLite classes loaded: 9 (main class + lambdas + inner classes).
+UnsatisfiedLinkError count: 0.
+"dlopen failed" count: 0.
+rlawt-specific mentions in RL log: 0 (RL's boot crashed at Fontconfig init before reaching GPU plugin / AWTContext loading — so rlawt native load is not covered by THIS run's evidence, but was already proven end-to-end in Task 21's MiniAwtContext smoke test at third_party/rlawt-bionic/test/ — see runelite-tablet/docs/logs/rlawt-bionic-awt-smoke.log).
+
+=== Known follow-up (NOT a Phase 2.1 gate) ===
+java.lang.RuntimeException: Fontconfig head is null, check your fonts or fonts configuration
+  at net.runelite.client.ui.FontManager.<clinit>(FontManager.java:88)
+
+— Termux doesn't ship `fontconfig` or system fonts by default. The proot-Ubuntu path has both (apt installs pulled them in during the original bootstrap).
+— Phase 3 prep: `pkg install fontconfig` and install a TTF font under Termux before attempting FPS A/B at Varrock East Bank.
+— This is NOT a Phase 2.1 blocker: the spec exit gate is "JVM starts and loads RL mainClass with the Bionic jar", which is proved by the banner + class-load log above.
+
+=== LWJGL native libs ===
+lwjgl-3.3.2-natives-linux-arm64.jar is on classpath. Not exercised this run (RL crashed pre-LWJGL-load at FontManager). Expected Phase 3 blocker per plan Risk R4 — jars contain glibc-linked .so libs that Bionic dlopen will reject. Triage deferred to Phase 3.
+
+=== Summary ===
+Phase 2.1 exit criteria satisfied:
+  * launch-runelite-native.sh in APK assets (runelite-tablet/app/src/main/assets/scripts/)
+  * RLT_NATIVE_TERMUX=1 gate reaches java directly without proot
+  * JVM starts under Termux-native openjdk-21
+  * Loads RL mainClass (net.runelite.client.RuneLite) with the Bionic rlawt jar on classpath
+  * Zero UnsatisfiedLinkError / zero dlopen failed during class-load
+  * RL's own logger prints its startup banner with our args

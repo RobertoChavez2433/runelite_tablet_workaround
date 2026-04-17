@@ -1,0 +1,364 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# launch-runelite-native.sh — Phase 2.1 native-Termux RuneLite launcher.
+#
+# This is the proot-free path. It bypasses proot-distro entirely, runs the
+# JVM directly under Termux-native openjdk-21, and uses our Bionic-rebuilt
+# rlawt-1.8-bionic.jar (see Task 21 spec).
+#
+# Goal: eliminate proot's ptrace syscall-interception (S77 diagnosis) so the
+# RuneLite Client thread is no longer capped at ~2000 syscalls/s.
+#
+# Gated by RLT_NATIVE_TERMUX=1. If the env flag is not set, this script
+# refuses to run so it can coexist with launch-runelite.sh during Phase 2.2
+# service-selector wiring.
+#
+# Phase 2.1 exit: JVM starts under Termux-native openjdk-21 without proot,
+# loads net.runelite.client.RuneLite, and Bionic dlopen resolves librlawt.so
+# NEEDED libs (libjawt, libGL.so.1, libGLX.so.0, libX11.so, libm, libdl, libc).
+# See spec .claude/specs/2026-04-17-phase-2.1-native-launch-spec.md.
+
+set -uo pipefail
+
+# ===================================================================
+# Gate + env bootstrap
+# ===================================================================
+if [ "${RLT_NATIVE_TERMUX:-0}" != "1" ]; then
+    echo "ERROR: launch-runelite-native.sh requires RLT_NATIVE_TERMUX=1" >&2
+    echo "       This is the proot-free path. Use launch-runelite.sh for the proot path." >&2
+    exit 2
+fi
+
+TERMUX_PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+if [ -f "$TERMUX_PREFIX/etc/profile" ]; then
+    # shellcheck disable=SC1091
+    . "$TERMUX_PREFIX/etc/profile"
+fi
+export PREFIX="${PREFIX:-$TERMUX_PREFIX}"
+export PATH="$PREFIX/bin:$PATH"
+export TMPDIR="${TMPDIR:-$PREFIX/tmp}"
+mkdir -p "$TMPDIR"
+
+LOGFILE="$HOME/runelite-native.log"
+CLASSLOAD_LOG="$HOME/native-launch-classload.log"
+echo "=== Native RuneLite launch $(date) ===" | tee "$LOGFILE"
+
+# Same cpuset-at-entry logging as the proot launcher, so we can diff.
+rlt_log_cpuset() {
+    local label="$1" pid="$2"
+    local file="/proc/$pid/cpuset"
+    local cset
+    cset=$(cat "$file" 2>/dev/null || echo "<unreadable>")
+    local line="CPUSET $label pid=$pid cpuset=$cset"
+    echo "$line" | tee -a "$LOGFILE" 2>/dev/null || true
+    if [ -x /system/bin/log ]; then
+        /system/bin/log -t RLT -p i "$line" 2>/dev/null || true
+    fi
+}
+rlt_log_cpuset "native-launch-entry" "$$"
+
+# ===================================================================
+# Locking (distinct from proot launcher so both paths can coexist)
+# ===================================================================
+LAUNCH_LOCK_DIR="$PREFIX/tmp/.rlt-launch-native.lock"
+LAUNCH_LOCK_PID_FILE="$LAUNCH_LOCK_DIR/pid"
+
+acquire_launch_lock() {
+    if mkdir "$LAUNCH_LOCK_DIR" 2>/dev/null; then
+        echo "$$" > "$LAUNCH_LOCK_PID_FILE"
+        return 0
+    fi
+    if [ -f "$LAUNCH_LOCK_PID_FILE" ]; then
+        local existing_pid
+        existing_pid="$(cat "$LAUNCH_LOCK_PID_FILE" 2>/dev/null || true)"
+        if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
+            echo "Another native RuneLite launch is already in progress (PID $existing_pid)" | tee -a "$LOGFILE"
+            exit 0
+        fi
+    fi
+    rm -rf "$LAUNCH_LOCK_DIR" 2>/dev/null || true
+    mkdir "$LAUNCH_LOCK_DIR" 2>/dev/null && echo "$$" > "$LAUNCH_LOCK_PID_FILE"
+}
+release_launch_lock() {
+    rm -rf "$LAUNCH_LOCK_DIR" 2>/dev/null || true
+}
+
+acquire_launch_lock
+
+# ===================================================================
+# Paths & constants
+# ===================================================================
+ROOTFS_PATH="$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu"
+RL_DOT_DIR="$ROOTFS_PATH/root/.runelite"
+RL_REPO_DIR="$RL_DOT_DIR/repository2"
+RL_PROFILE_DIR="$RL_DOT_DIR/profiles2"
+RL_CLIENT_LOG="$RL_DOT_DIR/logs/client.log"
+# APK-deployed location for the Bionic rlawt jar.
+# Set RLT_RLAWT_BIONIC_JAR to override (e.g. during ad-hoc adb push testing).
+RLAWT_BIONIC_JAR="${RLT_RLAWT_BIONIC_JAR:-$HOME/.rlt/rlawt-1.8-bionic.jar}"
+
+JAVA_HOME_NATIVE="$PREFIX/lib/jvm/java-21-openjdk"
+JAVA_BIN="$JAVA_HOME_NATIVE/bin/java"
+# Bionic dlopen does not honor -Djava.library.path for resolving NEEDED libs.
+# This is the runtime requirement from Task 21 Review Note #4.
+NATIVE_LD_LIBRARY_PATH="$JAVA_HOME_NATIVE/lib:$PREFIX/lib"
+
+export TERMUX_X11_BIN="$PREFIX/bin/termux-x11"
+export TERMUX_X11_PREF_BIN="$PREFIX/bin/termux-x11-preference"
+X11_SOCKET_DIR="$PREFIX/tmp/.X11-unix"
+X11_HOST_COMPONENT="com.runelitetablet/.presentation.hybrid.HybridX11HostActivity"
+X11_OVERRIDE_PACKAGE="com.runelitetablet"
+export TERMUX_X11_FORCE_FLIP=1
+
+# PIDs we own (for EXIT trap)
+VIRGL_PID=""
+X11_PID=""
+JAVA_PID=""
+
+# ===================================================================
+# Cleanup
+# ===================================================================
+find_pids_by_cmdline() {
+    local pattern="$1" proc cmdline
+    for proc in /proc/[0-9]*; do
+        [ -r "$proc/cmdline" ] || continue
+        cmdline="$(tr '\0' ' ' < "$proc/cmdline" 2>/dev/null || true)"
+        case "$cmdline" in
+            *"$pattern"*) basename "$proc" ;;
+        esac
+    done
+}
+
+stop_termux_x11() {
+    local pid
+    for pid in $(find_pids_by_cmdline 'com.termux.x11.Loader') \
+               $(find_pids_by_cmdline 'com.termux.x11.CmdEntryPoint') \
+               $(find_pids_by_cmdline 'termux-x11'); do
+        kill "$pid" 2>/dev/null || true
+    done
+    am broadcast -a com.termux.x11.ACTION_STOP --user 0 2>/dev/null || true
+    rm -f "$TMPDIR/.tX0-lock" 2>/dev/null || true
+    rm -f "$TMPDIR/.X0-lock" 2>/dev/null || true
+    rm -f "$X11_SOCKET_DIR/X0" 2>/dev/null || true
+}
+
+cleanup_previous() {
+    echo "Cleaning up previous native-launch state..." | tee -a "$LOGFILE"
+    pgrep -f 'net.runelite.client.RuneLite' 2>/dev/null | xargs -r kill 2>/dev/null || true
+    # Don't kill virgl if the external-virgl sentinel is active (we'd adopt it below).
+    if [ ! -f "$HOME/.rlt-external-virgl" ]; then
+        pkill -f 'virgl_test_server' 2>/dev/null || true
+        rm -f "$PREFIX/tmp/.virgl_test" 2>/dev/null || true
+    fi
+    stop_termux_x11
+    sleep 0.5
+}
+
+cleanup_on_exit() {
+    echo "" | tee -a "$LOGFILE"
+    echo "=== Native launch exit $(date) ===" | tee -a "$LOGFILE"
+    [ -n "${JAVA_PID:-}" ] && kill "$JAVA_PID" 2>/dev/null || true
+    [ -n "${VIRGL_PID:-}" ] && kill "$VIRGL_PID" 2>/dev/null || true
+    [ -n "${X11_PID:-}" ] && kill "$X11_PID" 2>/dev/null || true
+    pkill -f 'net.runelite.client.RuneLite' 2>/dev/null || true
+    pkill -f 'virgl_test_server' 2>/dev/null || true
+    stop_termux_x11
+    rm -f "$HOME/.rlt-native.pid" 2>/dev/null || true
+    release_launch_lock
+    echo "Native launch cleanup complete" | tee -a "$LOGFILE"
+}
+trap cleanup_on_exit EXIT
+
+cleanup_previous
+
+# ===================================================================
+# Preflight — fail fast with specific error messages
+# ===================================================================
+if [ ! -x "$JAVA_BIN" ]; then
+    echo "ERROR: Termux openjdk-21 missing at $JAVA_BIN" | tee -a "$LOGFILE"
+    echo "       Install with: pkg install openjdk-21" | tee -a "$LOGFILE"
+    exit 1
+fi
+if [ ! -f "$RLAWT_BIONIC_JAR" ]; then
+    echo "ERROR: Bionic rlawt jar missing at $RLAWT_BIONIC_JAR" | tee -a "$LOGFILE"
+    echo "       Deploy runelite-tablet/app/libs/rlawt-1.8-bionic.jar to \$HOME/.rlt/ before running." | tee -a "$LOGFILE"
+    exit 1
+fi
+if [ ! -d "$RL_REPO_DIR" ]; then
+    echo "ERROR: RuneLite repository2 dir missing at $RL_REPO_DIR" | tee -a "$LOGFILE"
+    echo "       Run the proot launcher at least once to populate it, or restore .runelite from backup." | tee -a "$LOGFILE"
+    exit 1
+fi
+
+echo "Preflight OK:" | tee -a "$LOGFILE"
+echo "  java=$JAVA_BIN" | tee -a "$LOGFILE"
+echo "  rlawt-bionic-jar=$RLAWT_BIONIC_JAR ($(stat -c%s "$RLAWT_BIONIC_JAR" 2>/dev/null) bytes)" | tee -a "$LOGFILE"
+echo "  rl-repo=$RL_REPO_DIR ($(ls "$RL_REPO_DIR"/*.jar 2>/dev/null | wc -l) jars)" | tee -a "$LOGFILE"
+
+# ===================================================================
+# Start PulseAudio (minimal — RL needs an audio endpoint or it logs noisily)
+# ===================================================================
+if command -v pulseaudio >/dev/null 2>&1; then
+    pulseaudio --start --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1" \
+        --exit-idle-time=-1 2>&1 | tee -a "$LOGFILE" || true
+    export PULSE_SERVER=tcp:127.0.0.1:4713
+else
+    echo "PulseAudio not installed — RL will use null audio backend" | tee -a "$LOGFILE"
+    export PULSE_SERVER=""
+fi
+
+# ===================================================================
+# Start Termux:X11 (identical to proot launcher)
+# ===================================================================
+if [ ! -x "$TERMUX_X11_BIN" ]; then
+    echo "ERROR: Termux:X11 launcher missing at $TERMUX_X11_BIN" | tee -a "$LOGFILE"
+    exit 1
+fi
+export TERMUX_X11_OVERRIDE_PACKAGE="$X11_OVERRIDE_PACKAGE"
+mkdir -p "$X11_SOCKET_DIR"
+"$TERMUX_X11_BIN" :0 &
+X11_PID=$!
+echo "X11 launch pid=$X11_PID" | tee -a "$LOGFILE"
+
+X11_READY=false
+for _i in $(seq 1 60); do
+    if [ -e "$X11_SOCKET_DIR/X0" ]; then X11_READY=true; break; fi
+    if ! kill -0 "$X11_PID" 2>/dev/null; then
+        echo "X11 process $X11_PID died before socket creation" | tee -a "$LOGFILE"
+        break
+    fi
+    sleep 0.2
+done
+if [ "$X11_READY" != true ]; then
+    echo "ERROR: X11 socket not ready after 12s" | tee -a "$LOGFILE"
+    exit 1
+fi
+echo "X11 socket ready" | tee -a "$LOGFILE"
+export DISPLAY=:0
+
+# Launch hybrid X11 host activity (undecorated frame). Mirrors proot launcher.
+am start --activity-single-top --activity-clear-top -n "$X11_HOST_COMPONENT" >/dev/null 2>&1 || true
+if [ -x "$TERMUX_X11_PREF_BIN" ]; then
+    timeout 5 "$TERMUX_X11_PREF_BIN" fullscreen:true 2>&1 | tee -a "$LOGFILE" || true
+    timeout 5 "$TERMUX_X11_PREF_BIN" showAdditionalKbd:false 2>&1 | tee -a "$LOGFILE" || true
+    timeout 5 "$TERMUX_X11_PREF_BIN" displayResolutionMode:native 2>&1 | tee -a "$LOGFILE" || true
+fi
+
+# ===================================================================
+# Start VirGL server (Termux-native already — no change from proot path)
+# ===================================================================
+if command -v virgl_test_server_android >/dev/null 2>&1; then
+    EXTERNAL_VIRGL_SENTINEL="$HOME/.rlt-external-virgl"
+    if [ -f "$EXTERNAL_VIRGL_SENTINEL" ] && [ -S "$PREFIX/tmp/.virgl_test" ]; then
+        EXISTING_VIRGL_PID=$(pgrep -f virgl_test_server_android | head -1 || true)
+        if [ -n "$EXISTING_VIRGL_PID" ]; then
+            VIRGL_PID="$EXISTING_VIRGL_PID"
+            echo "VIRGL-EXTERNAL: adopting pre-spawned virgl PID=$VIRGL_PID" | tee -a "$LOGFILE"
+        fi
+    fi
+    if [ -z "$VIRGL_PID" ]; then
+        VIRGL_LOG="$HOME/virgl-server.log"
+        env -u LD_LIBRARY_PATH VIRGL_RENDERER_THREAD=1 VIRGL_RENDERER_ASYNC=1 \
+            virgl_test_server_android > "$VIRGL_LOG" 2>&1 &
+        VIRGL_PID=$!
+        echo "VirGL server forked PID=$VIRGL_PID log=$VIRGL_LOG" | tee -a "$LOGFILE"
+        for _i in $(seq 1 30); do
+            [ -S "$PREFIX/tmp/.virgl_test" ] && kill -0 "$VIRGL_PID" 2>/dev/null && break
+            sleep 0.2
+        done
+        if [ ! -S "$PREFIX/tmp/.virgl_test" ]; then
+            echo "WARNING: VirGL socket not ready; rendering will fall back to software" | tee -a "$LOGFILE"
+        else
+            echo "VirGL socket ready" | tee -a "$LOGFILE"
+        fi
+    fi
+    # Env for Mesa virpipe backend (same as proot path, Termux-native)
+    export GALLIUM_DRIVER=virpipe
+    export VTEST_SOCKET_NAME="$PREFIX/tmp/.virgl_test"
+    export MESA_NO_ERROR=1
+    export MESA_GL_VERSION_OVERRIDE=4.3COMPAT
+    export MESA_GLSL_VERSION_OVERRIDE=430
+else
+    echo "virgl_test_server_android not installed — software rendering" | tee -a "$LOGFILE"
+fi
+rlt_log_cpuset "virgl-ready" "${VIRGL_PID:-$$}"
+
+# ===================================================================
+# Build RuneLite classpath at runtime
+# ===================================================================
+# Scan repository2/ live — the stored direct-classpath.txt is stale (points
+# at RL 1.12.20, rlawt-1.7; current disk has RL 1.12.24 + rlawt-1.8). See
+# spec U2. Skip stock rlawt-*.jar so our Bionic variant resolves instead.
+CLASSPATH_ENTRIES=""
+SKIPPED_RLAWT=""
+for jar in "$RL_REPO_DIR"/*.jar; do
+    [ -f "$jar" ] || continue
+    case "${jar##*/}" in
+        rlawt-*.jar)
+            SKIPPED_RLAWT="$jar"
+            continue
+            ;;
+    esac
+    if [ -z "$CLASSPATH_ENTRIES" ]; then
+        CLASSPATH_ENTRIES="$jar"
+    else
+        CLASSPATH_ENTRIES="${CLASSPATH_ENTRIES}:${jar}"
+    fi
+done
+if [ -z "$CLASSPATH_ENTRIES" ]; then
+    echo "ERROR: repository2/ produced an empty classpath" | tee -a "$LOGFILE"
+    exit 1
+fi
+# Prepend our Bionic rlawt jar so it shadows anything else.
+FULL_CLASSPATH="${RLAWT_BIONIC_JAR}:${CLASSPATH_ENTRIES}"
+
+echo "Classpath assembled:" | tee -a "$LOGFILE"
+echo "  bionic-rlawt-jar=$RLAWT_BIONIC_JAR" | tee -a "$LOGFILE"
+echo "  skipped-stock-rlawt=${SKIPPED_RLAWT:-<none>}" | tee -a "$LOGFILE"
+echo "  repo-jar-count=$(ls "$RL_REPO_DIR"/*.jar 2>/dev/null | wc -l)" | tee -a "$LOGFILE"
+echo "  classpath=$FULL_CLASSPATH" | tee -a "$LOGFILE"
+
+# ===================================================================
+# Invoke JVM directly — no proot
+# ===================================================================
+export LD_LIBRARY_PATH="$NATIVE_LD_LIBRARY_PATH"
+export JAVA_HOME="$JAVA_HOME_NATIVE"
+echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" | tee -a "$LOGFILE"
+echo "JAVA_HOME=$JAVA_HOME" | tee -a "$LOGFILE"
+
+MAIN_CLASS="net.runelite.client.RuneLite"
+CLIENT_ARGS="--insecure-write-credentials --debug"
+# -Xss2m: Bionic default thread stack is ~1MB, JVM threads want more.
+# -Xmx2g: matches device-memory budget used in proot path for small bench.
+# -Duser.home points at the proot rootfs .runelite dir so native JVM sees
+#   the same profiles2/, settings.properties, and credentials.properties.
+# -Xlog:class+load=info: classload log proves main class was loaded, even
+#   if RL's own loggers never initialize.
+JVM_ARGS=(
+    -Xss2m
+    -Xmx2g
+    -XX:+UseG1GC
+    -XX:MaxGCPauseMillis=50
+    "-Duser.home=$ROOTFS_PATH/root"
+    "-Xlog:class+load=info:file=$CLASSLOAD_LOG:time,uptime,level,tags:filecount=2,filesize=5M"
+)
+
+echo "=== Invoking JVM ===" | tee -a "$LOGFILE"
+echo "  cmd: $JAVA_BIN ${JVM_ARGS[*]} -cp <classpath> $MAIN_CLASS $CLIENT_ARGS" | tee -a "$LOGFILE"
+: > "$CLASSLOAD_LOG"
+"$JAVA_BIN" "${JVM_ARGS[@]}" -cp "$FULL_CLASSPATH" "$MAIN_CLASS" $CLIENT_ARGS >> "$LOGFILE" 2>&1 &
+JAVA_PID=$!
+echo "$JAVA_PID" > "$HOME/.rlt-native.pid"
+rlt_log_cpuset "java-started" "$JAVA_PID"
+echo "JVM PID=$JAVA_PID (log $LOGFILE, classload $CLASSLOAD_LOG)" | tee -a "$LOGFILE"
+
+# Pin JVM to big/prime cores (4-7). Same policy as proot path for A/B parity.
+if taskset -p 0xF0 "$JAVA_PID" 2>/dev/null; then
+    echo "AFFINITY: JVM (PID=$JAVA_PID) pinned to big/prime cores" | tee -a "$LOGFILE"
+else
+    echo "AFFINITY: taskset failed for JVM (PID=$JAVA_PID)" | tee -a "$LOGFILE"
+fi
+
+wait "$JAVA_PID"
+JAVA_EXIT=$?
+echo "JVM exited with code $JAVA_EXIT" | tee -a "$LOGFILE"
+exit "$JAVA_EXIT"
