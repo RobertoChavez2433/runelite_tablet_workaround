@@ -15,6 +15,24 @@ export TMPDIR="${TMPDIR:-$PREFIX/tmp}"
 mkdir -p "$TMPDIR"
 
 LOGFILE="$HOME/runelite-launch.log"
+
+# S75 Path A instrumentation: log Termux's cpuset at script entry so we can
+# tell whether RLT's bindService hoist moved us from /background to /top-app.
+# Children (proot, JVM, virgl, openbox) inherit this cpuset; if it's /background
+# the whole producer pipeline is pinned to little cores 0-3.
+rlt_log_cpuset() {
+    local label="$1"
+    local pid="$2"
+    local file="/proc/$pid/cpuset"
+    local cset
+    cset=$(cat "$file" 2>/dev/null || echo "<unreadable>")
+    local line="CPUSET $label pid=$pid cpuset=$cset"
+    echo "$line" | tee -a "$LOGFILE" 2>/dev/null || true
+    if [ -x /system/bin/log ]; then
+        /system/bin/log -t RLT -p i "$line" 2>/dev/null || true
+    fi
+}
+rlt_log_cpuset "launch-script-entry" "$$"
 INTERNAL_X11_LOGFILE="$HOME/internal-x11-start.log"
 TERMUX_RUNELITE_SETTINGS_DIR="$HOME/.runelite"
 TERMUX_DIRECT_CLASSPATH_FILE="$TERMUX_RUNELITE_SETTINGS_DIR/direct-classpath.txt"
@@ -286,9 +304,13 @@ cleanup_previous() {
     # Kill previous perf monitor if still running
     pkill -f 'perf-monitor.log' 2>/dev/null && killed=$((killed+1))
 
-    # Kill virgl server and clean up socket
-    pkill -f 'virgl_test_server' 2>/dev/null && killed=$((killed+1))
-    rm -f "$PREFIX/tmp/.virgl_test" 2>/dev/null || true
+    # Kill virgl server and clean up socket — UNLESS the external-virgl sentinel
+    # is active (Slice 4.5 proof gate). If so, leave the pre-spawned server
+    # running; the later external-virgl detection block will adopt it.
+    if [ ! -f "$HOME/.rlt-external-virgl" ]; then
+        pkill -f 'virgl_test_server' 2>/dev/null && killed=$((killed+1))
+        rm -f "$PREFIX/tmp/.virgl_test" 2>/dev/null || true
+    fi
 
     # Clean up stale credential, PID, and sentinel files
     # NOTE: Do NOT delete $HOME/.rlt-launch-env.sh here — it hasn't been read yet.
@@ -391,6 +413,27 @@ fi
 # The rejection was added for Turnip (Adreno) — Mali + VirGL is unaffected.
 export TERMUX_X11_FORCE_FLIP=1
 echo "TERMUX_X11_FORCE_FLIP=$TERMUX_X11_FORCE_FLIP (Present flip enabled for VirGL)" | tee -a "$LOGFILE"
+
+# Slice 4: sticky AHB lock. When sentinel $HOME/.rlt-sticky-ahb exists, skip
+# the defensive unlock/relock in lorieRedraw (InitOutput.c:~467). Safe on
+# Mali/Immortalis because AHB is DMA-coherent. Default off for A/B baseline.
+STICKY_AHB_SENTINEL="$HOME/.rlt-sticky-ahb"
+if [ -f "$STICKY_AHB_SENTINEL" ]; then
+    export RLT_STICKY_AHB_LOCK=1
+    echo "STICKY-AHB: enabled via sentinel $STICKY_AHB_SENTINEL" | tee -a "$LOGFILE"
+else
+    export RLT_STICKY_AHB_LOCK=0
+    echo "STICKY-AHB: disabled (sentinel $STICKY_AHB_SENTINEL absent, upstream unlock/relock preserved)" | tee -a "$LOGFILE"
+fi
+
+# FPS probe sentinel companion: $HOME/.rlt-fps-probe enables the FpsPlugin
+# overlay + unlocks gpu.fpsTarget/fpscontrol.maxFps per RL profile. Matches
+# the existing RLT_DEBUG_FPS_PROBE=1 gate below (session 71).
+FPS_PROBE_SENTINEL="$HOME/.rlt-fps-probe"
+if [ -f "$FPS_PROBE_SENTINEL" ]; then
+    export RLT_DEBUG_FPS_PROBE=1
+    echo "FPS-PROBE: enabled via sentinel $FPS_PROBE_SENTINEL" | tee -a "$LOGFILE"
+fi
 
 mkdir -p "$X11_SOCKET_DIR"
 if [ -n "$X11_OVERRIDE_PACKAGE" ]; then
@@ -533,10 +576,33 @@ if [ "$GPU_VENDOR" = "adreno" ]; then
 elif [ "$GPU_VENDOR" = "mali" ]; then
     # Mali: native VirGL is the validated baseline on the tablet. Alternate
     # server profiles are exposed only for bounded A/B testing.
-    pkill -f virgl_test_server 2>/dev/null || true
-    sleep 0.5
+    # S4.5 proof gate: if $HOME/.rlt-external-virgl exists and a virgl socket
+    # is already present, assume an externally-spawned virgl_test_server is
+    # running (pinned into a wider cpuset than Termux's /background). Skip
+    # our own spawn and reuse the existing socket.
+    EXTERNAL_VIRGL_SENTINEL="$HOME/.rlt-external-virgl"
+    if [ -f "$EXTERNAL_VIRGL_SENTINEL" ] && [ -S "$PREFIX/tmp/.virgl_test" ]; then
+        EXISTING_VIRGL_PID=$(pgrep -f virgl_test_server_android | head -1 || true)
+        if [ -n "$EXISTING_VIRGL_PID" ]; then
+            VIRGL_PID="$EXISTING_VIRGL_PID"
+            PROOT_GPU_ENV="mali-native"
+            echo "VIRGL-EXTERNAL: using pre-spawned virgl PID=$VIRGL_PID socket=$PREFIX/tmp/.virgl_test (sentinel $EXTERNAL_VIRGL_SENTINEL)" | tee -a "$LOGFILE"
+            echo "VIRGL-EXTERNAL: cpuset=$(cat /proc/$VIRGL_PID/cpuset 2>/dev/null) Cpus_allowed_list=$(grep Cpus_allowed_list /proc/$VIRGL_PID/status 2>/dev/null | awk '{print $2}')" | tee -a "$LOGFILE"
+            write_session_value virgl.pid "$VIRGL_PID"
+            write_session_value virgl.profile "external"
+        else
+            echo "VIRGL-EXTERNAL: sentinel set but no virgl_test_server_android process found; falling through to local spawn" | tee -a "$LOGFILE"
+        fi
+    fi
 
-    if command -v virgl_test_server_android >/dev/null 2>&1; then
+    if [ -z "$VIRGL_PID" ]; then
+        pkill -f virgl_test_server 2>/dev/null || true
+        sleep 0.5
+    fi
+
+    if [ -z "$VIRGL_PID" ] && ! command -v virgl_test_server_android >/dev/null 2>&1; then
+        echo "virgl_test_server_android not found — software rendering" | tee -a "$LOGFILE"
+    elif [ -z "$VIRGL_PID" ]; then
         VIRGL_SOCKET="$PREFIX/tmp/.virgl_test"
         VIRGL_SERVER_PROFILE="${RLT_VIRGL_SERVER_PROFILE:-${VIRGL_SERVER_PROFILE_OVERRIDE:-default}}"
         VIRGL_SERVER_ARGS=""
@@ -607,6 +673,7 @@ elif [ "$GPU_VENDOR" = "mali" ]; then
             PROOT_GPU_ENV="mali-native"
             write_session_value virgl.pid "$VIRGL_PID"
             write_session_value virgl.profile "$VIRGL_SERVER_PROFILE"
+            rlt_log_cpuset "virgl-ready" "$VIRGL_PID"
         else
             echo "VirGL server profile='$VIRGL_SERVER_PROFILE' failed (socket: $(ls -la "$VIRGL_SOCKET" 2>&1)), using software rendering" | tee -a "$LOGFILE"
             kill $VIRGL_PID 2>/dev/null || true
@@ -615,8 +682,6 @@ elif [ "$GPU_VENDOR" = "mali" ]; then
             PROOT_GPU_ENV=""
             rm -f "$(session_file virgl.pid)" 2>/dev/null || true
         fi
-    else
-        echo "virgl_test_server_android not found — software rendering" | tee -a "$LOGFILE"
     fi
 else
     echo "Unknown GPU vendor ($GPU_VENDOR) — software rendering" | tee -a "$LOGFILE"
@@ -1061,6 +1126,14 @@ echo "$JAVA_PID" > "$SESSION_DIR_IN_PROOT/java.pid"
 echo running > "$SESSION_DIR_IN_PROOT/state"
 echo "$RUNELITE_LAUNCH_MODE" > "$SESSION_DIR_IN_PROOT/runelite.launch.mode"
 echo "RuneLite started with PID $JAVA_PID" >&2
+
+# S75 Path A: record java cpuset so we can confirm producer inherited /top-app.
+# /proc is visible inside proot so /proc/PID/cpuset resolves against the host kernel.
+JAVA_CPUSET=$(cat "/proc/$JAVA_PID/cpuset" 2>/dev/null || echo "<unreadable>")
+echo "CPUSET java-started pid=$JAVA_PID cpuset=$JAVA_CPUSET" >&2
+if [ -x /system/bin/log ]; then
+    /system/bin/log -t RLT -p i "CPUSET java-started pid=$JAVA_PID cpuset=$JAVA_CPUSET" 2>/dev/null || true
+fi
 
 # Pin RuneLite Java process to big/prime cores (CPU 4-7)
 if taskset -p 0xF0 "$JAVA_PID" 2>/dev/null; then
