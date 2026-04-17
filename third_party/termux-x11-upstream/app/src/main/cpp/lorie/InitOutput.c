@@ -101,6 +101,22 @@ static volatile uint32_t gPresentAfterFlips = 0;
 static volatile uint32_t gPresentFlipAttempts = 0;
 static volatile uint32_t gPresentFlipAccepted = 0;
 static volatile uint32_t gPresentFlipRejected = 0;
+static volatile uint32_t gAhbLockCalls = 0;
+static volatile uint32_t gAhbUnlockCalls = 0;
+static volatile uint32_t gAhbStickyHits = 0;
+static volatile uint32_t gAhbFlushSkipped = 0;
+
+// Sticky AHB-lock flag (Slice 4). Default 0 = preserve upstream defensive
+// unlock/relock in lorieRedraw; 1 = skip the dance (valid when AHB is
+// DMA-coherent, which Mali/Immortalis is). Sampled once, cached.
+static int lorieStickyAhbLockCached = -1;
+static int lorieStickyAhbLock(void) {
+    if (lorieStickyAhbLockCached == -1) {
+        const char *v = getenv("RLT_STICKY_AHB_LOCK");
+        lorieStickyAhbLockCached = (v && v[0] == '1') ? 1 : 0;
+    }
+    return lorieStickyAhbLockCached;
+}
 
 typedef struct {
     LorieBuffer *buffer;
@@ -465,10 +481,16 @@ static Bool lorieRedraw(__unused ClientPtr pClient, __unused void *closure) {
         // Also according to AHardwareBuffer docs simultaneous reading in rendering thread and
         // locking for writing in other thread is fine.
         if (priv->locked) {
-            LorieBuffer_unlock(priv->buffer);
-            status = LorieBuffer_lock(priv->buffer, &priv->locked);
-            if (status)
-                FatalError("Failed to lock the surface: %d\n", status);
+            if (lorieStickyAhbLock()) {
+                __sync_fetch_and_add(&gAhbFlushSkipped, 1);
+            } else {
+                __sync_fetch_and_add(&gAhbUnlockCalls, 1);
+                LorieBuffer_unlock(priv->buffer);
+                __sync_fetch_and_add(&gAhbLockCalls, 1);
+                status = LorieBuffer_lock(priv->buffer, &priv->locked);
+                if (status)
+                    FatalError("Failed to lock the surface: %d\n", status);
+            }
         }
 
         DamageEmpty(pvfb->damage);
@@ -496,9 +518,15 @@ static CARD32 lorieFramecounter(unused OsTimerPtr timer, unused CARD32 time, unu
     uint32_t presentFlipAttempts = __sync_lock_test_and_set(&gPresentFlipAttempts, 0);
     uint32_t presentFlipAccepted = __sync_lock_test_and_set(&gPresentFlipAccepted, 0);
     uint32_t presentFlipRejected = __sync_lock_test_and_set(&gPresentFlipRejected, 0);
+    uint32_t ahbLockCalls = __sync_lock_test_and_set(&gAhbLockCalls, 0);
+    uint32_t ahbUnlockCalls = __sync_lock_test_and_set(&gAhbUnlockCalls, 0);
+    uint32_t ahbStickyHits = __sync_lock_test_and_set(&gAhbStickyHits, 0);
+    uint32_t ahbFlushSkipped = __sync_lock_test_and_set(&gAhbFlushSkipped, 0);
     log(INFO, "choreographer callbacks in 5.0 seconds = %.1f FPS", ((float) choreographerCallbacks) / 5.0f);
     log(INFO, "redraw wakeups in 5.0 seconds = %.1f FPS", ((float) redrawWakeups) / 5.0f);
     log(INFO, "damage-triggered redraws in 5.0 seconds = %.1f FPS", ((float) damageRequests) / 5.0f);
+    log(INFO, "AhbLockTrace: sticky=%d lock_calls=%u unlock_calls=%u sticky_hits=%u flush_skipped=%u in 5.0s",
+        lorieStickyAhbLock(), ahbLockCalls, ahbUnlockCalls, ahbStickyHits, ahbFlushSkipped);
     log(INFO, "present flip attempts in 5.0 seconds = %.1f FPS (accepted %.1f, rejected %.1f)",
         ((float) presentFlipAttempts) / 5.0f,
         ((float) presentFlipAccepted) / 5.0f,
@@ -995,14 +1023,17 @@ Bool loriePrepareAccess(PixmapPtr pPix, int index) {
         lorie_mutex_lock(&pvfb->state->lock, &pvfb->state->lockingPid);
 
     if (!priv->locked && !priv->mem) {
+        __sync_fetch_and_add(&gAhbLockCalls, 1);
         int err = LorieBuffer_lock(priv->buffer, &priv->locked);
         if (err) {
             dprintf(2, "Failed to lock buffer, err %d\n", err);
             return FALSE;
         }
         priv->wasLocked = FALSE;
-    } else
+    } else {
+        __sync_fetch_and_add(&gAhbStickyHits, 1);
         priv->wasLocked = TRUE;
+    }
 
     pPix->devPrivate.ptr = priv->locked ?: priv->mem;
     return TRUE;
@@ -1014,6 +1045,7 @@ void lorieFinishAccess(PixmapPtr pPix, int index) {
         lorie_mutex_unlock(&pvfb->state->lock, &pvfb->state->lockingPid);
 
     if (!priv->wasLocked) {
+        __sync_fetch_and_add(&gAhbUnlockCalls, 1);
         LorieBuffer_unlock(priv->buffer);
         priv->locked = NULL;
         priv->wasLocked = FALSE;
@@ -1049,9 +1081,12 @@ lorieUploadToScreen(PixmapPtr pDst, int x, int y, int w, int h, char *src, int s
 
     wasLocked = (priv->locked != NULL);
     if (!wasLocked) {
+        __sync_fetch_and_add(&gAhbLockCalls, 1);
         err = LorieBuffer_lock(priv->buffer, &priv->locked);
         if (err || !priv->locked)
             return FALSE;
+    } else {
+        __sync_fetch_and_add(&gAhbStickyHits, 1);
     }
 
     dst_base = priv->locked;
@@ -1068,6 +1103,7 @@ lorieUploadToScreen(PixmapPtr pDst, int x, int y, int w, int h, char *src, int s
     }
 
     if (!wasLocked) {
+        __sync_fetch_and_add(&gAhbUnlockCalls, 1);
         LorieBuffer_unlock(priv->buffer);
         priv->locked = NULL;
     }
