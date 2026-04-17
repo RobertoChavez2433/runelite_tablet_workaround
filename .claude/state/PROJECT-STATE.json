@@ -3,14 +3,14 @@
     "app_name": "Runelite for Tablet",
     "app_version": "0.1.0",
     "description": "Android installer app that runs the real RuneLite client on Samsung Tab S10 Ultra via Termux + proot-distro",
-    "last_updated": "2026-04-17T10:00:00Z",
-    "session_notes": "Session 77: Diagnosed proot ptrace syscall interception as the confirmed FPS bottleneck. Built /proc off-CPU sampler (scripts/jvm-wait-sampler.sh + jvm-wait-analyze.py) and captured 60s at Varrock East Bank: Client thread shows 3945 nonvol ctxt-switches/s, math works out to exactly 12 FPS ceiling (1970 syscalls/s ÷ 164 per frame). A/B'd RLT_PROOT_SECCOMP=1 — seccomp-bpf engages but Samsung OneUI kernel doesn't route SECCOMP_RET_TRACE; execve ENOSYS → launch fails. Proot 5.1.107-70 latest in Termux main, no upgrade path. User widened scope (Termux + RLT app forkable; RL + Android off-limits). Chose Option B: native-Termux JVM, skip proot-distro Ubuntu entirely. Installed openjdk-21, mesa, X11 libs, patchelf via Termux apt. rlawt-1.8.jar's bundled linux-aarch64/librlawt.so is glibc-linked with full VERNEED/VERSYM metadata. 4 YOLO workarounds (symlink → bionic paths, symlink → permitted namespace paths, patchelf --remove-needed/--replace-needed, gobjcopy --remove-section=.gnu.version_r) all failed at successive Bionic-linker glibc-rejection layers. Clean fix is rebuilding rlawt via Android NDK (Task 21, 2-4h). Three new analysis docs under runelite-tablet/docs/logs/. New memory: project_ptrace_is_the_fps_bottleneck.md."
+    "last_updated": "2026-04-17T14:35:00Z",
+    "session_notes": "Session 78: Task 21 + Phase 2.1 + Phase 2.2 + Phase 3-partial LANDED. Four commits on spike/direct-android-surface: (1) build(native) rlawt Bionic rebuild via Android NDK 28.2.13676358, produces librlawt.so with Bionic-only NEEDED + SONAME librlawt.so + single VERNEED entry referencing libc.so Bionic LIBC (not glibc). 26 undefined symbols all verified on device. MiniRlawtLoad + MiniAwtContext verified. (2) scripts(native) launch-runelite-native.sh gated by RLT_NATIVE_TERMUX=1, skips proot-distro, regenerates classpath live from repository2/, swaps Bionic rlawt jar. JVM reaches RL main class. (3) feat(scripts) Kotlin LaunchPreferences.useNativeTermux + APK-version-aware ScriptManager cache (fixes S72 re-deploy bug via $HOME/.rlt/deployed-version marker vs BuildConfig.VERSION_CODE) + deployJars via on-device `unzip -p \"$APK\" assets/libs/…` (141ms vs 30s base64-stdin timeout) + adaptive UI scale from context.resources.displayMetrics bucketed 1/1.5/2/2.5. (4) logging(native) DIAG preflight + HybridX11HostActivity WINDOW logging + WindowInsetsControllerCompat.hide(systemBars) immersive fix. DIAG isolated the Phase 3 GPU blocker: glxinfo -B on Termux fails identical to rlawt (Error: couldn't find RGB GLX visual or fbconfig); proot-Ubuntu Mesa against SAME X server succeeds past FBConfig enumeration. Bug is in Termux Mesa 26.0.5's client-side GLX handshake, NOT our pipeline/rlawt/RuneLite. Memory: feedback_no_hardcoded_ui_sizes.md (UI scale must be adaptive, never hardcoded). Session 79 plan: .claude/specs/2026-04-17-session-79-glx-handshake-debug-plan.md."
   },
   "current_phase": {
-    "phase_name": "120 FPS Presentation — S77 diagnosed proot ptrace bottleneck; Option B (native-Termux JVM) chosen, blocked on rlawt Bionic rebuild",
-    "phase_status": "ptrace_bottleneck_confirmed_option_b_blocked_on_rlawt_rebuild",
+    "phase_name": "120 FPS Presentation — Option B (native-Termux JVM) CODE PATH PROVEN. Blocker isolated to Termux Mesa GLX handshake (not our code).",
+    "phase_status": "native_termux_path_shipped_phase_3_fps_blocked_on_termux_mesa",
     "phase_started": "2026-04-16",
-    "progress_percentage": 65
+    "progress_percentage": 82
   },
   "release_cycle": {
     "last_release": null,
@@ -20,21 +20,39 @@
   },
   "active_blockers": [
     {
-      "id": "rlawt-native-lib-glibc-linked-blocks-native-termux-jvm",
-      "description": "rlawt-1.8.jar ships net/runelite/rlawt/linux-aarch64/librlawt.so as a glibc-linked ELF (NEEDED libc.so.6 + ld-linux-aarch64.so.1, full VERNEED/VERSYM sections). Termux's JVM is Bionic. Bionic's linker rejects glibc libs at 4 layers (NEEDED / namespace / VERNEED / VERSYM / vn_version). 4 YOLO workarounds in S77 hit successive rejections — the clean path is rebuild via Android NDK. rlawt's symbol surface is small and Bionic-ABI-compatible (no pthread, no exotic glibc); only metadata blocks. Task 21.",
+      "id": "termux-mesa-glx-handshake-returns-zero-fbconfigs",
+      "description": "S78 DIAG preflight evidence: Termux Mesa 26.0.5's client-side GLX query returns zero FBConfigs against the Termux:X11 X server. Same error from glxinfo -B, glxgears -info, and rlawt glXChooseFBConfig. Proot-Ubuntu Mesa against the same X server succeeds past FBConfig enumeration (fails later at X_GetImage BadMatch). Every env permutation failed identically on Termux: default, LIBGL_ALWAYS_SOFTWARE=1, LIBGL_ALWAYS_INDIRECT=1, explicit LIBGL_DRIVERS_PATH. LIBGL_DEBUG=verbose produces NO output — failure is too early for debug hook. EGL also fails (eglInitialize failed). DRI drivers all present in $PREFIX/lib/dri/ (swrast_dri.so, zink_dri.so, virtio_gpu_dri.so, kms_swrast_dri.so). Delta is Termux Mesa vs Ubuntu Mesa build; our pipeline/rlawt/RuneLite are fine. Session 79 plan: .claude/specs/2026-04-17-session-79-glx-handshake-debug-plan.md.",
       "severity": "P0",
       "discovered": "2026-04-17",
-      "session": 77
+      "session": 78
     },
     {
-      "id": "proot-ptrace-syscall-interception-caps-fps-at-12",
-      "description": "Upstream of rlawt blocker. S77 /proc-sampler measurement: RuneLite Client thread 3945 nonvoluntary ctxt-switches/s under default proot ptrace mode = synchronous syscall interception = ~2000 syscalls/s throughput ceiling = 12 FPS at 164 syscalls/frame (GL plugin). Cheap fix (RLT_PROOT_SECCOMP=1 seccomp-bpf) fails on Samsung OneUI kernel: kernel doesn't deliver SECCOMP_RET_TRACE events to proot, execve gets ENOSYS, proot-distro login dies. Proot 5.1.107-70 is latest in Termux main. Unblocks when Option B (native-Termux JVM, removes proot from hot path) is wired — which depends on the rlawt blocker above. Fallback: Task 20 (fork + patch proot seccomp filter).",
-      "severity": "P0",
+      "id": "rl-awt-frame-renders-at-765x503-cached-size",
+      "description": "Termux:X11 canvas fills physical screen after S78 immersive-bars fix, but RL's ContainableFrame is 765x503 because stored profile has runelite.gameSize=765x503. Orthogonal to GLX blocker. Fix: patch $ROOTFS/root/.runelite/profiles2/*.properties at native launch with adaptive gameSize + stretched-mode scalingFactor=100 (Session 79 Section E).",
+      "severity": "P1",
       "discovered": "2026-04-17",
-      "session": 77
+      "session": 78
     }
   ],
   "resolved_blockers": [
+    {
+      "id": "rlawt-native-lib-glibc-linked-blocks-native-termux-jvm",
+      "description": "rlawt-1.8.jar shipped glibc-linked librlawt.so, incompatible with Termux Bionic linker.",
+      "resolved": "2026-04-17",
+      "resolution": "Session 78 Task 21: rebuilt via Android NDK 28.2.13676358. librlawt.so Bionic-only NEEDED (libjawt.so libGL.so.1 libGLX.so.0 libX11.so libm.so libdl.so libc.so), SONAME librlawt.so, single VERNEED entry references libc.so Bionic LIBC (not glibc). 26 undefined symbols all verified present on device. Packaged as rlawt-1.8-bionic.jar. Verified via MiniRlawtLoad + MiniAwtContext + full RL launch."
+    },
+    {
+      "id": "proot-ptrace-syscall-interception-caps-fps-at-12",
+      "description": "Proot ptrace interception limited Client thread to ~2000 syscalls/s → 12 FPS ceiling.",
+      "resolved": "2026-04-17",
+      "resolution": "Session 78 Phase 2.1+2.2: launch-runelite-native.sh + Kotlin LaunchPreferences.useNativeTermux bypass proot entirely. JVM runs under Termux openjdk-21 directly; no proot in process tree. Classpath regenerated live from repository2/; Bionic rlawt jar swapped in via ScriptManager.deployJars() (APK unzip, 141ms). End-to-end native-path RL launch verified on R52X90378YB; Robey Wan character logged in."
+    },
+    {
+      "id": "scriptmanager-redeploy-bug-blocks-apk-updates",
+      "description": "Session 72+ bug: ScriptManager.scriptsDeployedGlobal @Volatile flag prevented re-deploy on APK update, stranding asset fixes on-host.",
+      "resolved": "2026-04-17",
+      "resolution": "Session 78 Phase 2.2: replaced global bool with per-APK-version marker at $HOME/.rlt/deployed-version compared to BuildConfig.VERSION_CODE. ensureMarkerChecked() invalidates in-memory cache on VERSION_CODE change; maybeWriteVersionMarker() writes fresh marker only after ALL three deploys (scripts/configs/jars) succeed for current version."
+    },
     {
       "id": "background-cpuset-clamps-producer-pipeline",
       "description": "S74 theorized Samsung OneUI's /background cpuset (CPUs 0-3) was clamping Termux subtree and thus FPS. S75-S76 landed Path A (bindService hoist to /top-app) with perfect scheduler landing (JVM+virgl on cpus 4-7). S76 measured FPS at 12-15 (vs 13 baseline). Scene FPS did not move. S77 /proc sampler showed system is 70%+ idle — pipeline is not CPU-bound. Cpuset was never the gate.",
@@ -80,6 +98,21 @@
   ],
   "brainstorm_backlog": [],
   "completed_phases": [
+    {
+      "phase_name": "Task 21: rlawt Bionic Rebuild",
+      "completed": "2026-04-17",
+      "notes": "Session 78: vendored upstream rlawt v1.8 at third_party/rlawt/; built Bionic adaptation at third_party/rlawt-bionic/ via Android NDK 28.2.13676358. Output librlawt.so (88800B) with Bionic-only NEEDED + SONAME librlawt.so + single-entry VERNEED referencing libc.so Bionic LIBC. 26 undefined symbols all verified on device. Drop-in rlawt-1.8-bionic.jar (260465B, SHA 5d7e882f…) ships in runelite-tablet/app/libs/ + APK assets."
+    },
+    {
+      "phase_name": "Phase 2.1: Native-Termux Launcher",
+      "completed": "2026-04-17",
+      "notes": "Session 78: launch-runelite-native.sh gated by RLT_NATIVE_TERMUX=1, skips proot-distro, reuses X11/virgl/PulseAudio, regenerates classpath live from repository2/, swaps Bionic rlawt jar, invokes Termux openjdk-21 directly. On R52X90378YB JVM reaches RL main class with zero UnsatisfiedLinkError / dlopen failures."
+    },
+    {
+      "phase_name": "Phase 2.2: Kotlin Service Selector + ScriptManager Fix",
+      "completed": "2026-04-17",
+      "notes": "Session 78: ui/LaunchPreferences.useNativeTermux SharedPreferences bool wired through AppContainer/SetupViewModelFactory into LaunchCoordinator. ScriptManager version-aware cache (fixes S72 re-deploy bug). deployJars() via on-device `unzip -p \"$APK\" assets/libs/…` in 141ms (vs 30s base64-stdin timeout). Adaptive UI scale from context.resources.displayMetrics bucketed 1/1.5/2/2.5. Proven end-to-end: tap Launch in UI → native-path command dispatched with RLT_NATIVE_TERMUX=1 RLT_UI_SCALE=2."
+    },
     {
       "phase_name": "Phase 9: Comprehensive Logging System",
       "completed": "2026-04-14",
