@@ -1,0 +1,1327 @@
+--------- beginning of system
+04-16 21:37:57.281 W/ActivityManager( 1701): registerReceiverWithFeature: no app for null
+--------- beginning of main
+04-16 21:37:57.615 I/RLT     (23237): +6ms [LIFECYCLE] CoreModule: initialized logger + file writer | thread=main
+04-16 21:37:57.622 I/RLT     (23237): +13ms [LIFECYCLE] AppContainer: creation started | thread=main
+04-16 21:37:57.622 D/RLT     (23237): +13ms [DI] AppContainer: CoreModule instantiated | thread=main
+04-16 21:37:57.622 D/RLT     (23237): +14ms [DI] TermuxModule: TermuxResultRegistry initialized | thread=main
+04-16 21:37:57.622 D/RLT     (23237): +14ms [DI] TermuxModule: TermuxCommandRunner initialized | thread=main
+04-16 21:37:57.623 D/RLT     (23237): +14ms [DI] TermuxModule: TermuxPackageHelper initialized | thread=main
+04-16 21:37:57.623 D/RLT     (23237): +14ms [DI] AppContainer: TermuxModule instantiated | thread=main
+04-16 21:37:57.623 D/RLT     (23237): +15ms [DI] AppContainer: AuthModule instantiated | thread=main
+04-16 21:37:57.623 D/RLT     (23237): +15ms [DI] InstallerModule: InstallResultRegistry initialized | thread=main
+04-16 21:37:57.626 D/RLT     (23237): +17ms [DI] InstallerModule: ApkDownloader initialized | thread=main
+04-16 21:37:57.626 D/RLT     (23237): +17ms [DI] InstallerModule: ApkInstaller initialized | thread=main
+04-16 21:37:57.626 D/RLT     (23237): +17ms [DI] AppContainer: InstallerModule instantiated | thread=main
+04-16 21:37:57.627 D/RLT     (23237): +18ms [DI] SetupModule: SetupStateStore initialized | thread=main
+04-16 21:37:57.627 D/RLT     (23237): +19ms [DI] SetupModule: ScriptManager initialized | thread=main
+04-16 21:37:57.629 D/RLT     (23237): +20ms [DI] SetupModule: SetupOrchestrator initialized | thread=main
+04-16 21:37:57.629 D/RLT     (23237): +20ms [DI] AppContainer: SetupModule instantiated | thread=main
+04-16 21:37:57.629 D/RLT     (23237): +20ms [DI] SessionModule: TermuxCommandRunner bound | thread=main
+04-16 21:37:57.629 D/RLT     (23237): +20ms [DI] AppContainer: SessionModule instantiated | thread=main
+04-16 21:37:57.629 D/RLT     (23237): +21ms [DI] AppContainer: PerfModule instantiated | thread=main
+04-16 21:37:57.630 D/RLT     (23237): +22ms [PRESENTATION] DirectSurfaceProbeBackend created: id=direct_surface_probe | thread=main
+04-16 21:37:57.630 I/RLT     (23237): +22ms [PRESENTATION] PresentationBackends initialized: stable=hybrid_x11, externalTermuxX11=termux_x11, directSurfaceProbe=direct_surface_probe | thread=main
+04-16 21:37:57.631 I/RLT     (23237): +22ms [DI] AppContainer: creation completed in 25ms, 6 modules wired | thread=main
+04-16 21:37:57.631 I/RLT     (23237): +22ms [LIFECYCLE] RuneLiteTabletApp.onCreate: PID=23237 thread=main | heap: used=3MB free=252MB max=256MB | disk: free=171868MB total=225922MB | thread=main
+04-16 21:37:57.631 I/RLT     (23237): DebugLogServer listening on port 8099
+04-16 21:37:57.632 I/RLT     (23237): +23ms [LIFECYCLE] RuneLiteTabletApp.onCreate complete: container created, notification channels created | thread=main
+04-16 21:37:57.662 I/RLT     (23237): +54ms [LIFECYCLE] MainActivity.onCreate: savedInstanceState=null (fresh start) PID=23237 thread=main | thread=main
+04-16 21:37:57.663 I/RLT     (23237): +54ms [PERF] onCreate: heap: used=4MB free=251MB max=256MB | disk: free=171868MB total=225922MB | thread=main
+04-16 21:37:57.671 I/RLT     (23237): +63ms [LIFECYCLE] MainActivity.onResume: bindActions + recheckPermissions + checkSession triggered | thread=main
+04-16 21:37:57.671 I/RLT     (23237): +63ms [PERF] onResume: heap: used=4MB free=251MB max=256MB | disk: free=171868MB total=225922MB | thread=main
+04-16 21:37:57.672 I/RLT     (23237): +63ms [LIFECYCLE] SetupViewModelFactory.create: building ViewModel with dependencies | thread=main
+04-16 21:37:57.672 D/RLT     (23237): +64ms [DI] AuthModule: lazy-init oauthManager | thread=main
+04-16 21:37:57.831 I/RLT     (23237): +223ms [STATE] SetupViewModel.startSetup: launching setup coroutine | thread=main
+04-16 21:37:57.832 I/RLT     (23237): +224ms [STATE] SetupOrchestrator.runSetup: starting orchestration corr=setup-e839 | thread=main
+04-16 21:37:57.833 I/RLT     (23237): +225ms [CLEANUP] Starting pre-setup cleanup | thread=DefaultDispatcher-worker-2
+04-16 21:37:57.837 I/RLT     (23237): +229ms [CLEANUP] cleanCachedApks: apk cache dir does not exist, skipping | thread=DefaultDispatcher-worker-2
+04-16 21:37:57.841 I/RLT     (23237): +233ms [CLEANUP] cleanOldLogs: deleted /data/user/0/com.runelitetablet/files/logs/rlt-perf-20260416-182107.log size=0 bytes age=11810188ms | thread=DefaultDispatcher-worker-2
+04-16 21:37:57.841 I/RLT     (23237): +233ms [CLEANUP] cleanOldLogs: kept 5 log file(s), deleted 1 | thread=DefaultDispatcher-worker-2
+04-16 21:37:57.842 I/RLT     (23237): +233ms [CLEANUP] Cleanup complete: filesDeleted=1 sessionsAbandoned=0 bytesReclaimed=0 durationMs=9 | thread=DefaultDispatcher-worker-2
+04-16 21:37:57.842 D/RLT     (23237): +233ms [STATE] SharedPrefsSetupStateStore: getStoredVersion cachedValue=7 | thread=main
+04-16 21:37:57.842 D/RLT     (23237): +234ms [STATE] SharedPrefsSetupStateStore: isVersionCurrent result=true | thread=main
+04-16 21:37:57.843 I/RLT     (23237): +234ms [STEP] [termux] isTermuxInstalled: result=true package=com.termux | thread=DefaultDispatcher-worker-2
+04-16 21:37:57.843 I/RLT     (23237): +235ms [STEP] [termux_x11] isTermuxX11Installed: result=true package=com.termux.x11 | thread=DefaultDispatcher-worker-2
+04-16 21:37:57.843 D/RLT     (23237): +235ms [STATE] SharedPrefsSetupStateStore: isCompleted step=step-proot cachedValue=true | thread=main
+04-16 21:37:57.843 D/RLT     (23237): +235ms [STATE] SharedPrefsSetupStateStore: isCompleted step=step-java cachedValue=true | thread=main
+04-16 21:37:57.844 D/RLT     (23237): +235ms [STATE] SharedPrefsSetupStateStore: isCompleted step=step-runelite cachedValue=true | thread=main
+04-16 21:37:57.844 D/RLT     (23237): +235ms [STATE] SharedPrefsSetupStateStore: isCompleted step=step-gpu cachedValue=true | thread=main
+04-16 21:37:57.844 I/RLT     (23237): +236ms [STATE] MarkerReconciler.reconcile: starting corr=setup-e839 | thread=main
+04-16 21:37:57.844 I/RLT     (23237): +236ms [SCRIPT] deployScripts: starting scriptCount=18 scripts=[install-proot.sh, install-java.sh, download-runelite.sh, check-markers.sh, check-x11-socket.sh, launch-runelite.sh, update-runelite.sh, health-check.sh, shutdown-session.sh, detect-gpu.sh, setup-gpu.sh, setup-gpu-mali.sh, monitor-cpu-affinity.sh, benchmark-pipeline.sh, profile-virgl-env.sh, check-kernel-caps.sh, test-server-zink.sh, test-user-ns.sh] | thread=main
+04-16 21:37:57.890 I/RLT     (23237): +282ms [SCRIPT] deployScriptsBatched: 18 scripts, 95284 bytes total | thread=main
+04-16 21:37:57.891 D/RLT     (23237): +282ms [CMD] TermuxResultRegistry: created executionId=1 corr=1 | thread=main
+04-16 21:37:57.891 I/RLT     (23237): +283ms [CMD] [id=1] execute: commandPath=/data/data/com.termux/files/usr/bin/bash args=-c mkdir -p /data/data/com.termux/files/home/scripts && echo 'IyEvZGF0YS9kYXRhL2NvbS50ZXJtdXgvZmlsZXMvdXNyL2Jpbi9iYXNoCnNldCAtZXVvIHBpcGVmYWlsCgojIGluc3RhbGwtcHJvb3Quc2gg4oCUIFN0ZXAgMzogSW5zdGFsbCBwcm… workdir=<default> background=true stdinLen=0 timeoutMs=30000 | thread=main
+04-16 21:37:57.891 I/RLT     (23237): +283ms [CMD] [id=1] awaiting result: deferred created pendingResultsSize=1 timeoutMs=30000 | thread=main
+04-16 21:37:57.892 I/RLT     (23237): +284ms [CMD] [id=1] intent built: action=com.termux.RUN_COMMAND component=com.termux/com.termux.app.RunCommandService extras=[PATH=/data/data/com.termux/files/usr/bin/bash BACKGROUND=true STDIN=absent PENDING_INTENT=present] | thread=main
+04-16 21:37:57.894 I/RLT     (23237): +286ms [CMD] [id=1] startService: success | thread=main
+04-16 21:37:57.908 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:37:57.911 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:37:58.136 I/SurfaceView(19060): 7161543 Changes: creating=false format=false size=false visible=true alpha=false hint=false left=false top=false z=false attached=true lifecycleStrategy=false
+04-16 21:37:58.136 I/SurfaceView(19060): 7161543 Cur surface: Surface(name=null mNativeObject=-5476376658604918112)/@0xd0176b5
+04-16 21:37:58.136 I/SurfaceView(19060): 7161543 surfaceDestroyed
+04-16 21:37:58.201 I/RLT     (23237): +592ms [LIFECYCLE] TermuxResultService.onCreate | thread=main
+04-16 21:37:58.201 I/RLT     (23237): +593ms [CMD] [id=1] onStartCommand: executionId=1 exitCode=0 errCode=-1 errmsg=null stdoutPreview='' stderrPreview='' resultBundle=true pendingResultsSize=1 | thread=main
+04-16 21:37:58.201 I/RLT     (23237): +593ms [CMD] [id=1] handleResult: executionId=1 exitCode=0 errCode=-1 errmsg=null stdoutLen=0 stdoutPreview='' stderrLen=0 stderrPreview='' | thread=main
+04-16 21:37:58.201 I/RLT     (23237): +593ms [CMD] [id=1] handleResult: deferred found in pendingResults — completing mapSizeAfter=0 | thread=main
+04-16 21:37:58.201 I/RLT     (23237): +593ms [CMD] [id=1] result: exitCode=0 error=null stdoutLen=0 stderrLen=0 durationMs=309 | thread=main
+04-16 21:37:58.201 I/RLT     (23237): +593ms [SCRIPT] deployScriptsBatched: success durationMs=357 | thread=main
+04-16 21:37:58.202 I/RLT     (23237): +593ms [SCRIPT] deployScripts: all scripts deployed successfully | thread=main
+04-16 21:37:58.202 D/RLT     (23237): +593ms [CMD] TermuxResultRegistry: created executionId=2 corr=2 | thread=main
+04-16 21:37:58.202 I/RLT     (23237): +593ms [CMD] [id=2] execute: commandPath=/data/data/com.termux/files/home/scripts/check-markers.sh args=<none> workdir=<default> background=true stdinLen=0 timeoutMs=10000 | thread=main
+04-16 21:37:58.202 I/RLT     (23237): +593ms [CMD] [id=2] awaiting result: deferred created pendingResultsSize=1 timeoutMs=10000 | thread=main
+04-16 21:37:58.202 I/RLT     (23237): +594ms [CMD] [id=2] intent built: action=com.termux.RUN_COMMAND component=com.termux/com.termux.app.RunCommandService extras=[PATH=/data/data/com.termux/files/home/scripts/check-markers.sh BACKGROUND=true STDIN=absent PENDING_INTENT=present] | thread=main
+04-16 21:37:58.204 I/RLT     (23237): +596ms [CMD] [id=2] startService: success | thread=main
+04-16 21:37:58.205 I/RLT     (23237): +596ms [LIFECYCLE] TermuxResultService.stopSelfIfIdle: 1 pending result(s) — staying alive pendingIds=[2] | thread=main
+04-16 21:37:58.216 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:37:58.220 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:37:58.259 I/RLT     (23237): +651ms [CMD] [id=2] onStartCommand: executionId=2 exitCode=0 errCode=-1 errmsg=null stdoutPreview='PRESENT step-proot
+04-16 21:37:58.259 I/RLT     (23237): PRESENT step-java
+04-16 21:37:58.259 I/RLT     (23237): PRESENT step-runelite
+04-16 21:37:58.259 I/RLT     (23237): PRESENT step-gpu
+04-16 21:37:58.259 I/RLT     (23237): VERSION 7
+04-16 21:37:58.259 I/RLT     (23237): ' stderrPreview='' resultBundle=true pendingResultsSize=1 | thread=main
+04-16 21:37:58.260 I/RLT     (23237): +651ms [CMD] [id=2] handleResult: executionId=2 exitCode=0 errCode=-1 errmsg=null stdoutLen=86 stdoutPreview='PRESENT step-proot
+04-16 21:37:58.260 I/RLT     (23237): PRESENT step-java
+04-16 21:37:58.260 I/RLT     (23237): PRESENT step-runelite
+04-16 21:37:58.260 I/RLT     (23237): PRESENT step-gpu
+04-16 21:37:58.260 I/RLT     (23237): VERSION 7
+04-16 21:37:58.260 I/RLT     (23237): ' stderrLen=0 stderrPreview='' | thread=main
+04-16 21:37:58.260 I/RLT     (23237): +651ms [CMD] [id=2] handleResult: deferred found in pendingResults — completing mapSizeAfter=0 | thread=main
+04-16 21:37:58.260 I/RLT     (23237): +651ms [CMD] [id=2] result: exitCode=0 error=null stdoutLen=86 stderrLen=0 durationMs=58 | thread=main
+04-16 21:37:58.260 I/RLT     (23237): +652ms [STATE] MarkerReconciler: raw output=PRESENT step-proot
+04-16 21:37:58.260 I/RLT     (23237): PRESENT step-java
+04-16 21:37:58.260 I/RLT     (23237): PRESENT step-runelite
+04-16 21:37:58.260 I/RLT     (23237): PRESENT step-gpu
+04-16 21:37:58.260 I/RLT     (23237): VERSION 7
+04-16 21:37:58.260 I/RLT     (23237):  corr=setup-e839 | thread=main
+04-16 21:37:58.261 I/RLT     (23237): +652ms [STATE] MarkerReconciler: present=[step-proot, step-java, step-runelite, step-gpu] absent=[] versionMismatch=false corr=setup-e839 | thread=main
+04-16 21:37:58.261 D/RLT     (23237): +652ms [STATE] SharedPrefsSetupStateStore: markCompleted step=step-proot newValue=true | thread=main
+04-16 21:37:58.261 D/RLT     (23237): +653ms [STATE] SharedPrefsSetupStateStore: markCompleted step=step-proot commit=success | thread=main
+04-16 21:37:58.261 D/RLT     (23237): +653ms [STATE] SharedPrefsSetupStateStore: markCompleted step=step-java newValue=true | thread=main
+04-16 21:37:58.261 D/RLT     (23237): +653ms [STATE] SharedPrefsSetupStateStore: markCompleted step=step-java commit=success | thread=main
+04-16 21:37:58.261 D/RLT     (23237): +653ms [STATE] SharedPrefsSetupStateStore: markCompleted step=step-runelite newValue=true | thread=main
+04-16 21:37:58.261 D/RLT     (23237): +653ms [STATE] SharedPrefsSetupStateStore: markCompleted step=step-runelite commit=success | thread=main
+04-16 21:37:58.261 D/RLT     (23237): +653ms [STATE] SharedPrefsSetupStateStore: markCompleted step=step-gpu newValue=true | thread=main
+04-16 21:37:58.261 D/RLT     (23237): +653ms [STATE] SharedPrefsSetupStateStore: markCompleted step=step-gpu commit=success | thread=main
+04-16 21:37:58.262 D/RLT     (23237): +653ms [STATE] SharedPrefsSetupStateStore: setStoredVersion step=script_version newValue=7 | thread=main
+04-16 21:37:58.262 D/RLT     (23237): +653ms [STATE] SharedPrefsSetupStateStore: setStoredVersion commit=success | thread=main
+04-16 21:37:58.262 D/RLT     (23237): +653ms [SETUP] runSetupFrom: skipping com.runelitetablet.setup.SetupStep$InstallTermux@9364b1a (completed) corr=setup-e839 | thread=main
+04-16 21:37:58.262 D/RLT     (23237): +653ms [SETUP] runSetupFrom: skipping com.runelitetablet.setup.SetupStep$InstallTermuxX11@71c164b (completed) corr=setup-e839 | thread=main
+04-16 21:37:58.262 I/RLT     (23237): +653ms [STATE] SetupOrchestrator: step com.runelitetablet.setup.SetupStep$EnablePermissions@ec28828 index=2 starting corr=setup-e839 | thread=main
+04-16 21:37:58.262 I/RLT     (23237): +654ms [STATE] PermissionHandler.verifyPermissions: permission=RUN_COMMAND checking | thread=main
+04-16 21:37:58.262 D/RLT     (23237): +654ms [CMD] TermuxResultRegistry: created executionId=3 corr=3 | thread=main
+04-16 21:37:58.262 I/RLT     (23237): +654ms [CMD] [id=3] execute: commandPath=/data/data/com.termux/files/usr/bin/echo args=ok workdir=<default> background=true stdinLen=0 timeoutMs=30000 | thread=main
+04-16 21:37:58.262 I/RLT     (23237): +654ms [CMD] [id=3] awaiting result: deferred created pendingResultsSize=1 timeoutMs=30000 | thread=main
+04-16 21:37:58.263 I/RLT     (23237): +655ms [CMD] [id=3] intent built: action=com.termux.RUN_COMMAND component=com.termux/com.termux.app.RunCommandService extras=[PATH=/data/data/com.termux/files/usr/bin/echo BACKGROUND=true STDIN=absent PENDING_INTENT=present] | thread=main
+04-16 21:37:58.266 I/RLT     (23237): +658ms [CMD] [id=3] startService: success | thread=main
+04-16 21:37:58.267 I/RLT     (23237): +658ms [LIFECYCLE] TermuxResultService.stopSelfIfIdle: 1 pending result(s) — staying alive pendingIds=[3] | thread=main
+04-16 21:37:58.278 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:37:58.280 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:37:58.292 I/RLT     (23237): +684ms [CMD] [id=3] onStartCommand: executionId=3 exitCode=0 errCode=-1 errmsg=null stdoutPreview='ok
+04-16 21:37:58.292 I/RLT     (23237): ' stderrPreview='' resultBundle=true pendingResultsSize=1 | thread=main
+04-16 21:37:58.292 I/RLT     (23237): +684ms [CMD] [id=3] handleResult: executionId=3 exitCode=0 errCode=-1 errmsg=null stdoutLen=3 stdoutPreview='ok
+04-16 21:37:58.292 I/RLT     (23237): ' stderrLen=0 stderrPreview='' | thread=main
+04-16 21:37:58.292 I/RLT     (23237): +684ms [CMD] [id=3] handleResult: deferred found in pendingResults — completing mapSizeAfter=0 | thread=main
+04-16 21:37:58.293 I/RLT     (23237): +684ms [CMD] [id=3] result: exitCode=0 error=null stdoutLen=3 stderrLen=0 durationMs=30 | thread=main
+04-16 21:37:58.293 I/RLT     (23237): +684ms [STATE] PermissionHandler.verifyPermissions: user_response=granted exitCode=0 | thread=main
+04-16 21:37:58.294 I/RLT     (23237): +686ms [STATE] PermissionHandler.isBatteryOptimized: permission=BATTERY_OPTIMIZATION package=com.termux result=true | thread=main
+04-16 21:37:58.295 I/RLT     (23237): +686ms [STATE] PermissionHandler.isBatteryOptimized: permission=BATTERY_OPTIMIZATION package=com.termux.x11 result=true | thread=main
+04-16 21:37:58.295 I/RLT     (23237): +686ms [STATE] PermissionHandler.hasRequiredBatteryExemptions: result=true | thread=main
+04-16 21:37:58.295 I/RLT     (23237): +686ms [STATE] SetupOrchestrator: step com.runelitetablet.setup.SetupStep$EnablePermissions@ec28828 completed duration=33ms corr=setup-e839 | thread=main
+04-16 21:37:58.295 D/RLT     (23237): +687ms [SETUP] runSetupFrom: skipping com.runelitetablet.setup.SetupStep$InstallProot@6b3b1ba (completed) corr=setup-e839 | thread=main
+04-16 21:37:58.295 D/RLT     (23237): +687ms [SETUP] runSetupFrom: skipping com.runelitetablet.setup.SetupStep$InstallJava@a85886b (completed) corr=setup-e839 | thread=main
+04-16 21:37:58.295 D/RLT     (23237): +687ms [SETUP] runSetupFrom: skipping com.runelitetablet.setup.SetupStep$DownloadRuneLite@82ddfc8 (completed) corr=setup-e839 | thread=main
+04-16 21:37:58.295 D/RLT     (23237): +687ms [SETUP] runSetupFrom: skipping com.runelitetablet.setup.SetupStep$InstallGpuDrivers@2676861 (completed) corr=setup-e839 | thread=main
+04-16 21:37:58.295 I/RLT     (23237): +687ms [STATE] SetupOrchestrator: step com.runelitetablet.setup.SetupStep$VerifySetup@d7f4d22 index=7 starting corr=setup-e839 | thread=main
+04-16 21:37:58.295 I/RLT     (23237): +687ms [VERIFY] SetupVerifier: starting verification corr=setup-e839 | thread=main
+04-16 21:37:58.295 D/RLT     (23237): +687ms [CMD] TermuxResultRegistry: created executionId=4 corr=4 | thread=main
+04-16 21:37:58.295 I/RLT     (23237): +687ms [CMD] [id=4] execute: commandPath=/data/data/com.termux/files/usr/bin/bash args=-c [ -d "$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu" ] && echo 'PASS: proot' || echo 'FAIL: proot'
+04-16 21:37:58.295 I/RLT     (23237): proot-distro login ubuntu -- which java < /dev/null && echo 'PASS: java' || echo 'FAIL: jav… workdir=<default> background=true stdinLen=0 timeoutMs=60000 | thread=main
+04-16 21:37:58.296 I/RLT     (23237): +687ms [CMD] [id=4] awaiting result: deferred created pendingResultsSize=1 timeoutMs=60000 | thread=main
+04-16 21:37:58.296 I/RLT     (23237): +687ms [CMD] [id=4] intent built: action=com.termux.RUN_COMMAND component=com.termux/com.termux.app.RunCommandService extras=[PATH=/data/data/com.termux/files/usr/bin/bash BACKGROUND=true STDIN=absent PENDING_INTENT=present] | thread=main
+04-16 21:37:58.297 I/RLT     (23237): +688ms [CMD] [id=4] startService: success | thread=main
+04-16 21:37:58.298 I/RLT     (23237): +689ms [LIFECYCLE] TermuxResultService.stopSelfIfIdle: 1 pending result(s) — staying alive pendingIds=[4] | thread=main
+04-16 21:37:58.309 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:37:58.312 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:38:01.858 I/RLT     (23237): +4250ms [CMD] [id=4] onStartCommand: executionId=4 exitCode=0 errCode=-1 errmsg=null stdoutPreview='PASS: proot
+04-16 21:38:01.858 I/RLT     (23237): /usr/bin/java
+04-16 21:38:01.858 I/RLT     (23237): PASS: java
+04-16 21:38:01.858 I/RLT     (23237): PASS: runelite
+04-16 21:38:01.858 I/RLT     (23237): PASS: x11
+04-16 21:38:01.858 I/RLT     (23237): ' stderrPreview='(B[m[1m[31mWarning: CPU doesn't support 32-bit instructions, some software may not work.(B[m
+04-16 21:38:01.858 I/RLT     (23237): proot warning: can't sanitize binding "/proc/self/fd/1": No such file or directory
+04-16 21:38:01.858 I/RLT     (23237): (B[m[1m[31mWar' resultBundle=true pendingResultsSize=1 | thread=main
+04-16 21:38:01.859 I/RLT     (23237): +4250ms [CMD] [id=4] handleResult: executionId=4 exitCode=0 errCode=-1 errmsg=null stdoutLen=62 stdoutPreview='PASS: proot
+04-16 21:38:01.859 I/RLT     (23237): /usr/bin/java
+04-16 21:38:01.859 I/RLT     (23237): PASS: java
+04-16 21:38:01.859 I/RLT     (23237): PASS: runelite
+04-16 21:38:01.859 I/RLT     (23237): PASS: x11
+04-16 21:38:01.859 I/RLT     (23237): ' stderrLen=364 stderrPreview='(B[m[1m[31mWarning: CPU doesn't support 32-bit instructions, some software may not work.(B[m
+04-16 21:38:01.859 I/RLT     (23237): proot warning: can't sanitize binding "/proc/self/fd/1": No such file or directory
+04-16 21:38:01.859 I/RLT     (23237): (B[m[1m[31mWar' | thread=main
+04-16 21:38:01.859 I/RLT     (23237): +4251ms [CMD] [id=4] handleResult: deferred found in pendingResults — completing mapSizeAfter=0 | thread=main
+04-16 21:38:01.860 I/RLT     (23237): +4251ms [CMD] [id=4] result: exitCode=0 error=null stdoutLen=62 stderrLen=364 durationMs=3563 | thread=main
+04-16 21:38:01.860 I/RLT     (23237): +4252ms [VERIFY] SetupVerifier: raw output=PASS: proot
+04-16 21:38:01.860 I/RLT     (23237): /usr/bin/java
+04-16 21:38:01.860 I/RLT     (23237): PASS: java
+04-16 21:38:01.860 I/RLT     (23237): PASS: runelite
+04-16 21:38:01.860 I/RLT     (23237): PASS: x11
+04-16 21:38:01.860 I/RLT     (23237):  exitCode=0 duration=3565ms versions=[PASS: proot; /usr/bin/java; PASS: java; PASS: runelite; PASS: x11] corr=setup-e839 | thread=main
+04-16 21:38:01.860 I/RLT     (23237): +4252ms [VERIFY] SetupVerifier: all checks passed duration=3565ms corr=setup-e839 | thread=main
+04-16 21:38:01.861 I/RLT     (23237): +4252ms [STATE] SetupOrchestrator: step com.runelitetablet.setup.SetupStep$VerifySetup@d7f4d22 completed duration=3566ms corr=setup-e839 | thread=main
+04-16 21:38:01.861 I/RLT     (23237): +4253ms [STATE] SetupOrchestrator.runSetup: complete duration=4029ms corr=setup-e839 | thread=main
+04-16 21:38:01.943 I/RLT     (23237): +4334ms [STATE] SetupViewModel: setup complete, navigating to com.runelitetablet.setup.AppScreen$Launch@f361343 hasCreds=true | thread=main
+04-16 21:38:02.365 I/RLT     (23237): +4756ms [LIFECYCLE] TermuxResultService.stopSelfIfIdle: no pending results — stopSelf(startId=4) | thread=main
+04-16 21:38:02.372 I/RLT     (23237): +4764ms [LIFECYCLE] TermuxResultService.onDestroy: pendingResults=0 (not clearing — deferreds are static, outlive service instances) | thread=main
+04-16 21:41:45.376 I/RLT     (23237): +227768ms [UI] SetupScreen: Launch RuneLite button clicked | thread=main
+04-16 21:41:45.377 I/RLT     (23237): +227769ms [STATE] LaunchCoordinator.launchRuneLite: starting pre-launch sequence corr=launch-5c3f | thread=main
+04-16 21:41:45.387 I/RLT     (23237): +227778ms [STATE] LaunchCoordinator: checking for updates corr=launch-5c3f | thread=main
+04-16 21:41:45.387 I/RLT     (23237): +227779ms [SCRIPT] deployScripts: skipping — already deployed (cached) | thread=main
+04-16 21:41:45.387 D/RLT     (23237): +227779ms [CMD] TermuxResultRegistry: created executionId=5 corr=5 | thread=main
+04-16 21:41:45.387 I/RLT     (23237): +227779ms [CMD] [id=5] execute: commandPath=/data/data/com.termux/files/home/scripts/update-runelite.sh args=<none> workdir=<default> background=true stdinLen=0 timeoutMs=60000 | thread=main
+04-16 21:41:45.388 I/RLT     (23237): +227779ms [CMD] [id=5] awaiting result: deferred created pendingResultsSize=1 timeoutMs=60000 | thread=main
+04-16 21:41:45.389 I/RLT     (23237): +227781ms [CMD] [id=5] intent built: action=com.termux.RUN_COMMAND component=com.termux/com.termux.app.RunCommandService extras=[PATH=/data/data/com.termux/files/home/scripts/update-runelite.sh BACKGROUND=true STDIN=absent PENDING_INTENT=present] | thread=main
+04-16 21:41:45.392 I/RLT     (23237): +227784ms [CMD] [id=5] startService: success | thread=main
+04-16 21:41:45.420 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:41:45.424 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:41:47.782 I/RLT     (23237): +230173ms [LIFECYCLE] TermuxResultService.onCreate | thread=main
+04-16 21:41:47.783 I/RLT     (23237): +230174ms [CMD] [id=5] onStartCommand: executionId=5 exitCode=0 errCode=-1 errmsg=null stdoutPreview='=== Checking for RuneLite updates ===
+04-16 21:41:47.783 I/RLT     (23237): Stored version: 2.7.7
+04-16 21:41:47.783 I/RLT     (23237): Latest version: 2.7.7
+04-16 21:41:47.783 I/RLT     (23237): UPDATE_STATUS current 2.7.7
+04-16 21:41:47.783 I/RLT     (23237): === update-runelite complete ===
+04-16 21:41:47.783 I/RLT     (23237): ' stderrPreview='' resultBundle=true pendingResultsSize=1 | thread=main
+04-16 21:41:47.783 I/RLT     (23237): +230175ms [CMD] [id=5] handleResult: executionId=5 exitCode=0 errCode=-1 errmsg=null stdoutLen=143 stdoutPreview='=== Checking for RuneLite updates ===
+04-16 21:41:47.783 I/RLT     (23237): Stored version: 2.7.7
+04-16 21:41:47.783 I/RLT     (23237): Latest version: 2.7.7
+04-16 21:41:47.783 I/RLT     (23237): UPDATE_STATUS current 2.7.7
+04-16 21:41:47.783 I/RLT     (23237): === update-runelite complete ===
+04-16 21:41:47.783 I/RLT     (23237): ' stderrLen=0 stderrPreview='' | thread=main
+04-16 21:41:47.783 I/RLT     (23237): +230175ms [CMD] [id=5] handleResult: deferred found in pendingResults — completing mapSizeAfter=0 | thread=main
+04-16 21:41:47.784 I/RLT     (23237): +230175ms [CMD] [id=5] result: exitCode=0 error=null stdoutLen=143 stderrLen=0 durationMs=2395 | thread=main
+04-16 21:41:47.784 I/RLT     (23237): +230176ms [STATE] LaunchCoordinator: running health check corr=launch-5c3f | thread=main
+04-16 21:41:47.785 I/RLT     (23237): +230176ms [SCRIPT] deployScripts: skipping — already deployed (cached) | thread=main
+04-16 21:41:47.785 D/RLT     (23237): +230176ms [CMD] TermuxResultRegistry: created executionId=6 corr=6 | thread=main
+04-16 21:41:47.785 I/RLT     (23237): +230176ms [CMD] [id=6] execute: commandPath=/data/data/com.termux/files/home/scripts/health-check.sh args=<none> workdir=<default> background=true stdinLen=0 timeoutMs=10000 | thread=main
+04-16 21:41:47.785 I/RLT     (23237): +230177ms [CMD] [id=6] awaiting result: deferred created pendingResultsSize=1 timeoutMs=10000 | thread=main
+04-16 21:41:47.789 I/RLT     (23237): +230181ms [CMD] [id=6] intent built: action=com.termux.RUN_COMMAND component=com.termux/com.termux.app.RunCommandService extras=[PATH=/data/data/com.termux/files/home/scripts/health-check.sh BACKGROUND=true STDIN=absent PENDING_INTENT=present] | thread=main
+04-16 21:41:47.792 I/RLT     (23237): +230184ms [CMD] [id=6] startService: success | thread=main
+04-16 21:41:47.812 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:41:47.816 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:41:51.583 I/RLT     (23237): +233975ms [CMD] [id=6] onStartCommand: executionId=6 exitCode=0 errCode=-1 errmsg=null stdoutPreview='=== Running health check ===
+04-16 21:41:51.583 I/RLT     (23237): HEALTH proot OK
+04-16 21:41:51.583 I/RLT     (23237): HEALTH java OK
+04-16 21:41:51.583 I/RLT     (23237): HEALTH runelite OK
+04-16 21:41:51.583 I/RLT     (23237): === health-check complete ===
+04-16 21:41:51.583 I/RLT     (23237): ' stderrPreview='' resultBundle=true pendingResultsSize=1 | thread=main
+04-16 21:41:51.584 I/RLT     (23237): +233976ms [CMD] [id=6] handleResult: executionId=6 exitCode=0 errCode=-1 errmsg=null stdoutLen=109 stdoutPreview='=== Running health check ===
+04-16 21:41:51.584 I/RLT     (23237): HEALTH proot OK
+04-16 21:41:51.584 I/RLT     (23237): HEALTH java OK
+04-16 21:41:51.584 I/RLT     (23237): HEALTH runelite OK
+04-16 21:41:51.584 I/RLT     (23237): === health-check complete ===
+04-16 21:41:51.584 I/RLT     (23237): ' stderrLen=0 stderrPreview='' | thread=main
+04-16 21:41:51.584 I/RLT     (23237): +233976ms [CMD] [id=6] handleResult: deferred found in pendingResults — completing mapSizeAfter=0 | thread=main
+04-16 21:41:51.586 I/RLT     (23237): +233977ms [CMD] [id=6] result: exitCode=0 error=null stdoutLen=109 stderrLen=0 durationMs=3797 | thread=main
+04-16 21:41:51.586 I/RLT     (23237): +233978ms [STATE] LaunchCoordinator.performLaunch: starting corr=launch-5c3f | thread=main
+04-16 21:41:51.601 I/RLT     (23237): +233993ms [STATE] LaunchCoordinator: hasCredentials=true corr=launch-5c3f | thread=main
+04-16 21:41:51.601 I/RLT     (23237): +233993ms [STATE] LaunchCoordinator: refreshing auth tokens parentCorrId=launch-5c3f childCorrId=launch-5c3f/auth-refresh-2e39 corr=launch-5c3f | thread=main
+04-16 21:41:51.602 I/RLT     (23237): +233993ms [STEP] [auth] refreshIfNeeded: checking token expiry parentCorrId=launch-5c3f/auth-refresh-2e39 corr=launch-5c3f/auth-refresh-2e39/refresh-637c | thread=main
+04-16 21:41:51.617 I/RLT     (23237): +234009ms [STEP] [auth] performTokenRefresh: exchanging refresh token corr=launch-5c3f/auth-refresh-2e39/refresh-637c | thread=main
+04-16 21:41:52.032 W/RLT     (23237): +234423ms [AUTH] parseJwtClaim(exp): failed: Unexpected JSON token at offset 3: Expected EOF after parsing, but had \ instead at path: $
+04-16 21:41:52.032 W/RLT     (23237): JSON input: $B\��1�_cy�3SA,K\a���9�:j7�q | thread=DefaultDispatcher-worker-3
+04-16 21:41:52.033 I/RLT     (23237): +234424ms [STEP] [auth] parseTokenResponse: token received, expiresIn=1800s expiry=1776391912 hasIdToken=true | thread=DefaultDispatcher-worker-3
+04-16 21:41:52.036 I/RLT     (23237): +234427ms [STEP] [auth] storeTokens: tokens stored (access_token in-memory only), expiry=1776391912 | thread=DefaultDispatcher-worker-3
+04-16 21:41:52.036 I/RLT     (23237): +234428ms [STEP] [auth] performTokenRefresh: tokens refreshed successfully corr=launch-5c3f/auth-refresh-2e39/refresh-637c | thread=main
+04-16 21:41:52.037 I/RLT     (23237): +234428ms [STATE] LaunchCoordinator: auth refresh result=com.runelitetablet.auth.AuthResult$Refreshed@d180c8d corr=launch-5c3f | thread=main
+04-16 21:41:52.041 I/RLT     (23237): +234432ms [STATE] LaunchCoordinator: validating session corr=launch-5c3f | thread=main
+04-16 21:41:52.042 I/RLT     (23237): +234434ms [STEP] [auth] validateSession: checking session against accounts API | thread=DefaultDispatcher-worker-3
+04-16 21:41:52.084 I/RLT     (23237): +234476ms [LIFECYCLE] TermuxResultService.stopSelfIfIdle: no pending results — stopSelf(startId=2) | thread=main
+04-16 21:41:52.090 I/RLT     (23237): +234481ms [LIFECYCLE] TermuxResultService.onDestroy: pendingResults=0 (not clearing — deferreds are static, outlive service instances) | thread=main
+04-16 21:41:52.406 I/RLT     (23237): +234797ms [STEP] [auth] validateSession: session valid (200) | thread=DefaultDispatcher-worker-3
+04-16 21:41:52.407 I/RLT     (23237): +234798ms [STATE] LaunchCoordinator: session valid corr=launch-5c3f | thread=main
+04-16 21:41:52.407 I/RLT     (23237): +234799ms [STATE] LaunchCoordinator: deploying env file backend=hybrid_x11 corr=launch-5c3f | thread=main
+04-16 21:41:52.431 D/RLT     (23237): +234823ms [CMD] TermuxResultRegistry: created executionId=7 corr=7 | thread=main
+04-16 21:41:52.432 I/RLT     (23237): +234823ms [CMD] [id=7] execute: commandPath=/data/data/com.termux/files/usr/bin/bash args=-c cat > /data/data/com.termux/files/home/.rlt-launch-env.sh && chmod 600 /data/data/com.termux/files/home/.rlt-launch-env.sh workdir=<default> background=true stdinLen=116 timeoutMs=30000 | thread=main
+04-16 21:41:52.432 I/RLT     (23237): +234823ms [CMD] [id=7] awaiting result: deferred created pendingResultsSize=1 timeoutMs=30000 | thread=main
+04-16 21:41:52.434 I/RLT     (23237): +234825ms [CMD] [id=7] intent built: action=com.termux.RUN_COMMAND component=com.termux/com.termux.app.RunCommandService extras=[PATH=/data/data/com.termux/files/usr/bin/bash BACKGROUND=true STDIN=present(116) PENDING_INTENT=present] | thread=main
+04-16 21:41:52.436 I/RLT     (23237): +234827ms [CMD] [id=7] startService: success | thread=main
+04-16 21:41:52.467 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:41:52.475 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:41:52.515 I/RLT     (23237): +234907ms [LIFECYCLE] TermuxResultService.onCreate | thread=main
+04-16 21:41:52.519 I/RLT     (23237): +234910ms [CMD] [id=7] onStartCommand: executionId=7 exitCode=0 errCode=-1 errmsg=null stdoutPreview='' stderrPreview='' resultBundle=true pendingResultsSize=1 | thread=main
+04-16 21:41:52.519 I/RLT     (23237): +234911ms [CMD] [id=7] handleResult: executionId=7 exitCode=0 errCode=-1 errmsg=null stdoutLen=0 stdoutPreview='' stderrLen=0 stderrPreview='' | thread=main
+04-16 21:41:52.519 I/RLT     (23237): +234911ms [CMD] [id=7] handleResult: deferred found in pendingResults — completing mapSizeAfter=0 | thread=main
+04-16 21:41:52.520 I/RLT     (23237): +234911ms [CMD] [id=7] result: exitCode=0 error=null stdoutLen=0 stderrLen=0 durationMs=86 | thread=main
+04-16 21:41:52.520 I/RLT     (23237): +234912ms [STEP] [auth] LaunchEnvDeployer: env file deployed to Termux at /data/data/com.termux/files/home/.rlt-launch-env.sh (credentials masked) | thread=main
+04-16 21:41:52.520 I/RLT     (23237): +234912ms [STATE] LaunchCoordinator: envFilePath=/data/data/com.termux/files/home/.rlt-launch-env.sh hasEnvFile=true corr=launch-5c3f | thread=main
+04-16 21:41:52.520 D/RLT     (23237): +234912ms [LAUNCH] LaunchCoordinator: env contents=[tokens redacted] backend=hybrid_x11 corr=launch-5c3f | thread=main
+04-16 21:41:52.521 I/RLT     (23237): +234913ms [STEP] [termux_x11] isTermuxX11Installed: result=true package=com.termux.x11 | thread=main
+04-16 21:41:52.521 D/RLT     (23237): +234913ms [PRESENTATION] HybridX11PresentationBackend.isInstalled=true (requires Termux:X11) | thread=main
+04-16 21:41:52.521 D/RLT     (23237): +234913ms [PRESENTATION] HybridX11PresentationBackend.applyLaunchPreferences: delegating to TermuxX11PresentationBackend | thread=main
+04-16 21:41:52.522 I/RLT     (23237): +234914ms [STEP] [launch] presentation: sent CHANGE_PREFERENCE broadcast to Termux:X11 (mode=native fullscreen=true) | thread=main
+04-16 21:41:52.523 D/RLT     (23237): +234914ms [PRESENTATION] HybridX11PresentationBackend.createLaunchIntent: target=com.runelitetablet.presentation.hybrid.HybridX11HostActivity, flags=[NEW_TASK, SINGLE_TOP, CLEAR_TOP] | thread=main
+04-16 21:41:52.523 I/RLT     (23237): +234914ms [STATE] launchInternal: dispatching command scriptPath=/data/data/com.termux/files/home/scripts/launch-runelite.sh envFile=/data/data/com.termux/files/home/.rlt-launch-env.sh backend=hybrid_x11 corr=launch-5c3f | thread=main
+04-16 21:41:52.523 I/RLT     (23237): +234915ms [CMD] [id=0] launchBackground: commandPath=/data/data/com.termux/files/home/scripts/launch-runelite.sh args=/data/data/com.termux/files/home/.rlt-launch-env.sh | thread=main
+04-16 21:41:52.525 I/RLT     (23237): +234916ms [CMD] [id=0] launchBackground: startService success commandPath=/data/data/com.termux/files/home/scripts/launch-runelite.sh | thread=main
+04-16 21:41:52.525 I/RLT     (23237): +234916ms [STATE] launchInternal: command dispatched success=true corr=launch-5c3f | thread=main
+04-16 21:41:52.525 I/RLT     (23237): +234916ms [STATE] LaunchCoordinator: launch succeeded, starting session service corr=launch-5c3f | thread=main
+04-16 21:41:52.525 I/RLT     (23237): +234917ms [STATE] startSessionService: starting foreground service corr=launch-5c3f | thread=main
+04-16 21:41:52.525 I/RLT     (23237): +234917ms [STATE] PermissionHandler.hasNotificationPermission: permission=POST_NOTIFICATIONS checking | thread=main
+04-16 21:41:52.526 I/RLT     (23237): +234918ms [STATE] PermissionHandler.hasNotificationPermission: permission=POST_NOTIFICATIONS user_response=granted | thread=main
+04-16 21:41:52.533 I/RLT     (23237): +234924ms [STATE] startSessionService: session service start confirmed corr=launch-5c3f | thread=main
+04-16 21:41:52.542 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:41:52.548 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:41:52.554 I/RLT     (23237): +234945ms [STATE] RuneLiteSessionService.onStartCommand: action=com.runelitetablet.session.START startId=1 | thread=main
+04-16 21:41:52.554 I/RLT     (23237): +234945ms [STATE] RuneLiteSessionService: com.runelitetablet.session.SessionState$Idle@238cfb9 -> Starting | thread=main
+04-16 21:41:52.556 D/RLT     (23237): +234947ms [SESSION] SessionNotificationHelper.buildNotification: text=Starting RuneLite... | thread=main
+04-16 21:41:52.557 D/RLT     (23237): +234949ms [SESSION] SessionNotificationHelper: built notification title='RuneLite is running' actions=2 channel=runelite_session | thread=main
+04-16 21:41:52.560 I/RLT     (23237): +234951ms [STATE] TermuxProcessPin: bindService success flags=0x1041 | thread=main
+04-16 21:41:52.573 D/RLT     (23237): +234964ms [SESSION] startPolling: waiting 30000ms for launch sequence before first poll | thread=main
+04-16 21:41:52.574 I/RLT     (23237): +234965ms [STATE] TermuxProcessPin: onServiceConnected name=ComponentInfo{com.termux/com.termux.app.RunCommandService} binder=true | thread=main
+04-16 21:41:53.020 I/RLT     (23237): +235412ms [LIFECYCLE] TermuxResultService.stopSelfIfIdle: no pending results — stopSelf(startId=1) | thread=main
+04-16 21:41:53.027 I/RLT     (23237): +235419ms [LIFECYCLE] TermuxResultService.onDestroy: pendingResults=0 (not clearing — deferreds are static, outlive service instances) | thread=main
+04-16 21:42:22.574 D/RLT     (23237): +264965ms [CMD] TermuxResultRegistry: created executionId=8 corr=8 | thread=main
+04-16 21:42:22.575 I/RLT     (23237): +264966ms [CMD] [id=8] execute: commandPath=/data/data/com.termux/files/usr/bin/bash args=-c SESSION_ALIVE="no"
+04-16 21:42:22.575 I/RLT     (23237): VIRGL_STATUS="n/a"
+04-16 21:42:22.575 I/RLT     (23237): if [ -f "$PREFIX/tmp/.rlt-session-alive" ]; then
+04-16 21:42:22.575 I/RLT     (23237):     SESSION_ALIVE="yes"
+04-16 21:42:22.575 I/RLT     (23237): fi
+04-16 21:42:22.575 I/RLT     (23237): # Check VirGL process health if PID file exists
+04-16 21:42:22.575 I/RLT     (23237): ACTIVE_SESSION_DIR="$HOME/.rlt-sess… workdir=<default> background=true stdinLen=0 timeoutMs=5000 | thread=main
+04-16 21:42:22.575 I/RLT     (23237): +264967ms [CMD] [id=8] awaiting result: deferred created pendingResultsSize=1 timeoutMs=5000 | thread=main
+04-16 21:42:22.580 I/RLT     (23237): +264972ms [CMD] [id=8] intent built: action=com.termux.RUN_COMMAND component=com.termux/com.termux.app.RunCommandService extras=[PATH=/data/data/com.termux/files/usr/bin/bash BACKGROUND=true STDIN=absent PENDING_INTENT=present] | thread=main
+04-16 21:42:22.584 I/RLT     (23237): +264976ms [CMD] [id=8] startService: success | thread=main
+04-16 21:42:22.609 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:42:22.613 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:42:22.632 I/RLT     (23237): +265024ms [LIFECYCLE] TermuxResultService.onCreate | thread=main
+04-16 21:42:22.633 I/RLT     (23237): +265025ms [CMD] [id=8] onStartCommand: executionId=8 exitCode=0 errCode=-1 errmsg=null stdoutPreview='session=no virgl=n/a
+04-16 21:42:22.633 I/RLT     (23237): ' stderrPreview='' resultBundle=true pendingResultsSize=1 | thread=main
+04-16 21:42:22.633 I/RLT     (23237): +265025ms [CMD] [id=8] handleResult: executionId=8 exitCode=0 errCode=-1 errmsg=null stdoutLen=21 stdoutPreview='session=no virgl=n/a
+04-16 21:42:22.633 I/RLT     (23237): ' stderrLen=0 stderrPreview='' | thread=main
+04-16 21:42:22.634 I/RLT     (23237): +265025ms [CMD] [id=8] handleResult: deferred found in pendingResults — completing mapSizeAfter=0 | thread=main
+04-16 21:42:22.634 I/RLT     (23237): +265026ms [CMD] [id=8] result: exitCode=0 error=null stdoutLen=21 stderrLen=0 durationMs=53 | thread=main
+04-16 21:42:22.635 D/RLT     (23237): +265026ms [SESSION] debounce: stopped count=1/3, keeping previous state | thread=main
+04-16 21:42:23.135 I/RLT     (23237): +265527ms [LIFECYCLE] TermuxResultService.stopSelfIfIdle: no pending results — stopSelf(startId=1) | thread=main
+04-16 21:42:23.140 I/RLT     (23237): +265532ms [LIFECYCLE] TermuxResultService.onDestroy: pendingResults=0 (not clearing — deferreds are static, outlive service instances) | thread=main
+04-16 21:42:27.634 D/RLT     (23237): +270026ms [CMD] TermuxResultRegistry: created executionId=9 corr=9 | thread=main
+04-16 21:42:27.635 I/RLT     (23237): +270027ms [CMD] [id=9] execute: commandPath=/data/data/com.termux/files/usr/bin/bash args=-c SESSION_ALIVE="no"
+04-16 21:42:27.635 I/RLT     (23237): VIRGL_STATUS="n/a"
+04-16 21:42:27.635 I/RLT     (23237): if [ -f "$PREFIX/tmp/.rlt-session-alive" ]; then
+04-16 21:42:27.635 I/RLT     (23237):     SESSION_ALIVE="yes"
+04-16 21:42:27.635 I/RLT     (23237): fi
+04-16 21:42:27.635 I/RLT     (23237): # Check VirGL process health if PID file exists
+04-16 21:42:27.635 I/RLT     (23237): ACTIVE_SESSION_DIR="$HOME/.rlt-sess… workdir=<default> background=true stdinLen=0 timeoutMs=5000 | thread=main
+04-16 21:42:27.636 I/RLT     (23237): +270028ms [CMD] [id=9] awaiting result: deferred created pendingResultsSize=1 timeoutMs=5000 | thread=main
+04-16 21:42:27.639 I/RLT     (23237): +270030ms [CMD] [id=9] intent built: action=com.termux.RUN_COMMAND component=com.termux/com.termux.app.RunCommandService extras=[PATH=/data/data/com.termux/files/usr/bin/bash BACKGROUND=true STDIN=absent PENDING_INTENT=present] | thread=main
+04-16 21:42:27.642 I/RLT     (23237): +270033ms [CMD] [id=9] startService: success | thread=main
+04-16 21:42:27.671 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:42:27.679 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:42:27.697 I/RLT     (23237): +270089ms [LIFECYCLE] TermuxResultService.onCreate | thread=main
+04-16 21:42:27.698 I/RLT     (23237): +270090ms [CMD] [id=9] onStartCommand: executionId=9 exitCode=0 errCode=-1 errmsg=null stdoutPreview='session=no virgl=n/a
+04-16 21:42:27.698 I/RLT     (23237): ' stderrPreview='' resultBundle=true pendingResultsSize=1 | thread=main
+04-16 21:42:27.699 I/RLT     (23237): +270090ms [CMD] [id=9] handleResult: executionId=9 exitCode=0 errCode=-1 errmsg=null stdoutLen=21 stdoutPreview='session=no virgl=n/a
+04-16 21:42:27.699 I/RLT     (23237): ' stderrLen=0 stderrPreview='' | thread=main
+04-16 21:42:27.699 I/RLT     (23237): +270091ms [CMD] [id=9] handleResult: deferred found in pendingResults — completing mapSizeAfter=0 | thread=main
+04-16 21:42:27.700 I/RLT     (23237): +270091ms [CMD] [id=9] result: exitCode=0 error=null stdoutLen=21 stderrLen=0 durationMs=61 | thread=main
+04-16 21:42:27.700 D/RLT     (23237): +270091ms [SESSION] debounce: stopped count=2/3, keeping previous state | thread=main
+04-16 21:42:28.200 I/RLT     (23237): +270592ms [LIFECYCLE] TermuxResultService.stopSelfIfIdle: no pending results — stopSelf(startId=1) | thread=main
+04-16 21:42:28.207 I/RLT     (23237): +270599ms [LIFECYCLE] TermuxResultService.onDestroy: pendingResults=0 (not clearing — deferreds are static, outlive service instances) | thread=main
+04-16 21:42:32.700 D/RLT     (23237): +275091ms [CMD] TermuxResultRegistry: created executionId=10 corr=10 | thread=main
+04-16 21:42:32.700 I/RLT     (23237): +275092ms [CMD] [id=10] execute: commandPath=/data/data/com.termux/files/usr/bin/bash args=-c SESSION_ALIVE="no"
+04-16 21:42:32.700 I/RLT     (23237): VIRGL_STATUS="n/a"
+04-16 21:42:32.700 I/RLT     (23237): if [ -f "$PREFIX/tmp/.rlt-session-alive" ]; then
+04-16 21:42:32.700 I/RLT     (23237):     SESSION_ALIVE="yes"
+04-16 21:42:32.700 I/RLT     (23237): fi
+04-16 21:42:32.700 I/RLT     (23237): # Check VirGL process health if PID file exists
+04-16 21:42:32.700 I/RLT     (23237): ACTIVE_SESSION_DIR="$HOME/.rlt-sess… workdir=<default> background=true stdinLen=0 timeoutMs=5000 | thread=main
+04-16 21:42:32.701 I/RLT     (23237): +275093ms [CMD] [id=10] awaiting result: deferred created pendingResultsSize=1 timeoutMs=5000 | thread=main
+04-16 21:42:32.703 I/RLT     (23237): +275094ms [CMD] [id=10] intent built: action=com.termux.RUN_COMMAND component=com.termux/com.termux.app.RunCommandService extras=[PATH=/data/data/com.termux/files/usr/bin/bash BACKGROUND=true STDIN=absent PENDING_INTENT=present] | thread=main
+04-16 21:42:32.707 I/RLT     (23237): +275098ms [CMD] [id=10] startService: success | thread=main
+04-16 21:42:32.730 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:42:32.733 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:42:32.751 I/RLT     (23237): +275142ms [LIFECYCLE] TermuxResultService.onCreate | thread=main
+04-16 21:42:32.751 I/RLT     (23237): +275143ms [CMD] [id=10] onStartCommand: executionId=10 exitCode=0 errCode=-1 errmsg=null stdoutPreview='session=no virgl=n/a
+04-16 21:42:32.751 I/RLT     (23237): ' stderrPreview='' resultBundle=true pendingResultsSize=1 | thread=main
+04-16 21:42:32.752 I/RLT     (23237): +275143ms [CMD] [id=10] handleResult: executionId=10 exitCode=0 errCode=-1 errmsg=null stdoutLen=21 stdoutPreview='session=no virgl=n/a
+04-16 21:42:32.752 I/RLT     (23237): ' stderrLen=0 stderrPreview='' | thread=main
+04-16 21:42:32.752 I/RLT     (23237): +275143ms [CMD] [id=10] handleResult: deferred found in pendingResults — completing mapSizeAfter=0 | thread=main
+04-16 21:42:32.752 I/RLT     (23237): +275144ms [CMD] [id=10] result: exitCode=0 error=null stdoutLen=21 stderrLen=0 durationMs=49 | thread=main
+04-16 21:42:32.753 I/RLT     (23237): +275144ms [STATE] RuneLiteSessionService.handleHealthStateChange: com.runelitetablet.session.SessionState$Starting@c3715e3 -> com.runelitetablet.session.SessionState$Stopped@cb1abe0 | thread=main
+04-16 21:42:32.755 I/RLT     (23237): +275146ms [STATE] TermuxProcessPin: unbindService ok | thread=main
+04-16 21:42:33.254 I/RLT     (23237): +275645ms [LIFECYCLE] TermuxResultService.stopSelfIfIdle: no pending results — stopSelf(startId=1) | thread=main
+04-16 21:42:33.256 I/RLT     (23237): +275647ms [LIFECYCLE] TermuxResultService.onDestroy: pendingResults=0 (not clearing — deferreds are static, outlive service instances) | thread=main
+04-16 21:44:20.077 I/RLT     (23237): +382469ms [UI] SetupScreen: Launch RuneLite button clicked | thread=main
+04-16 21:44:20.078 I/RLT     (23237): +382470ms [STATE] LaunchCoordinator.launchRuneLite: starting pre-launch sequence corr=launch-8be7 | thread=main
+04-16 21:44:20.088 I/RLT     (23237): +382479ms [STATE] LaunchCoordinator: checking for updates corr=launch-8be7 | thread=main
+04-16 21:44:20.088 I/RLT     (23237): +382480ms [SCRIPT] deployScripts: skipping — already deployed (cached) | thread=main
+04-16 21:44:20.088 D/RLT     (23237): +382480ms [CMD] TermuxResultRegistry: created executionId=11 corr=11 | thread=main
+04-16 21:44:20.089 I/RLT     (23237): +382480ms [CMD] [id=11] execute: commandPath=/data/data/com.termux/files/home/scripts/update-runelite.sh args=<none> workdir=<default> background=true stdinLen=0 timeoutMs=60000 | thread=main
+04-16 21:44:20.089 I/RLT     (23237): +382480ms [CMD] [id=11] awaiting result: deferred created pendingResultsSize=1 timeoutMs=60000 | thread=main
+04-16 21:44:20.090 I/RLT     (23237): +382482ms [CMD] [id=11] intent built: action=com.termux.RUN_COMMAND component=com.termux/com.termux.app.RunCommandService extras=[PATH=/data/data/com.termux/files/home/scripts/update-runelite.sh BACKGROUND=true STDIN=absent PENDING_INTENT=present] | thread=main
+04-16 21:44:20.096 I/RLT     (23237): +382488ms [CMD] [id=11] startService: success | thread=main
+04-16 21:44:20.129 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:44:20.134 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:44:22.561 I/RLT     (23237): +384953ms [LIFECYCLE] TermuxResultService.onCreate | thread=main
+04-16 21:44:22.563 I/RLT     (23237): +384954ms [CMD] [id=11] onStartCommand: executionId=11 exitCode=0 errCode=-1 errmsg=null stdoutPreview='=== Checking for RuneLite updates ===
+04-16 21:44:22.563 I/RLT     (23237): Stored version: 2.7.7
+04-16 21:44:22.563 I/RLT     (23237): Latest version: 2.7.7
+04-16 21:44:22.563 I/RLT     (23237): UPDATE_STATUS current 2.7.7
+04-16 21:44:22.563 I/RLT     (23237): === update-runelite complete ===
+04-16 21:44:22.563 I/RLT     (23237): ' stderrPreview='' resultBundle=true pendingResultsSize=1 | thread=main
+04-16 21:44:22.563 I/RLT     (23237): +384955ms [CMD] [id=11] handleResult: executionId=11 exitCode=0 errCode=-1 errmsg=null stdoutLen=143 stdoutPreview='=== Checking for RuneLite updates ===
+04-16 21:44:22.563 I/RLT     (23237): Stored version: 2.7.7
+04-16 21:44:22.563 I/RLT     (23237): Latest version: 2.7.7
+04-16 21:44:22.563 I/RLT     (23237): UPDATE_STATUS current 2.7.7
+04-16 21:44:22.563 I/RLT     (23237): === update-runelite complete ===
+04-16 21:44:22.563 I/RLT     (23237): ' stderrLen=0 stderrPreview='' | thread=main
+04-16 21:44:22.563 I/RLT     (23237): +384955ms [CMD] [id=11] handleResult: deferred found in pendingResults — completing mapSizeAfter=0 | thread=main
+04-16 21:44:22.566 I/RLT     (23237): +384958ms [CMD] [id=11] result: exitCode=0 error=null stdoutLen=143 stderrLen=0 durationMs=2475 | thread=main
+04-16 21:44:22.567 I/RLT     (23237): +384958ms [STATE] LaunchCoordinator: running health check corr=launch-8be7 | thread=main
+04-16 21:44:22.567 I/RLT     (23237): +384958ms [SCRIPT] deployScripts: skipping — already deployed (cached) | thread=main
+04-16 21:44:22.567 D/RLT     (23237): +384959ms [CMD] TermuxResultRegistry: created executionId=12 corr=12 | thread=main
+04-16 21:44:22.567 I/RLT     (23237): +384959ms [CMD] [id=12] execute: commandPath=/data/data/com.termux/files/home/scripts/health-check.sh args=<none> workdir=<default> background=true stdinLen=0 timeoutMs=10000 | thread=main
+04-16 21:44:22.567 I/RLT     (23237): +384959ms [CMD] [id=12] awaiting result: deferred created pendingResultsSize=1 timeoutMs=10000 | thread=main
+04-16 21:44:22.568 I/RLT     (23237): +384960ms [CMD] [id=12] intent built: action=com.termux.RUN_COMMAND component=com.termux/com.termux.app.RunCommandService extras=[PATH=/data/data/com.termux/files/home/scripts/health-check.sh BACKGROUND=true STDIN=absent PENDING_INTENT=present] | thread=main
+04-16 21:44:22.570 I/RLT     (23237): +384962ms [CMD] [id=12] startService: success | thread=main
+04-16 21:44:22.586 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:44:22.590 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:44:26.495 I/RLT     (23237): +388886ms [CMD] [id=12] onStartCommand: executionId=12 exitCode=0 errCode=-1 errmsg=null stdoutPreview='=== Running health check ===
+04-16 21:44:26.495 I/RLT     (23237): HEALTH proot OK
+04-16 21:44:26.495 I/RLT     (23237): HEALTH java OK
+04-16 21:44:26.495 I/RLT     (23237): HEALTH runelite OK
+04-16 21:44:26.495 I/RLT     (23237): === health-check complete ===
+04-16 21:44:26.495 I/RLT     (23237): ' stderrPreview='' resultBundle=true pendingResultsSize=1 | thread=main
+04-16 21:44:26.496 I/RLT     (23237): +388887ms [CMD] [id=12] handleResult: executionId=12 exitCode=0 errCode=-1 errmsg=null stdoutLen=109 stdoutPreview='=== Running health check ===
+04-16 21:44:26.496 I/RLT     (23237): HEALTH proot OK
+04-16 21:44:26.496 I/RLT     (23237): HEALTH java OK
+04-16 21:44:26.496 I/RLT     (23237): HEALTH runelite OK
+04-16 21:44:26.496 I/RLT     (23237): === health-check complete ===
+04-16 21:44:26.496 I/RLT     (23237): ' stderrLen=0 stderrPreview='' | thread=main
+04-16 21:44:26.496 I/RLT     (23237): +388888ms [CMD] [id=12] handleResult: deferred found in pendingResults — completing mapSizeAfter=0 | thread=main
+04-16 21:44:26.499 I/RLT     (23237): +388891ms [CMD] [id=12] result: exitCode=0 error=null stdoutLen=109 stderrLen=0 durationMs=3931 | thread=main
+04-16 21:44:26.500 I/RLT     (23237): +388891ms [STATE] LaunchCoordinator.performLaunch: starting corr=launch-8be7 | thread=main
+04-16 21:44:26.503 I/RLT     (23237): +388894ms [STATE] LaunchCoordinator: hasCredentials=true corr=launch-8be7 | thread=main
+04-16 21:44:26.503 I/RLT     (23237): +388895ms [STATE] LaunchCoordinator: refreshing auth tokens parentCorrId=launch-8be7 childCorrId=launch-8be7/auth-refresh-7edb corr=launch-8be7 | thread=main
+04-16 21:44:26.503 I/RLT     (23237): +388895ms [STEP] [auth] refreshIfNeeded: checking token expiry parentCorrId=launch-8be7/auth-refresh-7edb corr=launch-8be7/auth-refresh-7edb/refresh-e518 | thread=main
+04-16 21:44:26.519 I/RLT     (23237): +388910ms [STEP] [auth] refreshIfNeeded: token still valid ttl=1646s corr=launch-8be7/auth-refresh-7edb/refresh-e518 | thread=main
+04-16 21:44:26.519 I/RLT     (23237): +388911ms [STATE] LaunchCoordinator: auth refresh result=com.runelitetablet.auth.AuthResult$Valid@8b705fb corr=launch-8be7 | thread=main
+04-16 21:44:26.524 I/RLT     (23237): +388916ms [STATE] LaunchCoordinator: validating session corr=launch-8be7 | thread=main
+04-16 21:44:26.525 I/RLT     (23237): +388917ms [STEP] [auth] validateSession: checking session against accounts API | thread=DefaultDispatcher-worker-2
+04-16 21:44:26.999 I/RLT     (23237): +389390ms [LIFECYCLE] TermuxResultService.stopSelfIfIdle: no pending results — stopSelf(startId=2) | thread=main
+04-16 21:44:27.008 I/RLT     (23237): +389399ms [LIFECYCLE] TermuxResultService.onDestroy: pendingResults=0 (not clearing — deferreds are static, outlive service instances) | thread=main
+04-16 21:44:27.134 I/RLT     (23237): +389525ms [STEP] [auth] validateSession: session valid (200) | thread=DefaultDispatcher-worker-2
+04-16 21:44:27.135 I/RLT     (23237): +389527ms [STATE] LaunchCoordinator: session valid corr=launch-8be7 | thread=main
+04-16 21:44:27.136 I/RLT     (23237): +389527ms [STATE] LaunchCoordinator: deploying env file backend=hybrid_x11 corr=launch-8be7 | thread=main
+04-16 21:44:27.158 D/RLT     (23237): +389550ms [CMD] TermuxResultRegistry: created executionId=13 corr=13 | thread=main
+04-16 21:44:27.158 I/RLT     (23237): +389550ms [CMD] [id=13] execute: commandPath=/data/data/com.termux/files/usr/bin/bash args=-c cat > /data/data/com.termux/files/home/.rlt-launch-env.sh && chmod 600 /data/data/com.termux/files/home/.rlt-launch-env.sh workdir=<default> background=true stdinLen=116 timeoutMs=30000 | thread=main
+04-16 21:44:27.159 I/RLT     (23237): +389550ms [CMD] [id=13] awaiting result: deferred created pendingResultsSize=1 timeoutMs=30000 | thread=main
+04-16 21:44:27.159 I/RLT     (23237): +389551ms [CMD] [id=13] intent built: action=com.termux.RUN_COMMAND component=com.termux/com.termux.app.RunCommandService extras=[PATH=/data/data/com.termux/files/usr/bin/bash BACKGROUND=true STDIN=present(116) PENDING_INTENT=present] | thread=main
+04-16 21:44:27.163 I/RLT     (23237): +389555ms [CMD] [id=13] startService: success | thread=main
+04-16 21:44:27.189 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:44:27.194 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:44:27.233 I/RLT     (23237): +389625ms [LIFECYCLE] TermuxResultService.onCreate | thread=main
+04-16 21:44:27.234 I/RLT     (23237): +389626ms [CMD] [id=13] onStartCommand: executionId=13 exitCode=0 errCode=-1 errmsg=null stdoutPreview='' stderrPreview='' resultBundle=true pendingResultsSize=1 | thread=main
+04-16 21:44:27.235 I/RLT     (23237): +389626ms [CMD] [id=13] handleResult: executionId=13 exitCode=0 errCode=-1 errmsg=null stdoutLen=0 stdoutPreview='' stderrLen=0 stderrPreview='' | thread=main
+04-16 21:44:27.235 I/RLT     (23237): +389626ms [CMD] [id=13] handleResult: deferred found in pendingResults — completing mapSizeAfter=0 | thread=main
+04-16 21:44:27.236 I/RLT     (23237): +389627ms [CMD] [id=13] result: exitCode=0 error=null stdoutLen=0 stderrLen=0 durationMs=77 | thread=main
+04-16 21:44:27.236 I/RLT     (23237): +389627ms [STEP] [auth] LaunchEnvDeployer: env file deployed to Termux at /data/data/com.termux/files/home/.rlt-launch-env.sh (credentials masked) | thread=main
+04-16 21:44:27.236 I/RLT     (23237): +389628ms [STATE] LaunchCoordinator: envFilePath=/data/data/com.termux/files/home/.rlt-launch-env.sh hasEnvFile=true corr=launch-8be7 | thread=main
+04-16 21:44:27.236 D/RLT     (23237): +389628ms [LAUNCH] LaunchCoordinator: env contents=[tokens redacted] backend=hybrid_x11 corr=launch-8be7 | thread=main
+04-16 21:44:27.237 I/RLT     (23237): +389629ms [STEP] [termux_x11] isTermuxX11Installed: result=true package=com.termux.x11 | thread=main
+04-16 21:44:27.237 D/RLT     (23237): +389629ms [PRESENTATION] HybridX11PresentationBackend.isInstalled=true (requires Termux:X11) | thread=main
+04-16 21:44:27.237 D/RLT     (23237): +389629ms [PRESENTATION] HybridX11PresentationBackend.applyLaunchPreferences: delegating to TermuxX11PresentationBackend | thread=main
+04-16 21:44:27.238 I/RLT     (23237): +389630ms [STEP] [launch] presentation: sent CHANGE_PREFERENCE broadcast to Termux:X11 (mode=native fullscreen=true) | thread=main
+04-16 21:44:27.238 D/RLT     (23237): +389630ms [PRESENTATION] HybridX11PresentationBackend.createLaunchIntent: target=com.runelitetablet.presentation.hybrid.HybridX11HostActivity, flags=[NEW_TASK, SINGLE_TOP, CLEAR_TOP] | thread=main
+04-16 21:44:27.239 I/RLT     (23237): +389630ms [STATE] launchInternal: dispatching command scriptPath=/data/data/com.termux/files/home/scripts/launch-runelite.sh envFile=/data/data/com.termux/files/home/.rlt-launch-env.sh backend=hybrid_x11 corr=launch-8be7 | thread=main
+04-16 21:44:27.239 I/RLT     (23237): +389630ms [CMD] [id=0] launchBackground: commandPath=/data/data/com.termux/files/home/scripts/launch-runelite.sh args=/data/data/com.termux/files/home/.rlt-launch-env.sh | thread=main
+04-16 21:44:27.241 I/RLT     (23237): +389632ms [CMD] [id=0] launchBackground: startService success commandPath=/data/data/com.termux/files/home/scripts/launch-runelite.sh | thread=main
+04-16 21:44:27.241 I/RLT     (23237): +389633ms [STATE] launchInternal: command dispatched success=true corr=launch-8be7 | thread=main
+04-16 21:44:27.241 I/RLT     (23237): +389633ms [STATE] LaunchCoordinator: launch succeeded, starting session service corr=launch-8be7 | thread=main
+04-16 21:44:27.242 I/RLT     (23237): +389633ms [STATE] startSessionService: starting foreground service corr=launch-8be7 | thread=main
+04-16 21:44:27.242 I/RLT     (23237): +389633ms [STATE] PermissionHandler.hasNotificationPermission: permission=POST_NOTIFICATIONS checking | thread=main
+04-16 21:44:27.243 I/RLT     (23237): +389634ms [STATE] PermissionHandler.hasNotificationPermission: permission=POST_NOTIFICATIONS user_response=granted | thread=main
+04-16 21:44:27.250 I/RLT     (23237): +389642ms [STATE] startSessionService: session service start confirmed corr=launch-8be7 | thread=main
+04-16 21:44:27.260 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:44:27.264 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:44:27.270 I/RLT     (23237): +389662ms [STATE] RuneLiteSessionService.onStartCommand: action=com.runelitetablet.session.START startId=1 | thread=main
+04-16 21:44:27.270 I/RLT     (23237): +389662ms [STATE] RuneLiteSessionService: com.runelitetablet.session.SessionState$Stopped@cb1abe0 -> Starting | thread=main
+04-16 21:44:27.271 D/RLT     (23237): +389662ms [SESSION] SessionNotificationHelper.buildNotification: text=Starting RuneLite... | thread=main
+04-16 21:44:27.271 D/RLT     (23237): +389663ms [SESSION] SessionNotificationHelper: built notification title='RuneLite is running' actions=2 channel=runelite_session | thread=main
+04-16 21:44:27.274 I/RLT     (23237): +389665ms [STATE] TermuxProcessPin: bindService success flags=0x1041 | thread=main
+04-16 21:44:27.290 I/RLT     (23237): +389681ms [STATE] TermuxProcessPin: onServiceConnected name=ComponentInfo{com.termux/com.termux.app.RunCommandService} binder=true | thread=main
+04-16 21:44:27.290 D/RLT     (23237): +389681ms [SESSION] startPolling: waiting 30000ms for launch sequence before first poll | thread=main
+04-16 21:44:27.736 I/RLT     (23237): +390128ms [LIFECYCLE] TermuxResultService.stopSelfIfIdle: no pending results — stopSelf(startId=1) | thread=main
+04-16 21:44:27.744 I/RLT     (23237): +390135ms [LIFECYCLE] TermuxResultService.onDestroy: pendingResults=0 (not clearing — deferreds are static, outlive service instances) | thread=main
+04-16 21:44:57.291 D/RLT     (23237): +419682ms [CMD] TermuxResultRegistry: created executionId=14 corr=14 | thread=main
+04-16 21:44:57.291 I/RLT     (23237): +419683ms [CMD] [id=14] execute: commandPath=/data/data/com.termux/files/usr/bin/bash args=-c SESSION_ALIVE="no"
+04-16 21:44:57.291 I/RLT     (23237): VIRGL_STATUS="n/a"
+04-16 21:44:57.291 I/RLT     (23237): if [ -f "$PREFIX/tmp/.rlt-session-alive" ]; then
+04-16 21:44:57.291 I/RLT     (23237):     SESSION_ALIVE="yes"
+04-16 21:44:57.291 I/RLT     (23237): fi
+04-16 21:44:57.291 I/RLT     (23237): # Check VirGL process health if PID file exists
+04-16 21:44:57.291 I/RLT     (23237): ACTIVE_SESSION_DIR="$HOME/.rlt-sess… workdir=<default> background=true stdinLen=0 timeoutMs=5000 | thread=main
+04-16 21:44:57.291 I/RLT     (23237): +419683ms [CMD] [id=14] awaiting result: deferred created pendingResultsSize=1 timeoutMs=5000 | thread=main
+04-16 21:44:57.293 I/RLT     (23237): +419685ms [CMD] [id=14] intent built: action=com.termux.RUN_COMMAND component=com.termux/com.termux.app.RunCommandService extras=[PATH=/data/data/com.termux/files/usr/bin/bash BACKGROUND=true STDIN=absent PENDING_INTENT=present] | thread=main
+04-16 21:44:57.296 I/RLT     (23237): +419687ms [CMD] [id=14] startService: success | thread=main
+04-16 21:44:57.315 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:44:57.325 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:44:57.342 I/RLT     (23237): +419733ms [LIFECYCLE] TermuxResultService.onCreate | thread=main
+04-16 21:44:57.342 I/RLT     (23237): +419734ms [CMD] [id=14] onStartCommand: executionId=14 exitCode=0 errCode=-1 errmsg=null stdoutPreview='session=no virgl=n/a
+04-16 21:44:57.342 I/RLT     (23237): ' stderrPreview='' resultBundle=true pendingResultsSize=1 | thread=main
+04-16 21:44:57.342 I/RLT     (23237): +419734ms [CMD] [id=14] handleResult: executionId=14 exitCode=0 errCode=-1 errmsg=null stdoutLen=21 stdoutPreview='session=no virgl=n/a
+04-16 21:44:57.342 I/RLT     (23237): ' stderrLen=0 stderrPreview='' | thread=main
+04-16 21:44:57.342 I/RLT     (23237): +419734ms [CMD] [id=14] handleResult: deferred found in pendingResults — completing mapSizeAfter=0 | thread=main
+04-16 21:44:57.343 I/RLT     (23237): +419734ms [CMD] [id=14] result: exitCode=0 error=null stdoutLen=21 stderrLen=0 durationMs=49 | thread=main
+04-16 21:44:57.343 D/RLT     (23237): +419735ms [SESSION] debounce: stopped count=1/3, keeping previous state | thread=main
+04-16 21:44:57.734 W/ActivityManager( 1701): pid 3247 com.google.android.gms.persistent sent binder code 2 with flags 1 to frozen apps and got error -32
+04-16 21:44:57.842 I/RLT     (23237): +420234ms [LIFECYCLE] TermuxResultService.stopSelfIfIdle: no pending results — stopSelf(startId=1) | thread=main
+04-16 21:44:57.844 I/RLT     (23237): +420236ms [LIFECYCLE] TermuxResultService.onDestroy: pendingResults=0 (not clearing — deferreds are static, outlive service instances) | thread=main
+04-16 21:45:02.344 D/RLT     (23237): +424736ms [CMD] TermuxResultRegistry: created executionId=15 corr=15 | thread=main
+04-16 21:45:02.345 I/RLT     (23237): +424737ms [CMD] [id=15] execute: commandPath=/data/data/com.termux/files/usr/bin/bash args=-c SESSION_ALIVE="no"
+04-16 21:45:02.345 I/RLT     (23237): VIRGL_STATUS="n/a"
+04-16 21:45:02.345 I/RLT     (23237): if [ -f "$PREFIX/tmp/.rlt-session-alive" ]; then
+04-16 21:45:02.345 I/RLT     (23237):     SESSION_ALIVE="yes"
+04-16 21:45:02.345 I/RLT     (23237): fi
+04-16 21:45:02.345 I/RLT     (23237): # Check VirGL process health if PID file exists
+04-16 21:45:02.345 I/RLT     (23237): ACTIVE_SESSION_DIR="$HOME/.rlt-sess… workdir=<default> background=true stdinLen=0 timeoutMs=5000 | thread=main
+04-16 21:45:02.346 I/RLT     (23237): +424737ms [CMD] [id=15] awaiting result: deferred created pendingResultsSize=1 timeoutMs=5000 | thread=main
+04-16 21:45:02.348 I/RLT     (23237): +424739ms [CMD] [id=15] intent built: action=com.termux.RUN_COMMAND component=com.termux/com.termux.app.RunCommandService extras=[PATH=/data/data/com.termux/files/usr/bin/bash BACKGROUND=true STDIN=absent PENDING_INTENT=present] | thread=main
+04-16 21:45:02.353 I/RLT     (23237): +424744ms [CMD] [id=15] startService: success | thread=main
+04-16 21:45:02.374 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:45:02.378 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:45:02.398 I/RLT     (23237): +424789ms [LIFECYCLE] TermuxResultService.onCreate | thread=main
+04-16 21:45:02.399 I/RLT     (23237): +424790ms [CMD] [id=15] onStartCommand: executionId=15 exitCode=0 errCode=-1 errmsg=null stdoutPreview='session=no virgl=n/a
+04-16 21:45:02.399 I/RLT     (23237): ' stderrPreview='' resultBundle=true pendingResultsSize=1 | thread=main
+04-16 21:45:02.399 I/RLT     (23237): +424791ms [CMD] [id=15] handleResult: executionId=15 exitCode=0 errCode=-1 errmsg=null stdoutLen=21 stdoutPreview='session=no virgl=n/a
+04-16 21:45:02.399 I/RLT     (23237): ' stderrLen=0 stderrPreview='' | thread=main
+04-16 21:45:02.399 I/RLT     (23237): +424791ms [CMD] [id=15] handleResult: deferred found in pendingResults — completing mapSizeAfter=0 | thread=main
+04-16 21:45:02.400 I/RLT     (23237): +424791ms [CMD] [id=15] result: exitCode=0 error=null stdoutLen=21 stderrLen=0 durationMs=52 | thread=main
+04-16 21:45:02.400 D/RLT     (23237): +424792ms [SESSION] debounce: stopped count=2/3, keeping previous state | thread=main
+04-16 21:45:02.900 I/RLT     (23237): +425291ms [LIFECYCLE] TermuxResultService.stopSelfIfIdle: no pending results — stopSelf(startId=1) | thread=main
+04-16 21:45:02.903 I/RLT     (23237): +425295ms [LIFECYCLE] TermuxResultService.onDestroy: pendingResults=0 (not clearing — deferreds are static, outlive service instances) | thread=main
+04-16 21:45:07.401 D/RLT     (23237): +429792ms [CMD] TermuxResultRegistry: created executionId=16 corr=16 | thread=main
+04-16 21:45:07.402 I/RLT     (23237): +429793ms [CMD] [id=16] execute: commandPath=/data/data/com.termux/files/usr/bin/bash args=-c SESSION_ALIVE="no"
+04-16 21:45:07.402 I/RLT     (23237): VIRGL_STATUS="n/a"
+04-16 21:45:07.402 I/RLT     (23237): if [ -f "$PREFIX/tmp/.rlt-session-alive" ]; then
+04-16 21:45:07.402 I/RLT     (23237):     SESSION_ALIVE="yes"
+04-16 21:45:07.402 I/RLT     (23237): fi
+04-16 21:45:07.402 I/RLT     (23237): # Check VirGL process health if PID file exists
+04-16 21:45:07.402 I/RLT     (23237): ACTIVE_SESSION_DIR="$HOME/.rlt-sess… workdir=<default> background=true stdinLen=0 timeoutMs=5000 | thread=main
+04-16 21:45:07.402 I/RLT     (23237): +429794ms [CMD] [id=16] awaiting result: deferred created pendingResultsSize=1 timeoutMs=5000 | thread=main
+04-16 21:45:07.404 I/RLT     (23237): +429796ms [CMD] [id=16] intent built: action=com.termux.RUN_COMMAND component=com.termux/com.termux.app.RunCommandService extras=[PATH=/data/data/com.termux/files/usr/bin/bash BACKGROUND=true STDIN=absent PENDING_INTENT=present] | thread=main
+04-16 21:45:07.408 I/RLT     (23237): +429799ms [CMD] [id=16] startService: success | thread=main
+04-16 21:45:07.431 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:45:07.439 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:45:07.455 I/RLT     (23237): +429847ms [LIFECYCLE] TermuxResultService.onCreate | thread=main
+04-16 21:45:07.456 I/RLT     (23237): +429848ms [CMD] [id=16] onStartCommand: executionId=16 exitCode=0 errCode=-1 errmsg=null stdoutPreview='session=no virgl=n/a
+04-16 21:45:07.456 I/RLT     (23237): ' stderrPreview='' resultBundle=true pendingResultsSize=1 | thread=main
+04-16 21:45:07.457 I/RLT     (23237): +429848ms [CMD] [id=16] handleResult: executionId=16 exitCode=0 errCode=-1 errmsg=null stdoutLen=21 stdoutPreview='session=no virgl=n/a
+04-16 21:45:07.457 I/RLT     (23237): ' stderrLen=0 stderrPreview='' | thread=main
+04-16 21:45:07.457 I/RLT     (23237): +429848ms [CMD] [id=16] handleResult: deferred found in pendingResults — completing mapSizeAfter=0 | thread=main
+04-16 21:45:07.457 I/RLT     (23237): +429849ms [CMD] [id=16] result: exitCode=0 error=null stdoutLen=21 stderrLen=0 durationMs=52 | thread=main
+04-16 21:45:07.457 I/RLT     (23237): +429849ms [STATE] RuneLiteSessionService.handleHealthStateChange: com.runelitetablet.session.SessionState$Starting@c3715e3 -> com.runelitetablet.session.SessionState$Stopped@cb1abe0 | thread=main
+04-16 21:45:07.461 I/RLT     (23237): +429852ms [STATE] TermuxProcessPin: unbindService ok | thread=main
+04-16 21:45:07.958 I/RLT     (23237): +430349ms [LIFECYCLE] TermuxResultService.stopSelfIfIdle: no pending results — stopSelf(startId=1) | thread=main
+04-16 21:45:07.961 I/RLT     (23237): +430352ms [LIFECYCLE] TermuxResultService.onDestroy: pendingResults=0 (not clearing — deferreds are static, outlive service instances) | thread=main
+04-16 21:49:40.882 I/RLT     (25746): CPUSET launch-script-entry pid=25739 cpuset=/
+04-16 21:49:43.513 I/LorieNative(25873): XlorieIdentity: where=activity.constructor pid=25873 prog=app_process exe=/system/bin/app_process64 so=/data/app/~~iNwcSjv3C2CZCLwcLxpEtA==/com.termux.x11-1tus8NhfW98goVF914TrYw==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=/system/bin/app_process -Xnoimage-dex2oat / com.termux.x11.Loader :0 
+04-16 21:49:43.513 I/LorieNative(25873): XlorieIdentity: where=activity.JNI_OnLoad pid=25873 prog=app_process exe=/system/bin/app_process64 so=/data/app/~~iNwcSjv3C2CZCLwcLxpEtA==/com.termux.x11-1tus8NhfW98goVF914TrYw==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=/system/bin/app_process -Xnoimage-dex2oat / com.termux.x11.Loader :0 
+04-16 21:49:43.515 I/LorieNative(25873): XlorieIdentity: where=cmd.start pid=25873 prog=app_process exe=/system/bin/app_process64 so=/data/app/~~iNwcSjv3C2CZCLwcLxpEtA==/com.termux.x11-1tus8NhfW98goVF914TrYw==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=/system/bin/app_process -Xnoimage-dex2oat / com.termux.x11.Loader :0 
+04-16 21:49:43.515 V/LorieNative(25873): Using TMPDIR="/data/data/com.termux/files/usr/tmp"
+04-16 21:49:43.599 I/RLT     (23237): +705991ms [STEP] [hybrid_x11] TermuxX11StartReceiver: received ACTION_START binder=alive | thread=main
+04-16 21:49:43.600 D/RLT     (23237): +705992ms [HYBRID_X11] HybridX11Bridge: broadcast rate=0.0/s (count=1 window=1776390583600ms) | thread=main
+04-16 21:49:43.600 I/RLT     (23237): +705992ms [IPC] receive binder latency=0ms HybridX11Bridge.attach hash=14581448 alive=true | thread=main
+04-16 21:49:43.600 D/RLT     (23237): +705992ms [HYBRID_X11] HybridX11Bridge: linkToDeath registered | thread=main
+04-16 21:49:43.601 I/RLT     (23237): +705992ms [STEP] [hybrid_x11] HybridX11Bridge: attached broadcastCount=1 generation=1 binderToken=14581448 binderAlive=true | thread=main
+04-16 21:49:43.615 D/LorieNative(25873): shader: type=VERTEX status=1
+04-16 21:49:43.615 D/LorieNative(25873): shader: type=FRAGMENT status=1
+04-16 21:49:43.620 D/LorieNative(25873): shader: type=VERTEX status=1
+04-16 21:49:43.620 D/LorieNative(25873): shader: type=FRAGMENT status=1
+04-16 21:49:43.632 I/LorieNative(25873): PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=AHARDWAREBUFFER format=5 imported=0 flipped=0 mem=0 id=0
+04-16 21:49:43.632 I/LorieNative(25873): PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=1
+04-16 21:49:43.633 I/LorieNative(25873): PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=2
+04-16 21:49:43.633 I/LorieNative(25873): PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=REGULAR format=5 imported=0 flipped=0 mem=0 id=3
+04-16 21:49:44.140 I/RLT     (23237): +706532ms [LIFECYCLE] MainActivity.onPause: unbindActions called | thread=main
+04-16 21:49:44.141 I/RLT     (23237): +706532ms [PERF] onPause: heap: used=28MB free=0MB max=256MB | disk: free=172411MB total=225922MB | thread=main
+04-16 21:49:44.162 I/LorieNative(23237): XlorieIdentity: where=activity.constructor pid=23237 prog=com.runelitetablet exe=/system/bin/app_process64 so=/data/app/~~7N0waZDB92DEx5YeEV00pg==/com.runelitetablet-X1VsPme7kdaPiYwFbcKLYA==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=com.runelitetablet                                                                                 
+04-16 21:49:44.162 I/LorieNative(23237): XlorieIdentity: where=activity.JNI_OnLoad pid=23237 prog=com.runelitetablet exe=/system/bin/app_process64 so=/data/app/~~7N0waZDB92DEx5YeEV00pg==/com.runelitetablet-X1VsPme7kdaPiYwFbcKLYA==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=com.runelitetablet                                                                                 
+04-16 21:49:44.162 I/RLT     (23237): +706554ms [STEP] [hybrid_x11] ExternalXlorieLoader: loaded packaged Xlorie | thread=main
+04-16 21:49:44.164 I/LorieNative(23237): XlorieIdentity: where=activity.nativeInit pid=23237 prog=com.runelitetablet exe=/system/bin/app_process64 so=/data/app/~~7N0waZDB92DEx5YeEV00pg==/com.runelitetablet-X1VsPme7kdaPiYwFbcKLYA==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=com.runelitetablet                                                                                 
+04-16 21:49:44.164 I/LorieNative(23237): nativeInit: initializing JNI class/method lookups
+04-16 21:49:44.164 D/LorieNative(23237): nativeInit: Charset class+methods OK
+04-16 21:49:44.164 D/LorieNative(23237): nativeInit: CharBuffer class+methods OK
+04-16 21:49:44.164 I/LorieNative(23237): nativeInit: all 16 JNI methods registered successfully
+04-16 21:49:44.164 I/LorieNative(23237): nativeInit: AttachCurrentThread result=0 env=0xb40000733f9b1f10
+04-16 21:49:44.165 I/RLT     (23237): +706556ms [STEP] [hybrid_x11] Hybrid LorieView.reloadPreferences clipboardSync=true | thread=main
+04-16 21:49:44.166 I/RLT     (23237): +706557ms [THREAD] launcher->main op=observeBridgeState collecting bridge state | thread=main
+04-16 21:49:44.166 I/RLT     (23237): +706558ms [STEP] [hybrid_x11] HybridX11HostActivity: bridge updated generation=1, reconnecting | thread=main
+04-16 21:49:44.166 I/RLT     (23237): +706558ms [LIFECYCLE] HybridX11HostActivity.onCreate | thread=main
+04-16 21:49:44.166 I/RLT     (23237): +706558ms [STEP] [hybrid_x11] HybridX11HostActivity: loaded Xlorie from packaged:Xlorie | thread=main
+04-16 21:49:44.167 I/RLT     (23237): +706559ms [THREAD] scope->main op=attachLoop retry attempt=1 | thread=main
+04-16 21:49:44.168 D/RLT     (23237): +706559ms [HYBRID_X11] tryAttach: forceReconnect=true logcatAttached=false xConnectionAttached=false | thread=main
+04-16 21:49:44.168 W/RLT     (23237): +706560ms [HYBRID_X11] LorieServiceConnector.attachLogcat: getLogcatOutput returned null | thread=main
+04-16 21:49:44.168 D/RLT     (23237): +706560ms [HYBRID_X11] LorieServiceConnector.attachXConnection: binder=alive | thread=main
+04-16 21:49:44.169 I/LorieNative(25873): XlorieIdentity: where=cmd.getXConnection pid=25873 prog=app_process exe=/system/bin/app_process64 so=/data/app/~~iNwcSjv3C2CZCLwcLxpEtA==/com.termux.x11-1tus8NhfW98goVF914TrYw==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=/system/bin/app_process -Xnoimage-dex2oat / com.termux.x11.Loader :0 
+04-16 21:49:44.169 I/LorieNative(25873): Sent shared buffer width 1280 stride 1280 height 1024 format 5 type 3 id 0
+04-16 21:49:44.169 I/RLT     (23237): +706561ms [FD] detach fd=163 path=xConnection LorieServiceConnector.attachXConnection | thread=main
+04-16 21:49:44.169 I/RLT     (23237): +706561ms [FD] detach fd=163 path=xConnection LorieServiceConnector.attachXConnection | thread=main
+04-16 21:49:44.170 D/LorieNative(23237): connect_: new fd=163 added to ALooper (old_fd=-1)
+04-16 21:49:44.170 I/RLT     (23237): +706561ms [FD] close fd=163 path=xConnection consumed by JNI connect | thread=main
+04-16 21:49:44.170 I/RLT     (23237): +706561ms [STEP] [hybrid_x11] Xlorie MainActivity shim: clientConnectedStateChanged connected=true | thread=main
+04-16 21:49:44.170 I/RLT     (23237): +706561ms [STEP] [hybrid_x11] HybridX11HostActivity: connected=true | thread=main
+04-16 21:49:44.170 I/RLT     (23237): +706561ms [STEP] [hybrid_x11] Hybrid LorieView.reloadPreferences clipboardSync=true | thread=main
+04-16 21:49:44.170 I/RLT     (23237): +706562ms [IPC] send jni_connect latency=1ms fd=163 binder=alive | thread=main
+04-16 21:49:44.170 I/RLT     (23237): +706562ms [HYBRID_X11] tryAttach: xConnection attached latency=1ms | thread=main
+04-16 21:49:44.170 I/RLT     (23237): +706562ms [STEP] [hybrid_x11] HybridX11HostActivity: attached xConnection | thread=main
+04-16 21:49:44.170 I/RLT     (23237): +706562ms [STEP] [hybrid_x11] Hybrid LorieView.reloadPreferences clipboardSync=true | thread=main
+04-16 21:49:44.170 I/RLT     (23237): +706562ms [STEP] [hybrid_x11] Xlorie MainActivity shim: clientConnectedStateChanged connected=true | thread=main
+04-16 21:49:44.170 I/RLT     (23237): +706562ms [STEP] [hybrid_x11] HybridX11HostActivity: connected=true | thread=main
+04-16 21:49:44.171 I/RLT     (23237): +706562ms [PERF] PERF_DASHBOARD: started interval=10s | thread=main
+04-16 21:49:44.171 D/RLT     (23237): +706562ms [CMD] TermuxResultRegistry: created executionId=17 corr=17 | thread=main
+04-16 21:49:44.171 I/RLT     (23237): +706562ms [CMD] [id=17] execute: commandPath=/data/data/com.termux/files/usr/bin/bash args=-c SESSION_DIR=$(cat $PREFIX/tmp/rlt-session/current 2>/dev/null); echo virgl=$(cat $SESSION_DIR/virgl.pid 2>/dev/null); echo java=$(cat $SESSION_DIR/java.pid 2>/dev/null) workdir=<default> background=true stdinLen=0 timeoutMs=10000 | thread=main
+04-16 21:49:44.171 I/RLT     (23237): +706562ms [CMD] [id=17] awaiting result: deferred created pendingResultsSize=1 timeoutMs=10000 | thread=main
+04-16 21:49:44.171 I/RLT     (23237): +706563ms [CMD] [id=17] intent built: action=com.termux.RUN_COMMAND component=com.termux/com.termux.app.RunCommandService extras=[PATH=/data/data/com.termux/files/usr/bin/bash BACKGROUND=true STDIN=absent PENDING_INTENT=present] | thread=main
+04-16 21:49:44.172 I/RLT     (23237): +706564ms [CMD] [id=17] startService: success | thread=main
+04-16 21:49:44.172 I/RLT     (23237): +706564ms [LIFECYCLE] HybridX11HostActivity.onResume: frame callback + attach loop + perf dashboard started, sessionId=frames-f7b0 | thread=main
+04-16 21:49:44.173 D/LorieNative(23237): shader: type=VERTEX status=1
+04-16 21:49:44.173 D/LorieNative(23237): shader: type=FRAGMENT status=1
+04-16 21:49:44.173 D/LorieNative(23237): shader: type=VERTEX status=1
+04-16 21:49:44.173 D/LorieNative(23237): shader: type=FRAGMENT status=1
+04-16 21:49:44.178 D/LorieNative(23237): xcallback: EVENT_SHARED_SERVER_STATE stateFd=197
+04-16 21:49:44.178 D/LorieNative(23237): xcallback: mmap success addr=0x7126726000 size=1048760 fd=197
+04-16 21:49:44.179 I/LorieNative(23237): Received shared buffer width 1280 stride 1280 height 1024 format 5 type 3 id 0
+04-16 21:49:44.179 D/LorieNative(23237): buffer: alloc count=1 (free=0 outstanding=1)
+04-16 21:49:44.189 I/SurfaceView(23237): 158651211 Changes: creating=true format=true size=true visible=true alpha=false hint=false left=true top=true z=false attached=true lifecycleStrategy=false
+04-16 21:49:44.190 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:49:44.192 I/SurfaceView(23237): 158651211 Cur surface: Surface(name=null mNativeObject=0)/@0x42b0458
+04-16 21:49:44.192 I/SurfaceView(23237): 158651211 visibleChanged -- surfaceCreated
+04-16 21:49:44.192 I/SurfaceView(23237): 158651211 Changes: creating=true format=true size=false visible=false alpha=false hint=false left=false top=false z=false attached=true lifecycleStrategy=false
+04-16 21:49:44.192 I/SurfaceView(23237): 158651211 Cur surface: Surface(name=null mNativeObject=-5476376658604646192)/@0x42b0458
+04-16 21:49:44.193 I/SurfaceView(23237): 158651211 surfaceDestroyed
+04-16 21:49:44.193 I/RLT     (23237): +706584ms [SURFACE] destroyed 0x0 fmt= lifetime=0ms | thread=main
+04-16 21:49:44.193 I/RLT     (23237): +706585ms [STEP] [hybrid_x11] HybridInputController: host=0x0 client=0x0 | thread=main
+04-16 21:49:44.193 I/RLT     (23237): +706585ms [STEP] [hybrid_x11] HybridX11HostActivity: surface=0x0 screen=0x0 refresh=120 | thread=main
+04-16 21:49:44.193 I/SurfaceView(23237): 158651211 visibleChanged -- surfaceCreated
+04-16 21:49:44.194 I/RLT     (23237): +706585ms [SURFACE] created 2960x1848 fmt=BGRA_8888 holder=android.view.SurfaceView$1@5b3d9b1 requestedFormat=BGRA_8888(5) — format matters for Xlorie legacy drawing path | thread=main
+04-16 21:49:44.194 I/SurfaceView(23237): 158651211 surfaceChanged -- format=5 w=2960 h=1848
+04-16 21:49:44.194 I/RLT     (23237): +706585ms [SURFACE] changed 2960x1848 fmt=BGRA_8888 measured=2960x1848 jniLatency=0ms actualFormat=5 requestedFormat=BGRA_8888(5) — format mismatch blocks Xlorie legacy drawing | thread=main
+04-16 21:49:44.194 I/RLT     (23237): +706585ms [IPC] send jni_surfaceChanged latency=0ms surface=true | thread=main
+04-16 21:49:44.194 I/RLT     (23237): +706586ms [IPC] send jni_sendWindowChange latency=0ms width=2960 height=1848 framerate=120 | thread=main
+04-16 21:49:44.194 I/RLT     (23237): +706586ms [STEP] [hybrid_x11] HybridInputController: host=2960x1848 client=2960x1848 | thread=main
+04-16 21:49:44.194 W/ActivityManager( 1701): Foreground service started from background can not have location/camera/microphone access: service com.termux/.app.TermuxService
+04-16 21:49:44.194 I/RLT     (23237): +706586ms [STEP] [hybrid_x11] HybridX11HostActivity: surface=2960x1848 screen=2960x1848 refresh=120 | thread=main
+04-16 21:49:44.194 I/SurfaceView(23237): 158651211 surfaceRedrawNeeded
+04-16 21:49:44.194 I/SurfaceView(23237): 158651211 finishedDrawing
+04-16 21:49:44.195 I/RLT     (23237): +706586ms [SURFACE] created 2960x1848 fmt=BGRA_8888 holder=android.view.SurfaceView$1@5b3d9b1 requestedFormat=BGRA_8888(5) — format matters for Xlorie legacy drawing path | thread=main
+04-16 21:49:44.195 I/SurfaceView(23237): 158651211 surfaceChanged -- format=5 w=2960 h=1848
+04-16 21:49:44.198 I/LorieNative(25873): PixmapTrace: CreatePixmap pixmap=0x0 drawable=0x0 hasPriv=1 hasBuffer=1 type=AHARDWAREBUFFER format=5 imported=0 flipped=0 mem=0 id=4
+04-16 21:49:44.200 I/LorieNative(25873): PixmapTrace: SetWindowPixmap old-root pixmap=0xb400007595f74d90 drawable=1280x1024 hasPriv=1 hasBuffer=1 type=AHARDWAREBUFFER format=5 imported=0 flipped=0 mem=0 id=0
+04-16 21:49:44.200 I/LorieNative(25873): PixmapTrace: SetWindowPixmap new-root pixmap=0xb400007595f77090 drawable=2960x1848 hasPriv=1 hasBuffer=1 type=AHARDWAREBUFFER format=5 imported=0 flipped=0 mem=0 id=4
+04-16 21:49:44.200 I/LorieNative(25873): Sent shared buffer width 2960 stride 2960 height 1848 format 5 type 3 id 4
+04-16 21:49:44.202 V/LorieNative(25873): New reported framerate is 120
+04-16 21:49:44.203 I/RLT     (23237): +706594ms [SURFACE] changed 2960x1848 fmt=BGRA_8888 measured=2960x1848 jniLatency=7ms actualFormat=5 requestedFormat=BGRA_8888(5) — format mismatch blocks Xlorie legacy drawing | thread=main
+04-16 21:49:44.203 I/RLT     (23237): +706594ms [IPC] send jni_surfaceChanged latency=7ms surface=true | thread=main
+04-16 21:49:44.203 I/RLT     (23237): +706594ms [IPC] send jni_sendWindowChange latency=0ms width=2960 height=1848 framerate=120 | thread=main
+04-16 21:49:44.203 I/RLT     (23237): +706595ms [STEP] [hybrid_x11] HybridInputController: host=2960x1848 client=2960x1848 | thread=main
+04-16 21:49:44.203 I/SurfaceView(23237): 158651211 surfaceRedrawNeeded
+04-16 21:49:44.203 I/SurfaceView(23237): 158651211 finishedDrawing
+04-16 21:49:44.208 D/LorieNative(23237): xcallback: EVENT_REMOVE_BUFFER id=0
+04-16 21:49:44.208 D/LorieNative(23237): buffer: free count=1 (alloc=1 outstanding=0)
+04-16 21:49:44.208 I/LorieNative(23237): Received shared buffer width 2960 stride 2960 height 1848 format 5 type 3 id 4
+04-16 21:49:44.208 D/LorieNative(23237): buffer: alloc count=2 (free=1 outstanding=1)
+04-16 21:49:44.208 W/RLT     (23237): +706600ms [SURFACE] triggerCallback: post delayed 43ms (UI thread saturated?) | thread=main
+04-16 21:49:44.223 I/RLT     (23237): +706615ms [SURFACE] changed 2960x1848 fmt=BGRA_8888 measured=2960x1848 jniLatency=14ms actualFormat=5 requestedFormat=BGRA_8888(5) — format mismatch blocks Xlorie legacy drawing | thread=main
+04-16 21:49:44.223 I/RLT     (23237): +706615ms [IPC] send jni_surfaceChanged latency=14ms surface=true | thread=main
+04-16 21:49:44.223 I/RLT     (23237): +706615ms [IPC] send jni_sendWindowChange latency=0ms width=2960 height=1848 framerate=120 | thread=main
+04-16 21:49:44.224 I/RLT     (23237): +706615ms [STEP] [hybrid_x11] HybridInputController: host=2960x1848 client=2960x1848 | thread=main
+04-16 21:49:44.224 W/RLT     (23237): +706615ms [SURFACE] triggerCallback: post delayed 53ms (UI thread saturated?) | thread=main
+04-16 21:49:44.237 I/RLT     (23237): +706628ms [SURFACE] changed 2960x1848 fmt=BGRA_8888 measured=2960x1848 jniLatency=12ms actualFormat=5 requestedFormat=BGRA_8888(5) — format mismatch blocks Xlorie legacy drawing | thread=main
+04-16 21:49:44.237 I/RLT     (23237): +706629ms [IPC] send jni_surfaceChanged latency=12ms surface=true | thread=main
+04-16 21:49:44.237 I/RLT     (23237): +706629ms [IPC] send jni_sendWindowChange latency=0ms width=2960 height=1848 framerate=120 | thread=main
+04-16 21:49:44.237 I/RLT     (23237): +706629ms [STEP] [hybrid_x11] HybridInputController: host=2960x1848 client=2960x1848 | thread=main
+04-16 21:49:44.238 W/RLT     (23237): +706630ms [JANK] frame=2 actual=58.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:44.248 I/RLT     (23237): +706640ms [LIFECYCLE] TermuxResultService.onCreate | thread=main
+04-16 21:49:44.249 I/RLT     (23237): +706640ms [CMD] [id=17] onStartCommand: executionId=17 exitCode=0 errCode=-1 errmsg=null stdoutPreview='virgl=
+04-16 21:49:44.249 I/RLT     (23237): java=
+04-16 21:49:44.249 I/RLT     (23237): ' stderrPreview='' resultBundle=true pendingResultsSize=1 | thread=main
+04-16 21:49:44.249 I/RLT     (23237): +706641ms [CMD] [id=17] handleResult: executionId=17 exitCode=0 errCode=-1 errmsg=null stdoutLen=13 stdoutPreview='virgl=
+04-16 21:49:44.249 I/RLT     (23237): java=
+04-16 21:49:44.249 I/RLT     (23237): ' stderrLen=0 stderrPreview='' | thread=main
+04-16 21:49:44.249 I/RLT     (23237): +706641ms [CMD] [id=17] handleResult: deferred found in pendingResults — completing mapSizeAfter=0 | thread=main
+04-16 21:49:44.249 I/RLT     (23237): +706641ms [CMD] [id=17] result: exitCode=0 error=null stdoutLen=13 stderrLen=0 durationMs=78 | thread=main
+04-16 21:49:44.250 W/RLT     (23237): +706641ms [CPU_BOOST] No PIDs found in session: virgl=
+04-16 21:49:44.250 W/RLT     (23237): java=
+04-16 21:49:44.250 W/RLT     (23237):  | thread=main
+04-16 21:49:44.696 I/LorieNative(25934): XlorieIdentity: where=activity.constructor pid=25934 prog=app_process exe=/system/bin/app_process64 so=/data/app/~~iNwcSjv3C2CZCLwcLxpEtA==/com.termux.x11-1tus8NhfW98goVF914TrYw==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=/system/bin/app_process -Xnoimage-dex2oat / com.termux.x11.Loader fullscreen:true 
+04-16 21:49:44.696 I/LorieNative(25934): XlorieIdentity: where=activity.JNI_OnLoad pid=25934 prog=app_process exe=/system/bin/app_process64 so=/data/app/~~iNwcSjv3C2CZCLwcLxpEtA==/com.termux.x11-1tus8NhfW98goVF914TrYw==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=/system/bin/app_process -Xnoimage-dex2oat / com.termux.x11.Loader fullscreen:true 
+04-16 21:49:44.735 D/LorieNative(25934): shader: type=VERTEX status=1
+04-16 21:49:44.736 D/LorieNative(25934): shader: type=FRAGMENT status=1
+04-16 21:49:44.740 D/LorieNative(25934): shader: type=VERTEX status=1
+04-16 21:49:44.740 D/LorieNative(25934): shader: type=FRAGMENT status=1
+04-16 21:49:44.751 I/RLT     (23237): +707142ms [LIFECYCLE] TermuxResultService.stopSelfIfIdle: no pending results — stopSelf(startId=1) | thread=main
+04-16 21:49:44.754 I/RLT     (23237): +707145ms [LIFECYCLE] TermuxResultService.onDestroy: pendingResults=0 (not clearing — deferreds are static, outlive service instances) | thread=main
+04-16 21:49:45.005 W/RLT     (23237): +707396ms [JANK] frame=92 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.046 W/RLT     (23237): +707437ms [JANK] frame=93 actual=41.8ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.080 W/RLT     (23237): +707471ms [JANK] frame=94 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.113 W/RLT     (23237): +707504ms [JANK] frame=95 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.146 W/RLT     (23237): +707538ms [JANK] frame=96 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.179 W/RLT     (23237): +707571ms [JANK] frame=97 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.213 W/RLT     (23237): +707604ms [JANK] frame=98 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.246 W/RLT     (23237): +707637ms [JANK] frame=99 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.279 W/RLT     (23237): +707670ms [JANK] frame=100 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.312 W/RLT     (23237): +707704ms [JANK] frame=101 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.346 W/RLT     (23237): +707738ms [JANK] frame=102 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.380 W/RLT     (23237): +707771ms [JANK] frame=103 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.413 W/RLT     (23237): +707804ms [JANK] frame=104 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.446 W/RLT     (23237): +707838ms [JANK] frame=105 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.480 W/RLT     (23237): +707871ms [JANK] frame=106 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.512 W/RLT     (23237): +707904ms [JANK] frame=107 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.546 W/RLT     (23237): +707938ms [JANK] frame=108 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.580 W/RLT     (23237): +707971ms [JANK] frame=109 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.612 W/RLT     (23237): +708004ms [JANK] frame=110 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.646 W/RLT     (23237): +708038ms [JANK] frame=111 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.679 W/RLT     (23237): +708071ms [JANK] frame=112 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.712 W/RLT     (23237): +708104ms [JANK] frame=113 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.746 W/RLT     (23237): +708138ms [JANK] frame=114 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.779 W/RLT     (23237): +708170ms [JANK] frame=115 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.813 W/RLT     (23237): +708205ms [JANK] frame=116 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.846 W/RLT     (23237): +708238ms [JANK] frame=117 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.879 W/RLT     (23237): +708271ms [JANK] frame=118 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.912 W/RLT     (23237): +708303ms [JANK] frame=119 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.946 I/RLT     (23237): +708338ms [THREAD] Choreographer->main op=doFrame frame=120 | thread=main
+04-16 21:49:45.948 I/RLT     (23237): +708339ms [FRAME] fps=67.4 jank=30 p99=33.3ms heap=6MB periodic corr=frames-f7b0 | thread=main
+04-16 21:49:45.948 W/RLT     (23237): +708339ms [JANK] frame=120 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:45.979 W/RLT     (23237): +708370ms [JANK] frame=121 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.012 W/RLT     (23237): +708404ms [JANK] frame=122 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.046 W/RLT     (23237): +708438ms [JANK] frame=123 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.080 W/RLT     (23237): +708471ms [JANK] frame=124 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.112 W/RLT     (23237): +708503ms [JANK] frame=125 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.146 W/RLT     (23237): +708537ms [JANK] frame=126 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.179 W/RLT     (23237): +708571ms [JANK] frame=127 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.212 W/RLT     (23237): +708604ms [JANK] frame=128 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.246 W/RLT     (23237): +708638ms [JANK] frame=129 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.279 W/RLT     (23237): +708671ms [JANK] frame=130 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.314 W/RLT     (23237): +708705ms [JANK] frame=131 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.347 W/RLT     (23237): +708738ms [JANK] frame=132 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.379 W/RLT     (23237): +708771ms [JANK] frame=133 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.412 W/RLT     (23237): +708803ms [JANK] frame=134 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.446 W/RLT     (23237): +708838ms [JANK] frame=135 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.479 W/RLT     (23237): +708871ms [JANK] frame=136 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.513 W/RLT     (23237): +708905ms [JANK] frame=137 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.546 W/RLT     (23237): +708938ms [JANK] frame=138 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.579 W/RLT     (23237): +708971ms [JANK] frame=139 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.612 W/RLT     (23237): +709004ms [JANK] frame=140 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.646 W/RLT     (23237): +709038ms [JANK] frame=141 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.679 W/RLT     (23237): +709071ms [JANK] frame=142 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.712 W/RLT     (23237): +709104ms [JANK] frame=143 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.746 W/RLT     (23237): +709138ms [JANK] frame=144 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.779 W/RLT     (23237): +709171ms [JANK] frame=145 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.812 W/RLT     (23237): +709203ms [JANK] frame=146 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.846 W/RLT     (23237): +709237ms [JANK] frame=147 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.879 W/RLT     (23237): +709270ms [JANK] frame=148 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.912 W/RLT     (23237): +709304ms [JANK] frame=149 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.946 W/RLT     (23237): +709338ms [JANK] frame=150 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:46.980 W/RLT     (23237): +709371ms [JANK] frame=151 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.013 W/RLT     (23237): +709404ms [JANK] frame=152 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.046 W/RLT     (23237): +709438ms [JANK] frame=153 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.079 W/RLT     (23237): +709471ms [JANK] frame=154 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.112 W/RLT     (23237): +709504ms [JANK] frame=155 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.146 W/RLT     (23237): +709537ms [JANK] frame=156 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.179 W/RLT     (23237): +709571ms [JANK] frame=157 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.212 W/RLT     (23237): +709604ms [JANK] frame=158 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.246 W/RLT     (23237): +709637ms [JANK] frame=159 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.298 W/RLT     (23237): +709689ms [JANK] frame=160 actual=51.9ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.314 W/RLT     (23237): +709705ms [JANK] frame=161 actual=16.7ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.704 W/RLT     (23237): +710096ms [JANK] frame=207 actual=16.7ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.738 W/RLT     (23237): +710129ms [JANK] frame=208 actual=33.4ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.771 W/RLT     (23237): +710163ms [JANK] frame=209 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.805 W/RLT     (23237): +710196ms [JANK] frame=210 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.838 W/RLT     (23237): +710229ms [JANK] frame=211 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.871 W/RLT     (23237): +710262ms [JANK] frame=212 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.905 W/RLT     (23237): +710297ms [JANK] frame=213 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.938 W/RLT     (23237): +710330ms [JANK] frame=214 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:47.971 W/RLT     (23237): +710362ms [JANK] frame=215 actual=33.4ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.004 W/RLT     (23237): +710396ms [JANK] frame=216 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.038 W/RLT     (23237): +710430ms [JANK] frame=217 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.071 W/RLT     (23237): +710463ms [JANK] frame=218 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.105 W/RLT     (23237): +710496ms [JANK] frame=219 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.138 W/RLT     (23237): +710529ms [JANK] frame=220 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.171 W/RLT     (23237): +710563ms [JANK] frame=221 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.204 W/RLT     (23237): +710596ms [JANK] frame=222 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.238 W/RLT     (23237): +710629ms [JANK] frame=223 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.272 W/RLT     (23237): +710663ms [JANK] frame=224 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.304 W/RLT     (23237): +710696ms [JANK] frame=225 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.338 W/RLT     (23237): +710730ms [JANK] frame=226 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.371 W/RLT     (23237): +710762ms [JANK] frame=227 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.404 W/RLT     (23237): +710796ms [JANK] frame=228 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.438 W/RLT     (23237): +710829ms [JANK] frame=229 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.471 W/RLT     (23237): +710862ms [JANK] frame=230 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.504 W/RLT     (23237): +710896ms [JANK] frame=231 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.538 W/RLT     (23237): +710929ms [JANK] frame=232 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.572 W/RLT     (23237): +710963ms [JANK] frame=233 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.605 W/RLT     (23237): +710996ms [JANK] frame=234 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.633 I/LorieNative(25873): choreographer callbacks in 5.0 seconds = 51.2 FPS
+04-16 21:49:48.634 I/LorieNative(25873): redraw wakeups in 5.0 seconds = 51.0 FPS
+04-16 21:49:48.635 I/LorieNative(25873): damage-triggered redraws in 5.0 seconds = 0.4 FPS
+04-16 21:49:48.635 I/LorieNative(25873): AhbLockTrace: sticky=0 lock_calls=2 unlock_calls=2 sticky_hits=11 flush_skipped=0 in 5.0s
+04-16 21:49:48.635 I/LorieNative(25873): present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-16 21:49:48.635 I/LorieNative(25873): present after-flips in 5.0 seconds = 0.0 FPS
+04-16 21:49:48.635 I/LorieNative(25873): 5 frames in 5.0 seconds = 1.0 FPS
+04-16 21:49:48.638 W/RLT     (23237): +711029ms [JANK] frame=235 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.672 W/RLT     (23237): +711063ms [JANK] frame=236 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.705 W/RLT     (23237): +711097ms [JANK] frame=237 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.738 W/RLT     (23237): +711129ms [JANK] frame=238 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.772 W/RLT     (23237): +711163ms [JANK] frame=239 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.805 I/RLT     (23237): +711196ms [THREAD] Choreographer->main op=doFrame frame=240 | thread=main
+04-16 21:49:48.807 I/RLT     (23237): +711198ms [FRAME] fps=42.1 jank=105 p99=33.4ms heap=7MB periodic corr=frames-f7b0 | thread=main
+04-16 21:49:48.807 W/RLT     (23237): +711199ms [JANK] frame=240 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.838 W/RLT     (23237): +711230ms [JANK] frame=241 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.872 W/RLT     (23237): +711263ms [JANK] frame=242 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.905 W/RLT     (23237): +711296ms [JANK] frame=243 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.938 W/RLT     (23237): +711330ms [JANK] frame=244 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:48.972 W/RLT     (23237): +711363ms [JANK] frame=245 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.004 W/RLT     (23237): +711396ms [JANK] frame=246 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.039 W/RLT     (23237): +711430ms [JANK] frame=247 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.072 W/RLT     (23237): +711463ms [JANK] frame=248 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.104 W/RLT     (23237): +711496ms [JANK] frame=249 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.138 W/RLT     (23237): +711530ms [JANK] frame=250 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.171 W/RLT     (23237): +711563ms [JANK] frame=251 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.203 W/RLT     (23237): +711595ms [JANK] frame=252 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.237 W/RLT     (23237): +711628ms [JANK] frame=253 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.270 W/RLT     (23237): +711661ms [JANK] frame=254 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.303 W/RLT     (23237): +711695ms [JANK] frame=255 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.336 W/RLT     (23237): +711728ms [JANK] frame=256 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.370 W/RLT     (23237): +711761ms [JANK] frame=257 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.403 W/RLT     (23237): +711795ms [JANK] frame=258 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.436 W/RLT     (23237): +711828ms [JANK] frame=259 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.470 W/RLT     (23237): +711862ms [JANK] frame=260 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.504 W/RLT     (23237): +711896ms [JANK] frame=261 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.537 W/RLT     (23237): +711929ms [JANK] frame=262 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.570 W/RLT     (23237): +711962ms [JANK] frame=263 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.604 W/RLT     (23237): +711996ms [JANK] frame=264 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.638 W/RLT     (23237): +712029ms [JANK] frame=265 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.670 W/RLT     (23237): +712062ms [JANK] frame=266 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.704 W/RLT     (23237): +712096ms [JANK] frame=267 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.737 W/RLT     (23237): +712128ms [JANK] frame=268 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.740 I/LorieNative(25969): XlorieIdentity: where=activity.constructor pid=25969 prog=app_process exe=/system/bin/app_process64 so=/data/app/~~iNwcSjv3C2CZCLwcLxpEtA==/com.termux.x11-1tus8NhfW98goVF914TrYw==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=/system/bin/app_process -Xnoimage-dex2oat / com.termux.x11.Loader showAdditionalKbd:false 
+04-16 21:49:49.741 I/LorieNative(25969): XlorieIdentity: where=activity.JNI_OnLoad pid=25969 prog=app_process exe=/system/bin/app_process64 so=/data/app/~~iNwcSjv3C2CZCLwcLxpEtA==/com.termux.x11-1tus8NhfW98goVF914TrYw==/base.apk!/lib/arm64-v8a/libXlorie.so cmdline=/system/bin/app_process -Xnoimage-dex2oat / com.termux.x11.Loader showAdditionalKbd:false 
+04-16 21:49:49.771 W/RLT     (23237): +712162ms [JANK] frame=269 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.791 D/LorieNative(25969): shader: type=VERTEX status=1
+04-16 21:49:49.791 D/LorieNative(25969): shader: type=FRAGMENT status=1
+04-16 21:49:49.795 D/LorieNative(25969): shader: type=VERTEX status=1
+04-16 21:49:49.795 D/LorieNative(25969): shader: type=FRAGMENT status=1
+04-16 21:49:49.804 W/RLT     (23237): +712196ms [JANK] frame=270 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.838 W/RLT     (23237): +712230ms [JANK] frame=271 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.871 W/RLT     (23237): +712263ms [JANK] frame=272 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.905 W/RLT     (23237): +712296ms [JANK] frame=273 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.939 W/RLT     (23237): +712330ms [JANK] frame=274 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:49.971 W/RLT     (23237): +712363ms [JANK] frame=275 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.005 W/RLT     (23237): +712396ms [JANK] frame=276 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.039 W/RLT     (23237): +712431ms [JANK] frame=277 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.072 W/RLT     (23237): +712464ms [JANK] frame=278 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.104 W/RLT     (23237): +712496ms [JANK] frame=279 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.138 W/RLT     (23237): +712530ms [JANK] frame=280 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.172 W/RLT     (23237): +712563ms [JANK] frame=281 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.205 W/RLT     (23237): +712596ms [JANK] frame=282 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.238 W/RLT     (23237): +712630ms [JANK] frame=283 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.272 W/RLT     (23237): +712663ms [JANK] frame=284 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.305 W/RLT     (23237): +712696ms [JANK] frame=285 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.338 W/RLT     (23237): +712730ms [JANK] frame=286 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.371 W/RLT     (23237): +712763ms [JANK] frame=287 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.405 W/RLT     (23237): +712796ms [JANK] frame=288 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.439 W/RLT     (23237): +712830ms [JANK] frame=289 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.472 W/RLT     (23237): +712863ms [JANK] frame=290 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.505 W/RLT     (23237): +712896ms [JANK] frame=291 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.539 W/RLT     (23237): +712931ms [JANK] frame=292 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.572 W/RLT     (23237): +712963ms [JANK] frame=293 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.605 W/RLT     (23237): +712997ms [JANK] frame=294 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.639 W/RLT     (23237): +713030ms [JANK] frame=295 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.671 W/RLT     (23237): +713063ms [JANK] frame=296 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.705 W/RLT     (23237): +713096ms [JANK] frame=297 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.739 W/RLT     (23237): +713131ms [JANK] frame=298 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.772 W/RLT     (23237): +713163ms [JANK] frame=299 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.805 W/RLT     (23237): +713197ms [JANK] frame=300 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.838 W/RLT     (23237): +713230ms [JANK] frame=301 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.872 W/RLT     (23237): +713263ms [JANK] frame=302 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.906 W/RLT     (23237): +713297ms [JANK] frame=303 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.939 W/RLT     (23237): +713331ms [JANK] frame=304 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:50.972 W/RLT     (23237): +713363ms [JANK] frame=305 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.005 W/RLT     (23237): +713396ms [JANK] frame=306 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.039 W/RLT     (23237): +713431ms [JANK] frame=307 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.072 W/RLT     (23237): +713463ms [JANK] frame=308 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.105 W/RLT     (23237): +713497ms [JANK] frame=309 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.139 W/RLT     (23237): +713530ms [JANK] frame=310 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.172 W/RLT     (23237): +713564ms [JANK] frame=311 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.205 W/RLT     (23237): +713597ms [JANK] frame=312 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.238 W/RLT     (23237): +713630ms [JANK] frame=313 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.272 W/RLT     (23237): +713663ms [JANK] frame=314 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.305 W/RLT     (23237): +713697ms [JANK] frame=315 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.339 W/RLT     (23237): +713731ms [JANK] frame=316 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.373 W/RLT     (23237): +713764ms [JANK] frame=317 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.405 W/RLT     (23237): +713797ms [JANK] frame=318 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.439 W/RLT     (23237): +713831ms [JANK] frame=319 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.472 W/RLT     (23237): +713863ms [JANK] frame=320 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.505 W/RLT     (23237): +713897ms [JANK] frame=321 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.539 W/RLT     (23237): +713931ms [JANK] frame=322 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.572 W/RLT     (23237): +713964ms [JANK] frame=323 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.605 W/RLT     (23237): +713996ms [JANK] frame=324 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.639 W/RLT     (23237): +714030ms [JANK] frame=325 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.671 W/RLT     (23237): +714062ms [JANK] frame=326 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.706 W/RLT     (23237): +714097ms [JANK] frame=327 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.739 W/RLT     (23237): +714130ms [JANK] frame=328 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.772 W/RLT     (23237): +714163ms [JANK] frame=329 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.806 W/RLT     (23237): +714198ms [JANK] frame=330 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.839 W/RLT     (23237): +714230ms [JANK] frame=331 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.873 W/RLT     (23237): +714264ms [JANK] frame=332 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.906 W/RLT     (23237): +714297ms [JANK] frame=333 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.939 W/RLT     (23237): +714330ms [JANK] frame=334 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:51.973 W/RLT     (23237): +714364ms [JANK] frame=335 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.005 W/RLT     (23237): +714397ms [JANK] frame=336 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.039 W/RLT     (23237): +714430ms [JANK] frame=337 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.073 W/RLT     (23237): +714464ms [JANK] frame=338 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.105 W/RLT     (23237): +714496ms [JANK] frame=339 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.139 W/RLT     (23237): +714531ms [JANK] frame=340 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.172 W/RLT     (23237): +714563ms [JANK] frame=341 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.205 W/RLT     (23237): +714597ms [JANK] frame=342 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.239 W/RLT     (23237): +714630ms [JANK] frame=343 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.272 W/RLT     (23237): +714664ms [JANK] frame=344 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.305 W/RLT     (23237): +714696ms [JANK] frame=345 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.339 W/RLT     (23237): +714730ms [JANK] frame=346 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.372 W/RLT     (23237): +714764ms [JANK] frame=347 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.406 W/RLT     (23237): +714797ms [JANK] frame=348 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.439 W/RLT     (23237): +714831ms [JANK] frame=349 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.473 W/RLT     (23237): +714864ms [JANK] frame=350 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.506 W/RLT     (23237): +714897ms [JANK] frame=351 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.539 W/RLT     (23237): +714931ms [JANK] frame=352 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.572 W/RLT     (23237): +714964ms [JANK] frame=353 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.606 W/RLT     (23237): +714997ms [JANK] frame=354 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.640 W/RLT     (23237): +715031ms [JANK] frame=355 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.673 W/RLT     (23237): +715064ms [JANK] frame=356 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.705 W/RLT     (23237): +715097ms [JANK] frame=357 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.739 W/RLT     (23237): +715131ms [JANK] frame=358 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.772 W/RLT     (23237): +715163ms [JANK] frame=359 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.806 I/RLT     (23237): +715197ms [THREAD] Choreographer->main op=doFrame frame=360 | thread=main
+04-16 21:49:52.811 I/RLT     (23237): +715202ms [FRAME] fps=30.0 jank=194 p99=33.3ms heap=7MB periodic corr=frames-f7b0 | thread=main
+04-16 21:49:52.811 W/RLT     (23237): +715203ms [JANK] frame=360 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.840 W/RLT     (23237): +715231ms [JANK] frame=361 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.872 W/RLT     (23237): +715264ms [JANK] frame=362 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.906 W/RLT     (23237): +715297ms [JANK] frame=363 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.939 W/RLT     (23237): +715331ms [JANK] frame=364 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:52.973 W/RLT     (23237): +715364ms [JANK] frame=365 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.006 W/RLT     (23237): +715398ms [JANK] frame=366 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.040 W/RLT     (23237): +715432ms [JANK] frame=367 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.073 W/RLT     (23237): +715464ms [JANK] frame=368 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.106 W/RLT     (23237): +715497ms [JANK] frame=369 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.139 W/RLT     (23237): +715530ms [JANK] frame=370 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.172 W/RLT     (23237): +715564ms [JANK] frame=371 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.205 W/RLT     (23237): +715597ms [JANK] frame=372 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.239 W/RLT     (23237): +715630ms [JANK] frame=373 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.272 W/RLT     (23237): +715664ms [JANK] frame=374 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.306 W/RLT     (23237): +715698ms [JANK] frame=375 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.339 W/RLT     (23237): +715731ms [JANK] frame=376 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.373 W/RLT     (23237): +715765ms [JANK] frame=377 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.406 W/RLT     (23237): +715798ms [JANK] frame=378 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.440 W/RLT     (23237): +715831ms [JANK] frame=379 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.473 W/RLT     (23237): +715865ms [JANK] frame=380 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.506 W/RLT     (23237): +715898ms [JANK] frame=381 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.539 W/RLT     (23237): +715931ms [JANK] frame=382 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.573 W/RLT     (23237): +715964ms [JANK] frame=383 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.606 W/RLT     (23237): +715998ms [JANK] frame=384 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.635 I/LorieNative(25873): choreographer callbacks in 5.0 seconds = 30.0 FPS
+04-16 21:49:53.636 I/LorieNative(25873): redraw wakeups in 5.0 seconds = 30.0 FPS
+04-16 21:49:53.636 I/LorieNative(25873): damage-triggered redraws in 5.0 seconds = 0.0 FPS
+04-16 21:49:53.636 I/LorieNative(25873): AhbLockTrace: sticky=0 lock_calls=0 unlock_calls=0 sticky_hits=0 flush_skipped=0 in 5.0s
+04-16 21:49:53.636 I/LorieNative(25873): present flip attempts in 5.0 seconds = 0.0 FPS (accepted 0.0, rejected 0.0)
+04-16 21:49:53.636 I/LorieNative(25873): present after-flips in 5.0 seconds = 0.0 FPS
+04-16 21:49:53.640 W/RLT     (23237): +716031ms [JANK] frame=385 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.674 W/RLT     (23237): +716065ms [JANK] frame=386 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.706 W/RLT     (23237): +716098ms [JANK] frame=387 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.739 W/RLT     (23237): +716130ms [JANK] frame=388 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.773 W/RLT     (23237): +716164ms [JANK] frame=389 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.806 W/RLT     (23237): +716197ms [JANK] frame=390 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.840 W/RLT     (23237): +716231ms [JANK] frame=391 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.872 W/RLT     (23237): +716264ms [JANK] frame=392 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.906 W/RLT     (23237): +716297ms [JANK] frame=393 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.939 W/RLT     (23237): +716331ms [JANK] frame=394 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:53.973 W/RLT     (23237): +716364ms [JANK] frame=395 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.006 W/RLT     (23237): +716397ms [JANK] frame=396 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.039 W/RLT     (23237): +716431ms [JANK] frame=397 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.073 W/RLT     (23237): +716465ms [JANK] frame=398 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.106 W/RLT     (23237): +716498ms [JANK] frame=399 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.139 W/RLT     (23237): +716531ms [JANK] frame=400 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.172 W/RLT     (23237): +716563ms [JANK] frame=401 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.172 I/RLT     (23237): +716563ms [PERF] PERF_SUMMARY:   renderer_fps=0.0 wait_choreo_pct=0 wait_content_pct=0 wait_state_pct=0 | thread=perf-dashboard
+04-16 21:49:54.206 W/RLT     (23237): +716597ms [JANK] frame=402 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.238 W/RLT     (23237): +716629ms [JANK] frame=403 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.271 W/RLT     (23237): +716663ms [JANK] frame=404 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.305 W/RLT     (23237): +716697ms [JANK] frame=405 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.339 W/RLT     (23237): +716730ms [JANK] frame=406 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.372 W/RLT     (23237): +716763ms [JANK] frame=407 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.406 W/RLT     (23237): +716797ms [JANK] frame=408 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.439 W/RLT     (23237): +716831ms [JANK] frame=409 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.472 W/RLT     (23237): +716864ms [JANK] frame=410 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.506 W/RLT     (23237): +716897ms [JANK] frame=411 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.538 W/RLT     (23237): +716930ms [JANK] frame=412 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.542 W/LorieNative(23237): xcallback: fd=163 events=0x9 ERROR=0 HANGUP=1 — X11 connection dead
+04-16 21:49:54.542 W/LorieNative(23237): xcallback: X11 connection lost — server may have died (outstanding buffers=1)
+04-16 21:49:54.542 I/RLT     (23237): +716934ms [STEP] [hybrid_x11] Xlorie MainActivity shim: clientConnectedStateChanged connected=true | thread=main
+04-16 21:49:54.543 I/RLT     (23237): +716934ms [STEP] [hybrid_x11] HybridX11HostActivity: connected=true | thread=main
+04-16 21:49:54.547 W/RLT     (23237): +716939ms [HYBRID_X11] HybridX11Bridge: remote binder died (lifetime=10947ms) | thread=binder:23237_1
+04-16 21:49:54.548 D/RLT     (23237): +716939ms [HYBRID_X11] HybridX11Bridge.clear: reason=binder_died wasAlive=false generation=1 | thread=binder:23237_1
+04-16 21:49:54.550 D/LorieNative(23237): disconnected fd=163
+04-16 21:49:54.588 W/RLT     (23237): +716980ms [JANK] frame=413 actual=50.0ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.605 W/RLT     (23237): +716996ms [JANK] frame=414 actual=16.7ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.862 W/RLT     (23237): +717254ms [JANK] frame=440 actual=50.1ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.896 W/RLT     (23237): +717287ms [JANK] frame=441 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.930 W/RLT     (23237): +717321ms [JANK] frame=442 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.962 W/RLT     (23237): +717354ms [JANK] frame=443 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:54.996 W/RLT     (23237): +717388ms [JANK] frame=444 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.029 W/RLT     (23237): +717420ms [JANK] frame=445 actual=33.4ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.063 W/RLT     (23237): +717454ms [JANK] frame=446 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.095 W/RLT     (23237): +717487ms [JANK] frame=447 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.128 W/RLT     (23237): +717519ms [JANK] frame=448 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.162 W/RLT     (23237): +717554ms [JANK] frame=449 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.196 W/RLT     (23237): +717587ms [JANK] frame=450 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.229 W/RLT     (23237): +717621ms [JANK] frame=451 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.262 W/RLT     (23237): +717654ms [JANK] frame=452 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.296 W/RLT     (23237): +717687ms [JANK] frame=453 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.329 W/RLT     (23237): +717721ms [JANK] frame=454 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.363 W/RLT     (23237): +717754ms [JANK] frame=455 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.396 W/RLT     (23237): +717788ms [JANK] frame=456 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.429 W/RLT     (23237): +717820ms [JANK] frame=457 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.463 W/RLT     (23237): +717854ms [JANK] frame=458 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.496 W/RLT     (23237): +717887ms [JANK] frame=459 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.529 W/RLT     (23237): +717920ms [JANK] frame=460 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.562 W/RLT     (23237): +717954ms [JANK] frame=461 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.595 W/RLT     (23237): +717987ms [JANK] frame=462 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.628 W/RLT     (23237): +718020ms [JANK] frame=463 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.663 W/RLT     (23237): +718054ms [JANK] frame=464 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.696 W/RLT     (23237): +718088ms [JANK] frame=465 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.730 W/RLT     (23237): +718121ms [JANK] frame=466 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.763 W/RLT     (23237): +718155ms [JANK] frame=467 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.796 W/RLT     (23237): +718187ms [JANK] frame=468 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.830 W/RLT     (23237): +718221ms [JANK] frame=469 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.862 W/RLT     (23237): +718254ms [JANK] frame=470 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.897 W/RLT     (23237): +718288ms [JANK] frame=471 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.930 W/RLT     (23237): +718321ms [JANK] frame=472 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.963 W/RLT     (23237): +718354ms [JANK] frame=473 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:55.996 W/RLT     (23237): +718388ms [JANK] frame=474 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.030 W/RLT     (23237): +718421ms [JANK] frame=475 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.063 W/RLT     (23237): +718455ms [JANK] frame=476 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.096 W/RLT     (23237): +718488ms [JANK] frame=477 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.130 W/RLT     (23237): +718521ms [JANK] frame=478 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.163 W/RLT     (23237): +718554ms [JANK] frame=479 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.196 I/RLT     (23237): +718588ms [THREAD] Choreographer->main op=doFrame frame=480 | thread=main
+04-16 21:49:56.201 I/RLT     (23237): +718592ms [FRAME] fps=35.4 jank=214 p99=33.3ms heap=8MB periodic corr=frames-f7b0 | thread=main
+04-16 21:49:56.202 W/RLT     (23237): +718594ms [JANK] frame=480 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.230 W/RLT     (23237): +718621ms [JANK] frame=481 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.263 W/RLT     (23237): +718654ms [JANK] frame=482 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.296 W/RLT     (23237): +718688ms [JANK] frame=483 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.330 W/RLT     (23237): +718721ms [JANK] frame=484 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.363 W/RLT     (23237): +718754ms [JANK] frame=485 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.396 W/RLT     (23237): +718788ms [JANK] frame=486 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.430 W/RLT     (23237): +718821ms [JANK] frame=487 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.463 W/RLT     (23237): +718855ms [JANK] frame=488 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.496 W/RLT     (23237): +718887ms [JANK] frame=489 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.530 W/RLT     (23237): +718921ms [JANK] frame=490 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.563 W/RLT     (23237): +718955ms [JANK] frame=491 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.597 W/RLT     (23237): +718988ms [JANK] frame=492 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.630 W/RLT     (23237): +719021ms [JANK] frame=493 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.663 W/RLT     (23237): +719054ms [JANK] frame=494 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.696 W/RLT     (23237): +719087ms [JANK] frame=495 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.730 W/RLT     (23237): +719121ms [JANK] frame=496 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.763 W/RLT     (23237): +719155ms [JANK] frame=497 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.796 W/RLT     (23237): +719187ms [JANK] frame=498 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.830 W/RLT     (23237): +719221ms [JANK] frame=499 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.864 W/RLT     (23237): +719255ms [JANK] frame=500 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.896 W/RLT     (23237): +719288ms [JANK] frame=501 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.930 W/RLT     (23237): +719321ms [JANK] frame=502 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.963 W/RLT     (23237): +719355ms [JANK] frame=503 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:56.996 W/RLT     (23237): +719388ms [JANK] frame=504 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.030 W/RLT     (23237): +719422ms [JANK] frame=505 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.063 W/RLT     (23237): +719454ms [JANK] frame=506 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.097 W/RLT     (23237): +719488ms [JANK] frame=507 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.130 W/RLT     (23237): +719521ms [JANK] frame=508 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.163 W/RLT     (23237): +719554ms [JANK] frame=509 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.196 W/RLT     (23237): +719588ms [JANK] frame=510 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.230 W/RLT     (23237): +719621ms [JANK] frame=511 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.263 W/RLT     (23237): +719654ms [JANK] frame=512 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.298 W/RLT     (23237): +719690ms [JANK] frame=513 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.330 W/RLT     (23237): +719722ms [JANK] frame=514 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.363 W/RLT     (23237): +719755ms [JANK] frame=515 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.396 W/RLT     (23237): +719788ms [JANK] frame=516 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.430 W/RLT     (23237): +719822ms [JANK] frame=517 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.463 W/RLT     (23237): +719855ms [JANK] frame=518 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.497 W/RLT     (23237): +719888ms [JANK] frame=519 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.530 W/RLT     (23237): +719921ms [JANK] frame=520 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.562 W/RLT     (23237): +719954ms [JANK] frame=521 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.596 W/RLT     (23237): +719988ms [JANK] frame=522 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.630 W/RLT     (23237): +720022ms [JANK] frame=523 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.663 W/RLT     (23237): +720055ms [JANK] frame=524 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.696 W/RLT     (23237): +720088ms [JANK] frame=525 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.730 W/RLT     (23237): +720121ms [JANK] frame=526 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.763 W/RLT     (23237): +720155ms [JANK] frame=527 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.796 W/RLT     (23237): +720188ms [JANK] frame=528 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.830 W/RLT     (23237): +720222ms [JANK] frame=529 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.863 W/RLT     (23237): +720254ms [JANK] frame=530 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.896 W/RLT     (23237): +720287ms [JANK] frame=531 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.930 W/RLT     (23237): +720321ms [JANK] frame=532 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.962 W/RLT     (23237): +720354ms [JANK] frame=533 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:57.996 W/RLT     (23237): +720388ms [JANK] frame=534 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.030 W/RLT     (23237): +720421ms [JANK] frame=535 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.063 W/RLT     (23237): +720455ms [JANK] frame=536 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.097 W/RLT     (23237): +720489ms [JANK] frame=537 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.130 W/RLT     (23237): +720522ms [JANK] frame=538 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.163 W/RLT     (23237): +720555ms [JANK] frame=539 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.196 W/RLT     (23237): +720588ms [JANK] frame=540 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.231 W/RLT     (23237): +720622ms [JANK] frame=541 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.263 W/RLT     (23237): +720655ms [JANK] frame=542 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.297 W/RLT     (23237): +720688ms [JANK] frame=543 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.331 W/RLT     (23237): +720722ms [JANK] frame=544 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.363 W/RLT     (23237): +720755ms [JANK] frame=545 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.397 W/RLT     (23237): +720789ms [JANK] frame=546 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.430 W/RLT     (23237): +720822ms [JANK] frame=547 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.463 W/RLT     (23237): +720855ms [JANK] frame=548 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.497 W/RLT     (23237): +720888ms [JANK] frame=549 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.530 W/RLT     (23237): +720922ms [JANK] frame=550 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.564 W/RLT     (23237): +720955ms [JANK] frame=551 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.597 W/RLT     (23237): +720988ms [JANK] frame=552 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.630 W/RLT     (23237): +721022ms [JANK] frame=553 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.663 W/RLT     (23237): +721054ms [JANK] frame=554 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.697 W/RLT     (23237): +721089ms [JANK] frame=555 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.730 W/RLT     (23237): +721121ms [JANK] frame=556 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.763 W/RLT     (23237): +721155ms [JANK] frame=557 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.797 W/RLT     (23237): +721188ms [JANK] frame=558 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.830 W/RLT     (23237): +721222ms [JANK] frame=559 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.864 W/RLT     (23237): +721255ms [JANK] frame=560 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.897 W/RLT     (23237): +721288ms [JANK] frame=561 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.930 W/RLT     (23237): +721322ms [JANK] frame=562 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.963 W/RLT     (23237): +721355ms [JANK] frame=563 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:58.997 W/RLT     (23237): +721388ms [JANK] frame=564 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.030 W/RLT     (23237): +721422ms [JANK] frame=565 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.064 W/RLT     (23237): +721456ms [JANK] frame=566 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.098 W/RLT     (23237): +721490ms [JANK] frame=567 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.131 W/RLT     (23237): +721522ms [JANK] frame=568 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.164 W/RLT     (23237): +721555ms [JANK] frame=569 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.197 W/RLT     (23237): +721588ms [JANK] frame=570 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.230 W/RLT     (23237): +721622ms [JANK] frame=571 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.263 W/RLT     (23237): +721654ms [JANK] frame=572 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.298 W/RLT     (23237): +721689ms [JANK] frame=573 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.330 W/RLT     (23237): +721722ms [JANK] frame=574 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.363 W/RLT     (23237): +721755ms [JANK] frame=575 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.398 W/RLT     (23237): +721789ms [JANK] frame=576 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.430 W/RLT     (23237): +721821ms [JANK] frame=577 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.464 W/RLT     (23237): +721855ms [JANK] frame=578 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.497 W/RLT     (23237): +721888ms [JANK] frame=579 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.530 W/RLT     (23237): +721922ms [JANK] frame=580 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.563 W/RLT     (23237): +721955ms [JANK] frame=581 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.596 W/RLT     (23237): +721988ms [JANK] frame=582 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.630 W/RLT     (23237): +722021ms [JANK] frame=583 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.664 W/RLT     (23237): +722055ms [JANK] frame=584 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.697 W/RLT     (23237): +722088ms [JANK] frame=585 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.730 W/RLT     (23237): +722121ms [JANK] frame=586 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.763 W/RLT     (23237): +722155ms [JANK] frame=587 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.797 W/RLT     (23237): +722188ms [JANK] frame=588 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.830 W/RLT     (23237): +722222ms [JANK] frame=589 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.864 W/RLT     (23237): +722255ms [JANK] frame=590 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.898 W/RLT     (23237): +722290ms [JANK] frame=591 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.930 W/RLT     (23237): +722322ms [JANK] frame=592 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.964 W/RLT     (23237): +722356ms [JANK] frame=593 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:49:59.998 W/RLT     (23237): +722389ms [JANK] frame=594 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.030 W/RLT     (23237): +722421ms [JANK] frame=595 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.080 W/RLT     (23237): +722472ms [JANK] frame=596 actual=50.7ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.097 W/RLT     (23237): +722489ms [JANK] frame=597 actual=16.7ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.122 I/RLT     (23237): +722514ms [THREAD] Choreographer->main op=doFrame frame=600 | thread=main
+04-16 21:50:00.128 I/RLT     (23237): +722519ms [FRAME] fps=30.6 jank=211 p99=33.4ms heap=9MB periodic corr=frames-f7b0 | thread=main
+04-16 21:50:00.355 W/RLT     (23237): +722746ms [JANK] frame=625 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.396 W/RLT     (23237): +722788ms [JANK] frame=626 actual=41.7ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.429 W/RLT     (23237): +722821ms [JANK] frame=627 actual=33.4ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.463 W/RLT     (23237): +722854ms [JANK] frame=628 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.496 W/RLT     (23237): +722888ms [JANK] frame=629 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.529 W/RLT     (23237): +722920ms [JANK] frame=630 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.563 W/RLT     (23237): +722954ms [JANK] frame=631 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.596 W/RLT     (23237): +722988ms [JANK] frame=632 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.629 W/RLT     (23237): +723021ms [JANK] frame=633 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.663 W/RLT     (23237): +723054ms [JANK] frame=634 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.696 W/RLT     (23237): +723087ms [JANK] frame=635 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.729 W/RLT     (23237): +723121ms [JANK] frame=636 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.763 W/RLT     (23237): +723154ms [JANK] frame=637 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.796 W/RLT     (23237): +723187ms [JANK] frame=638 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.829 W/RLT     (23237): +723220ms [JANK] frame=639 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.862 W/RLT     (23237): +723254ms [JANK] frame=640 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.895 W/RLT     (23237): +723286ms [JANK] frame=641 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.930 W/RLT     (23237): +723321ms [JANK] frame=642 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.963 W/RLT     (23237): +723354ms [JANK] frame=643 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:00.996 W/RLT     (23237): +723388ms [JANK] frame=644 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.029 W/RLT     (23237): +723421ms [JANK] frame=645 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.063 W/RLT     (23237): +723454ms [JANK] frame=646 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.096 W/RLT     (23237): +723488ms [JANK] frame=647 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.129 W/RLT     (23237): +723521ms [JANK] frame=648 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.163 W/RLT     (23237): +723554ms [JANK] frame=649 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.196 W/RLT     (23237): +723587ms [JANK] frame=650 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.229 W/RLT     (23237): +723621ms [JANK] frame=651 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.263 W/RLT     (23237): +723654ms [JANK] frame=652 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.296 W/RLT     (23237): +723688ms [JANK] frame=653 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.329 W/RLT     (23237): +723721ms [JANK] frame=654 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.363 W/RLT     (23237): +723754ms [JANK] frame=655 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.396 W/RLT     (23237): +723787ms [JANK] frame=656 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.429 W/RLT     (23237): +723820ms [JANK] frame=657 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.463 W/RLT     (23237): +723854ms [JANK] frame=658 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.497 W/RLT     (23237): +723888ms [JANK] frame=659 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.530 W/RLT     (23237): +723921ms [JANK] frame=660 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.563 W/RLT     (23237): +723954ms [JANK] frame=661 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.596 W/RLT     (23237): +723988ms [JANK] frame=662 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.629 W/RLT     (23237): +724021ms [JANK] frame=663 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.662 W/RLT     (23237): +724053ms [JANK] frame=664 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.696 W/RLT     (23237): +724087ms [JANK] frame=665 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.729 W/RLT     (23237): +724121ms [JANK] frame=666 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.763 W/RLT     (23237): +724154ms [JANK] frame=667 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.796 W/RLT     (23237): +724187ms [JANK] frame=668 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.829 W/RLT     (23237): +724220ms [JANK] frame=669 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.863 W/RLT     (23237): +724254ms [JANK] frame=670 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.896 W/RLT     (23237): +724288ms [JANK] frame=671 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.930 W/RLT     (23237): +724321ms [JANK] frame=672 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.963 W/RLT     (23237): +724354ms [JANK] frame=673 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:01.996 W/RLT     (23237): +724387ms [JANK] frame=674 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.030 W/RLT     (23237): +724421ms [JANK] frame=675 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.063 W/RLT     (23237): +724454ms [JANK] frame=676 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.097 W/RLT     (23237): +724489ms [JANK] frame=677 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.130 W/RLT     (23237): +724521ms [JANK] frame=678 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.163 W/RLT     (23237): +724554ms [JANK] frame=679 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.197 W/RLT     (23237): +724588ms [JANK] frame=680 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.229 W/RLT     (23237): +724621ms [JANK] frame=681 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.263 W/RLT     (23237): +724654ms [JANK] frame=682 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.296 W/RLT     (23237): +724688ms [JANK] frame=683 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.330 W/RLT     (23237): +724721ms [JANK] frame=684 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.363 W/RLT     (23237): +724755ms [JANK] frame=685 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.396 W/RLT     (23237): +724788ms [JANK] frame=686 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.430 W/RLT     (23237): +724821ms [JANK] frame=687 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.463 W/RLT     (23237): +724854ms [JANK] frame=688 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.497 W/RLT     (23237): +724889ms [JANK] frame=689 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.530 W/RLT     (23237): +724921ms [JANK] frame=690 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.563 W/RLT     (23237): +724954ms [JANK] frame=691 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.597 W/RLT     (23237): +724989ms [JANK] frame=692 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.630 W/RLT     (23237): +725021ms [JANK] frame=693 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.663 W/RLT     (23237): +725054ms [JANK] frame=694 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.696 W/RLT     (23237): +725087ms [JANK] frame=695 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.729 W/RLT     (23237): +725121ms [JANK] frame=696 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.763 W/RLT     (23237): +725154ms [JANK] frame=697 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.796 W/RLT     (23237): +725188ms [JANK] frame=698 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.829 W/RLT     (23237): +725220ms [JANK] frame=699 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.862 W/RLT     (23237): +725254ms [JANK] frame=700 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.896 W/RLT     (23237): +725287ms [JANK] frame=701 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.930 W/RLT     (23237): +725321ms [JANK] frame=702 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.963 W/RLT     (23237): +725354ms [JANK] frame=703 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:02.996 W/RLT     (23237): +725388ms [JANK] frame=704 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.030 W/RLT     (23237): +725421ms [JANK] frame=705 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.062 W/RLT     (23237): +725454ms [JANK] frame=706 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.097 W/RLT     (23237): +725488ms [JANK] frame=707 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.130 W/RLT     (23237): +725521ms [JANK] frame=708 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.163 W/RLT     (23237): +725555ms [JANK] frame=709 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.197 W/RLT     (23237): +725588ms [JANK] frame=710 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.229 W/RLT     (23237): +725620ms [JANK] frame=711 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.263 W/RLT     (23237): +725654ms [JANK] frame=712 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.297 W/RLT     (23237): +725688ms [JANK] frame=713 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.330 W/RLT     (23237): +725721ms [JANK] frame=714 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.363 W/RLT     (23237): +725754ms [JANK] frame=715 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.397 W/RLT     (23237): +725788ms [JANK] frame=716 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.430 W/RLT     (23237): +725821ms [JANK] frame=717 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.462 W/RLT     (23237): +725854ms [JANK] frame=718 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.497 W/RLT     (23237): +725888ms [JANK] frame=719 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.529 I/RLT     (23237): +725920ms [THREAD] Choreographer->main op=doFrame frame=720 | thread=main
+04-16 21:50:03.531 I/RLT     (23237): +725923ms [FRAME] fps=35.0 jank=212 p99=33.3ms heap=10MB periodic corr=frames-f7b0 | thread=main
+04-16 21:50:03.532 W/RLT     (23237): +725923ms [JANK] frame=720 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.563 W/RLT     (23237): +725955ms [JANK] frame=721 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.596 W/RLT     (23237): +725988ms [JANK] frame=722 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.629 W/RLT     (23237): +726021ms [JANK] frame=723 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.663 W/RLT     (23237): +726054ms [JANK] frame=724 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.696 W/RLT     (23237): +726088ms [JANK] frame=725 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.730 W/RLT     (23237): +726121ms [JANK] frame=726 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.763 W/RLT     (23237): +726154ms [JANK] frame=727 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.796 W/RLT     (23237): +726188ms [JANK] frame=728 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.830 W/RLT     (23237): +726221ms [JANK] frame=729 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.863 W/RLT     (23237): +726254ms [JANK] frame=730 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.896 W/RLT     (23237): +726288ms [JANK] frame=731 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.929 W/RLT     (23237): +726320ms [JANK] frame=732 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.963 W/RLT     (23237): +726354ms [JANK] frame=733 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:03.997 W/RLT     (23237): +726388ms [JANK] frame=734 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.030 W/RLT     (23237): +726421ms [JANK] frame=735 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.062 W/RLT     (23237): +726454ms [JANK] frame=736 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.097 W/RLT     (23237): +726488ms [JANK] frame=737 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.129 W/RLT     (23237): +726521ms [JANK] frame=738 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.163 W/RLT     (23237): +726554ms [JANK] frame=739 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.171 I/RLT     (23237): +726563ms [PERF] PERF_SUMMARY:   renderer_fps=0.0 wait_choreo_pct=0 wait_content_pct=0 wait_state_pct=0 | thread=perf-dashboard
+04-16 21:50:04.197 W/RLT     (23237): +726588ms [JANK] frame=740 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.230 W/RLT     (23237): +726621ms [JANK] frame=741 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.262 W/RLT     (23237): +726654ms [JANK] frame=742 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.296 W/RLT     (23237): +726688ms [JANK] frame=743 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.329 W/RLT     (23237): +726720ms [JANK] frame=744 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.363 W/RLT     (23237): +726754ms [JANK] frame=745 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.397 W/RLT     (23237): +726788ms [JANK] frame=746 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.430 W/RLT     (23237): +726822ms [JANK] frame=747 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.463 W/RLT     (23237): +726854ms [JANK] frame=748 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.496 W/RLT     (23237): +726888ms [JANK] frame=749 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.530 W/RLT     (23237): +726922ms [JANK] frame=750 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.563 W/RLT     (23237): +726955ms [JANK] frame=751 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.597 W/RLT     (23237): +726988ms [JANK] frame=752 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.630 W/RLT     (23237): +727022ms [JANK] frame=753 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.663 W/RLT     (23237): +727054ms [JANK] frame=754 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.696 W/RLT     (23237): +727087ms [JANK] frame=755 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.730 W/RLT     (23237): +727121ms [JANK] frame=756 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.762 W/RLT     (23237): +727154ms [JANK] frame=757 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.796 W/RLT     (23237): +727188ms [JANK] frame=758 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.830 W/RLT     (23237): +727221ms [JANK] frame=759 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.863 W/RLT     (23237): +727254ms [JANK] frame=760 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.896 W/RLT     (23237): +727288ms [JANK] frame=761 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.929 W/RLT     (23237): +727321ms [JANK] frame=762 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.963 W/RLT     (23237): +727354ms [JANK] frame=763 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:04.996 W/RLT     (23237): +727388ms [JANK] frame=764 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.030 W/RLT     (23237): +727421ms [JANK] frame=765 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.063 W/RLT     (23237): +727455ms [JANK] frame=766 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.096 W/RLT     (23237): +727488ms [JANK] frame=767 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.129 W/RLT     (23237): +727520ms [JANK] frame=768 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.163 W/RLT     (23237): +727554ms [JANK] frame=769 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.196 W/RLT     (23237): +727588ms [JANK] frame=770 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.229 W/RLT     (23237): +727620ms [JANK] frame=771 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.263 W/RLT     (23237): +727654ms [JANK] frame=772 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.297 W/RLT     (23237): +727688ms [JANK] frame=773 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.329 W/RLT     (23237): +727721ms [JANK] frame=774 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.363 W/RLT     (23237): +727754ms [JANK] frame=775 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.397 W/RLT     (23237): +727788ms [JANK] frame=776 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.430 W/RLT     (23237): +727821ms [JANK] frame=777 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.463 W/RLT     (23237): +727854ms [JANK] frame=778 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.496 W/RLT     (23237): +727887ms [JANK] frame=779 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.530 W/RLT     (23237): +727922ms [JANK] frame=780 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.563 W/RLT     (23237): +727954ms [JANK] frame=781 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.596 W/RLT     (23237): +727988ms [JANK] frame=782 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.630 W/RLT     (23237): +728021ms [JANK] frame=783 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.663 W/RLT     (23237): +728054ms [JANK] frame=784 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.696 W/RLT     (23237): +728087ms [JANK] frame=785 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.729 W/RLT     (23237): +728121ms [JANK] frame=786 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.762 W/RLT     (23237): +728154ms [JANK] frame=787 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.796 W/RLT     (23237): +728188ms [JANK] frame=788 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.828 W/RLT     (23237): +728220ms [JANK] frame=789 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.863 W/RLT     (23237): +728255ms [JANK] frame=790 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.895 W/RLT     (23237): +728286ms [JANK] frame=791 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.929 W/RLT     (23237): +728321ms [JANK] frame=792 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:05.963 W/RLT     (23237): +728355ms [JANK] frame=793 actual=33.3ms expected=12.0ms exceeded threshold corr=frames-f7b0 | thread=main
+04-16 21:50:06.032 W/ActivityManager( 1701): setHasOverlayUi called on unknown pid: 23237
+04-16 21:50:06.066 I/SurfaceView(19060): 7161543 Changes: creating=false format=false size=false visible=false alpha=false hint=false left=false top=false z=false attached=true lifecycleStrategy=false
+04-16 21:50:06.067 I/SurfaceView(19060): 7161543 Changes: creating=true format=false size=false visible=true alpha=false hint=false left=false top=false z=false attached=true lifecycleStrategy=false
+04-16 21:50:06.069 I/SurfaceView(19060): 7161543 Cur surface: Surface(name=null mNativeObject=0)/@0xd0176b5
+04-16 21:50:06.069 I/SurfaceView(19060): 7161543 visibleChanged -- surfaceCreated
+04-16 21:50:06.107 I/SurfaceView(19060): 7161543 surfaceChanged -- format=4 w=2960 h=1848
+04-16 21:50:06.107 I/SurfaceView(19060): 7161543 surfaceRedrawNeeded
+04-16 21:50:06.211 I/SurfaceView(19060): 7161543 finishedDrawing
+04-16 21:50:06.648 W/ActivityManager( 1701): pid 1701 system sent binder code 7 with flags 1 to frozen apps and got error -32
+04-16 21:53:01.576 I/SurfaceView(19060): 7161543 Changes: creating=false format=false size=true visible=false alpha=false hint=true left=false top=false z=false attached=true lifecycleStrategy=false
+04-16 21:53:01.576 I/SurfaceView(19060): 7161543 Cur surface: Surface(name=null mNativeObject=-5476376658604319888)/@0xd0176b5
+04-16 21:53:01.576 I/SurfaceView(19060): 7161543 surfaceChanged -- format=4 w=1848 h=2960
+04-16 21:53:01.576 I/SurfaceView(19060): 7161543 surfaceRedrawNeeded
+04-16 21:53:01.576 I/SurfaceView(19060): 7161543 finishedDrawing
+04-16 21:53:03.349 I/SurfaceView(19060): 7161543 Changes: creating=false format=false size=false visible=false alpha=false hint=true left=false top=false z=false attached=true lifecycleStrategy=false
+04-16 21:53:03.349 I/SurfaceView(19060): 7161543 Cur surface: Surface(name=null mNativeObject=-5476376658604319888)/@0xd0176b5
+04-16 21:53:03.349 I/SurfaceView(19060): 7161543 surfaceChanged -- format=4 w=1848 h=2960
+04-16 21:53:03.349 I/SurfaceView(19060): 7161543 surfaceRedrawNeeded
+04-16 21:53:03.349 I/SurfaceView(19060): 7161543 finishedDrawing
