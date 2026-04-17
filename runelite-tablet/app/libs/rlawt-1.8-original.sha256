@@ -1,0 +1,6 @@
+24f9b6d77d8de814a8dacddf9c4e2227da70459375ca72cc961ae81d33eff75a  rlawt-1.8.jar
+# Source: /data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root/.runelite/repository2/rlawt-1.8.jar
+# Pulled via adb during Session 78 Phase 21F.
+# Size: 237113 bytes.
+# This is the upstream glibc-linked jar; our Bionic drop-in replacement is
+# runelite-tablet/app/libs/rlawt-1.8-bionic.jar.
