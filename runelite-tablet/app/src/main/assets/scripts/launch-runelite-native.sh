@@ -321,6 +321,83 @@ if command -v virgl_test_server_android >/dev/null 2>&1; then
 else
     echo "virgl_test_server_android not installed — software rendering" | tee -a "$LOGFILE"
 fi
+
+# Export LD_LIBRARY_PATH + JAVA_HOME NOW so the DIAG block below captures real values
+# (previously they were only set right before the JVM invoke, and the DIAG dump logged
+# `<unset>`). glxinfo also needs LD_LIBRARY_PATH set to pick up Termux's libGL rather
+# than any system stub.
+export LD_LIBRARY_PATH="$NATIVE_LD_LIBRARY_PATH"
+export JAVA_HOME="$JAVA_HOME_NATIVE"
+
+# ===================================================================
+# DIAGNOSTIC PREFLIGHT — dump everything rlawt/Java/virgl see so we can
+# actually debug size/GPU issues without guessing. Adds no overhead in
+# the happy path (log writes only) and makes post-mortems tractable.
+# ===================================================================
+echo "=== DIAG preflight @$(date +%H:%M:%S.%3N) ===" | tee -a "$LOGFILE"
+echo "[DIAG] device physical size (Android wm): unreadable from run-as com.termux" | tee -a "$LOGFILE"
+echo "[DIAG] Termux:X11 resolution prefs:" | tee -a "$LOGFILE"
+if [ -r /data/data/com.termux.x11/shared_prefs/com.termux.x11_preferences.xml ]; then
+    grep -E 'displayResolution|fullscreen|adjustResolution|displayStretch' \
+        /data/data/com.termux.x11/shared_prefs/com.termux.x11_preferences.xml \
+        2>/dev/null | sed 's/^/  /' | tee -a "$LOGFILE"
+else
+    echo "  (prefs file not readable from com.termux uid)" | tee -a "$LOGFILE"
+fi
+echo "[DIAG] Termux:X11 server process(es):" | tee -a "$LOGFILE"
+# Termux:X11's server runs under Android app_process with its cmdline set to
+# "com.termux.x11.Loader" or "com.termux.x11.CmdEntryPoint" — never "termux-x11".
+# Match via find_pids_by_cmdline to cover both.
+_x11_pids="$(find_pids_by_cmdline 'com.termux.x11.Loader')$(echo)$(find_pids_by_cmdline 'com.termux.x11.CmdEntryPoint')"
+if [ -n "$_x11_pids" ]; then
+    for p in $_x11_pids; do
+        echo "  pid=$p cmdline=$(tr '\0' ' ' < /proc/$p/cmdline 2>/dev/null)" | tee -a "$LOGFILE"
+    done
+else
+    echo "  (none)" | tee -a "$LOGFILE"
+fi
+echo "[DIAG] VirGL server:" | tee -a "$LOGFILE"
+if [ -S "$PREFIX/tmp/.virgl_test" ]; then
+    echo "  socket OK $(stat -c '%Y %n' "$PREFIX/tmp/.virgl_test")" | tee -a "$LOGFILE"
+    pgrep -af virgl_test_server_android 2>/dev/null | sed 's/^/  pid: /' | tee -a "$LOGFILE"
+    echo "  virgl-server.log (last 5):" | tee -a "$LOGFILE"
+    tail -5 "$HOME/virgl-server.log" 2>/dev/null | sed 's/^/    /' | tee -a "$LOGFILE"
+else
+    echo "  socket missing — virgl not running, RL will see software Mesa only" | tee -a "$LOGFILE"
+fi
+echo "[DIAG] Mesa env that rlawt/GL will see:" | tee -a "$LOGFILE"
+for v in GALLIUM_DRIVER VTEST_SOCKET_NAME MESA_GL_VERSION_OVERRIDE MESA_GLSL_VERSION_OVERRIDE MESA_EXTENSION_OVERRIDE MESA_NO_ERROR LD_LIBRARY_PATH DISPLAY; do
+    eval "val=\${$v:-<unset>}"
+    echo "  $v=$val" | tee -a "$LOGFILE"
+done
+echo "[DIAG] glxinfo (OpenGL renderer + FBConfigs):" | tee -a "$LOGFILE"
+if command -v glxinfo >/dev/null 2>&1; then
+    # -B: short info (vendor / renderer / version); then dump up to 50 FBConfigs
+    # so we can see what Mesa/virgl actually offers when rlawt's glXChooseFBConfig
+    # returns 0 matches.
+    timeout 10 glxinfo -B 2>&1 | head -30 | sed 's/^/  /' | tee -a "$LOGFILE"
+    echo "[DIAG] glxinfo FBConfig summary (first 10 visuals):" | tee -a "$LOGFILE"
+    timeout 10 glxinfo 2>&1 | grep -E 'visual id|color sizes|samples|stencil|depth|drawable|renderable' \
+        | head -40 | sed 's/^/  /' | tee -a "$LOGFILE"
+else
+    echo "  glxinfo not installed — run 'pkg install mesa-demos' for fb-config diagnostics" | tee -a "$LOGFILE"
+fi
+echo "[DIAG] RL profile window/layout prefs:" | tee -a "$LOGFILE"
+RL_PROFILE_DIR="$ROOTFS_PATH/root/.runelite/profiles2"
+if [ -d "$RL_PROFILE_DIR" ]; then
+    for prof in "$RL_PROFILE_DIR"/*.properties; do
+        [ -f "$prof" ] || continue
+        echo "  --- $(basename "$prof") ---" | tee -a "$LOGFILE"
+        grep -aE 'runelite\.(gameSize|lockWindowSize|containInScreen|automaticResizeType|rememberScreenBounds)|stretchedmode\.' \
+            "$prof" 2>/dev/null | sed 's/^/    /' | tee -a "$LOGFILE"
+    done
+else
+    echo "  (profile dir missing)" | tee -a "$LOGFILE"
+fi
+echo "[DIAG] Bionic rlawt jar expected on classpath:" | tee -a "$LOGFILE"
+echo "  $(ls -la "$RLAWT_BIONIC_JAR" 2>&1)" | tee -a "$LOGFILE"
+echo "=== DIAG end ===" | tee -a "$LOGFILE"
+
 rlt_log_cpuset "virgl-ready" "${VIRGL_PID:-$$}"
 
 # ===================================================================
@@ -361,8 +438,7 @@ echo "  classpath=$FULL_CLASSPATH" | tee -a "$LOGFILE"
 # ===================================================================
 # Invoke JVM directly — no proot
 # ===================================================================
-export LD_LIBRARY_PATH="$NATIVE_LD_LIBRARY_PATH"
-export JAVA_HOME="$JAVA_HOME_NATIVE"
+# LD_LIBRARY_PATH / JAVA_HOME already exported before the DIAG block above.
 echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" | tee -a "$LOGFILE"
 echo "JAVA_HOME=$JAVA_HOME" | tee -a "$LOGFILE"
 

@@ -15,6 +15,9 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import com.runelitetablet.domain.presentation.FrameTimingTracker
 import com.runelitetablet.BuildConfig
@@ -101,6 +104,21 @@ class HybridX11HostActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Full immersive: hide status bar + navigation bar so Termux:X11's canvas gets
+        // the entire physical screen. `enableEdgeToEdge` above lets content draw under
+        // the bars, but without this call they remain visible (opaque or as overlays
+        // depending on OEM theming). On Samsung tablets (e.g. Tab S10 Ultra) system
+        // bars otherwise consume ~200px top and ~100px bottom of a 1848-tall screen,
+        // leaving RL's canvas in an ugly letterboxed window.
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+        // Also extend under display cutouts so we get those pixels too on notched displays.
+        @Suppress("DEPRECATION")
+        window.attributes = window.attributes.apply {
+            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
         @Suppress("DEPRECATION")
         window.attributes = window.attributes.apply { preferredRefreshRate = 120f }
 
@@ -121,6 +139,30 @@ class HybridX11HostActivity : ComponentActivity() {
             }
         }
         AppLog.lifecycle("HybridX11HostActivity.onCreate")
+        // WINDOW-geometry preflight: capture what Android hands us BEFORE any surface change.
+        // Lets us tell whether immersive bars took effect, what the starting window-insets
+        // look like, and whether the display is reporting DP or PX-scaled dimensions.
+        val dm = resources.displayMetrics
+        val flags = window.attributes.flags
+        val cutoutMode = window.attributes.layoutInDisplayCutoutMode
+        AppLog.d(
+            "WINDOW",
+            "HybridX11HostActivity.onCreate: displayMetrics=${dm.widthPixels}x${dm.heightPixels}@${dm.density}x " +
+                "(densityDpi=${dm.densityDpi}) flags=0x${flags.toString(16)} cutoutMode=$cutoutMode " +
+                "systemBars=hidden(via WindowInsetsControllerCompat)"
+        )
+        window.decorView.setOnApplyWindowInsetsListener { v, insets ->
+            // Log insets AFTER layout — systemBars should be 0/0/0/0 once the immersive
+            // controller has fired; if they're non-zero something is overriding us.
+            val sbInsets = androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(insets, v)
+                .getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            AppLog.d(
+                "WINDOW",
+                "onApplyWindowInsets: systemBars=left=${sbInsets.left} top=${sbInsets.top} " +
+                    "right=${sbInsets.right} bottom=${sbInsets.bottom} (non-zero = bars still consuming space)"
+            )
+            insets
+        }
         updateStatus("loaded Xlorie from ${loadResult.loadedFrom}")
     }
 
@@ -144,6 +186,22 @@ class HybridX11HostActivity : ComponentActivity() {
         lorieView.setCallback(object : LorieView.Callback {
             override fun changed(surfaceWidth: Int, surfaceHeight: Int, screenWidth: Int, screenHeight: Int) {
                 val framerate = display?.refreshRate?.toInt() ?: 120
+                // WINDOW tag covers every window-geometry transition so we can diff expected
+                // vs actual at each launch. Previously only went into the TextView overlay,
+                // which made post-mortems on "why is the canvas 1480x924 instead of 2960x1848"
+                // impossible. Now every callback lands in logcat + DebugLogServer.
+                val dm = resources.displayMetrics
+                val physW = dm.widthPixels
+                val physH = dm.heightPixels
+                val density = dm.density
+                AppLog.d(
+                    "WINDOW",
+                    "LorieView.changed: surface=${surfaceWidth}x$surfaceHeight " +
+                        "screen=${screenWidth}x$screenHeight refresh=${framerate}Hz " +
+                        "displayMetrics=${physW}x${physH}@${density}x " +
+                        "(ratios: surface/display=${String.format("%.2f", surfaceWidth.toFloat() / physW)}x" +
+                        " screen/display=${String.format("%.2f", screenWidth.toFloat() / physW)}x)"
+                )
                 if (screenWidth > 0 && screenHeight > 0) {
                     AppLog.ipc("send", "jni_sendWindowChange", 0, "width=$screenWidth height=$screenHeight framerate=$framerate")
                     LorieView.sendWindowChange(screenWidth, screenHeight, framerate, "builtin")
