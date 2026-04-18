@@ -28,6 +28,9 @@
 #include "rlawt.h"
 #include <jawt_md.h>
 #include <string.h>
+#include <stdio.h>
+
+#define RLAWT_LOG(...) do { fprintf(stderr, "[rlawt] " __VA_ARGS__); fflush(stderr); } while (0)
 
 static XErrorEvent lastError = {0};
 static int rlawtXErrorHandler(Display *display, XErrorEvent *event) {
@@ -104,6 +107,17 @@ JNIEXPORT void JNICALL Java_net_runelite_rlawt_AWTContext_createGLContext(JNIEnv
 
 	int screen = DefaultScreen(ctx->dpy);
 
+	RLAWT_LOG("createGLContext: displayName=%s screen=%d\n", displayName ? displayName : "(null)", screen);
+	RLAWT_LOG("  dspi->visualID=%lu (0x%lx)  dspi->drawable=0x%lx\n",
+		(unsigned long)dspi->visualID, (unsigned long)dspi->visualID, (unsigned long)dspi->drawable);
+	RLAWT_LOG("  ctx: alphaDepth=%d depthDepth=%d stencilDepth=%d multisamples=%d\n",
+		ctx->alphaDepth, ctx->depthDepth, ctx->stencilDepth, ctx->multisamples);
+	{
+		Visual *defVis = DefaultVisual(ctx->dpy, screen);
+		VisualID defVid = XVisualIDFromVisual(defVis);
+		RLAWT_LOG("  DefaultVisualID=%lu (0x%lx)\n", (unsigned long)defVid, (unsigned long)defVid);
+	}
+
 	GLXFBConfig fbConfig = NULL;
 	for (int db = 0; db < 2; db++) {
 		ctx->doubleBuffered = db == 0;
@@ -127,6 +141,8 @@ JNIEXPORT void JNICALL Java_net_runelite_rlawt_AWTContext_createGLContext(JNIEnv
 
 		int nConfigs;
 		GLXFBConfig *fbConfigs = glXChooseFBConfig(ctx->dpy, screen, attribs, &nConfigs);
+		RLAWT_LOG("  glXChooseFBConfig DB=%d nConfigs=%d fbConfigs=%p\n",
+			ctx->doubleBuffered, nConfigs, (void*)fbConfigs);
 		if (!fbConfigs) {
 			continue;
 		}
@@ -135,11 +151,15 @@ JNIEXPORT void JNICALL Java_net_runelite_rlawt_AWTContext_createGLContext(JNIEnv
 		for (int i = 0; i < nConfigs; i++) {
 			int	fbVid = -1;
 			glXGetFBConfigAttrib(ctx->dpy, fbConfigs[i], GLX_VISUAL_ID, &fbVid);
+			RLAWT_LOG("    DB=%d fbconfig[%d] GLX_VISUAL_ID=%d (0x%x) %s\n",
+				ctx->doubleBuffered, i, fbVid, fbVid,
+				(unsigned long)fbVid == (unsigned long)dspi->visualID ? "<-- MATCH" : "");
 			if (fbVid == dspi->visualID) {
 				fbConfig = fbConfigs[i];
 				break;
 			}
 		}
+		RLAWT_LOG("  DB=%d selection after loop: fbConfig=%p\n", ctx->doubleBuffered, (void*)fbConfig);
 
 		if (fbConfig) {
 			XFree(fbConfigs);
