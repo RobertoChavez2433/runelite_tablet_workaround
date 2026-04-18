@@ -28,6 +28,8 @@ import com.runelitetablet.domain.command.CommandRunner
 import com.runelitetablet.perf.CpuBooster
 import com.runelitetablet.perf.PerfDashboard
 import com.termux.x11.LorieView
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -43,6 +45,8 @@ class HybridX11HostActivity : ComponentActivity() {
     private var lastHandledGeneration = 0
     private var lastStatusMessage: String? = null
     private var lifecycleActive = false
+    private var hasEverAttached = false
+    private var binderDiedTimeoutJob: Job? = null
     private var perfDashboard: PerfDashboard? = null
     private var cpuBooster: CpuBooster? = null
     private var commandRunner: CommandRunner? = null
@@ -230,6 +234,7 @@ class HybridX11HostActivity : ComponentActivity() {
         lifecycleScope.launch {
             AppLog.thread("launcher", Thread.currentThread().name, "observeBridgeState", "collecting bridge state")
             HybridX11Bridge.state.collectLatest { state ->
+                handleBinderDeathEscapeHatch(state)
                 if (state.generation <= 0 || state.generation == lastHandledGeneration) return@collectLatest
                 lastHandledGeneration = state.generation
                 attachController.notifyBridgeStateChanged(); setStatusVisible(true)
@@ -238,6 +243,39 @@ class HybridX11HostActivity : ComponentActivity() {
                     attachController.startAttachLoop(lifecycleScope)
             }
         }
+    }
+
+    /**
+     * If the binder dies after we were previously attached (e.g. the RuneLite JVM or
+     * Termux:X11 server exited) the attach loop retries forever and the user is stuck
+     * staring at "binderAlive=false last=binder_died". Finish the activity after a short
+     * grace period so they land back on the RLT main screen and can re-tap Launch.
+     * Gated on `hasEverAttached` so the escape hatch never fires during the initial
+     * pre-attach wait.
+     */
+    private fun handleBinderDeathEscapeHatch(state: HybridX11BridgeState) {
+        if (state.binderAlive) {
+            hasEverAttached = true
+            binderDiedTimeoutJob?.cancel()
+            binderDiedTimeoutJob = null
+            return
+        }
+        if (!hasEverAttached || state.lastEvent != "binder_died") return
+        if (binderDiedTimeoutJob?.isActive == true) return
+        binderDiedTimeoutJob = lifecycleScope.launch {
+            AppLog.w("HYBRID_X11", "binder_died after prior attach — scheduling escape hatch in 3s")
+            delay(BINDER_DIED_ESCAPE_HATCH_MS)
+            if (HybridX11Bridge.state.value.binderAlive) {
+                AppLog.d("HYBRID_X11", "binder_died escape hatch cancelled: binder recovered")
+                return@launch
+            }
+            AppLog.w("HYBRID_X11", "binder_died escape hatch fired — finishing activity")
+            runOnUiThread { if (!isFinishing) finish() }
+        }
+    }
+
+    private companion object {
+        const val BINDER_DIED_ESCAPE_HATCH_MS = 3_000L
     }
 
     override fun onNewIntent(intent: Intent) {
