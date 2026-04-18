@@ -3,14 +3,14 @@
     "app_name": "Runelite for Tablet",
     "app_version": "0.1.0",
     "description": "Android installer app that runs the real RuneLite client on Samsung Tab S10 Ultra via Termux + proot-distro",
-    "last_updated": "2026-04-17T14:35:00Z",
-    "session_notes": "Session 78: Task 21 + Phase 2.1 + Phase 2.2 + Phase 3-partial LANDED. Four commits on spike/direct-android-surface: (1) build(native) rlawt Bionic rebuild via Android NDK 28.2.13676358, produces librlawt.so with Bionic-only NEEDED + SONAME librlawt.so + single VERNEED entry referencing libc.so Bionic LIBC (not glibc). 26 undefined symbols all verified on device. MiniRlawtLoad + MiniAwtContext verified. (2) scripts(native) launch-runelite-native.sh gated by RLT_NATIVE_TERMUX=1, skips proot-distro, regenerates classpath live from repository2/, swaps Bionic rlawt jar. JVM reaches RL main class. (3) feat(scripts) Kotlin LaunchPreferences.useNativeTermux + APK-version-aware ScriptManager cache (fixes S72 re-deploy bug via $HOME/.rlt/deployed-version marker vs BuildConfig.VERSION_CODE) + deployJars via on-device `unzip -p \"$APK\" assets/libs/…` (141ms vs 30s base64-stdin timeout) + adaptive UI scale from context.resources.displayMetrics bucketed 1/1.5/2/2.5. (4) logging(native) DIAG preflight + HybridX11HostActivity WINDOW logging + WindowInsetsControllerCompat.hide(systemBars) immersive fix. DIAG isolated the Phase 3 GPU blocker: glxinfo -B on Termux fails identical to rlawt (Error: couldn't find RGB GLX visual or fbconfig); proot-Ubuntu Mesa against SAME X server succeeds past FBConfig enumeration. Bug is in Termux Mesa 26.0.5's client-side GLX handshake, NOT our pipeline/rlawt/RuneLite. Memory: feedback_no_hardcoded_ui_sizes.md (UI scale must be adaptive, never hardcoded). Session 79 plan: .claude/specs/2026-04-17-session-79-glx-handshake-debug-plan.md."
+    "last_updated": "2026-04-17T22:10:00Z",
+    "session_notes": "Session 79: LWJGL Bionic-compat unblock landed. GPU plugin activates for first time on native path — virgl/Mali-G720/Mesa 25.2.8 confirmed in runelite-native.log (Plugin GpuPlugin is now running + Using device: virgl (Mali-G720-Immortalis MC12) + Using driver: 4.3 (Compatibility Profile) Mesa 25.2.8). Fix is a three-layer compat script shipped in-APK: (1) patchelf --replace-needed rewrites glibc sonames in DT_NEEDED AND DT_VERNEED in one call (empirically verified — both sections updated); (2) bulk patchelf --clear-symbol-version on all 83 GLIBC_2.17-versioned imported symbols so Bionic does name-only lookup; (3) libbionic-compat.c on-device-compiled shim supplies the 4 glibc-only symbols Bionic truly lacks (__errno_location, __xstat64, __fxstat64, __getdelim). Also landed: HybridX11HostActivity binder_died 3s escape hatch, rlawt RLAWT_LOG instrumentation, Mesa 25.2.8 rebuild (Patch 3 + Patch 4 in build notes, deploy script Git-Bash path fix), scripts/glx-fbconfig-probe.c diagnostic tool. **New issue open for S80**: FPS regressed with GPU on vs software baseline — quantification + refinement next. Memory: project_gpu_enabled_fps_regression.md."
   },
   "current_phase": {
-    "phase_name": "120 FPS Presentation — Option B (native-Termux JVM) CODE PATH PROVEN. Blocker isolated to Termux Mesa GLX handshake (not our code).",
-    "phase_status": "native_termux_path_shipped_phase_3_fps_blocked_on_termux_mesa",
+    "phase_name": "120 FPS Presentation — Option B native-Termux JVM FULLY OPERATIONAL with GPU plugin. Next: close GPU-mode FPS regression.",
+    "phase_status": "native_termux_path_gpu_active_perf_regression_open",
     "phase_started": "2026-04-16",
-    "progress_percentage": 82
+    "progress_percentage": 90
   },
   "release_cycle": {
     "last_release": null,
@@ -20,21 +20,38 @@
   },
   "active_blockers": [
     {
-      "id": "termux-mesa-glx-handshake-returns-zero-fbconfigs",
-      "description": "S78 DIAG preflight evidence: Termux Mesa 26.0.5's client-side GLX query returns zero FBConfigs against the Termux:X11 X server. Same error from glxinfo -B, glxgears -info, and rlawt glXChooseFBConfig. Proot-Ubuntu Mesa against the same X server succeeds past FBConfig enumeration (fails later at X_GetImage BadMatch). Every env permutation failed identically on Termux: default, LIBGL_ALWAYS_SOFTWARE=1, LIBGL_ALWAYS_INDIRECT=1, explicit LIBGL_DRIVERS_PATH. LIBGL_DEBUG=verbose produces NO output — failure is too early for debug hook. EGL also fails (eglInitialize failed). DRI drivers all present in $PREFIX/lib/dri/ (swrast_dri.so, zink_dri.so, virtio_gpu_dri.so, kms_swrast_dri.so). Delta is Termux Mesa vs Ubuntu Mesa build; our pipeline/rlawt/RuneLite are fine. Session 79 plan: .claude/specs/2026-04-17-session-79-glx-handshake-debug-plan.md.",
+      "id": "gpu-mode-fps-regression-vs-software-baseline",
+      "description": "S79 unblocked GPU plugin on native path (virgl/Mali-G720/Mesa 25.2.8 confirmed running). But FPS regressed vs software-render baseline once GPU mode is on. Magnitude unquantified — no per-phase telemetry (draw/swap/VirGL submit/GPU) exists yet. S80 entry point: seed extensive perf logging on both launch-runelite-native.sh DIAG and rlawt RLAWT_LOG hooks, capture 60s FpsPlugin A/B at Varrock East Bank (task D3 / issue #17 — now unblocked), investigate likely culprits (VirGL IPC overhead, compat-shim indirection, Mesa 25.2.8 vs 26.0.5 deltas, cpuset drift). Do NOT propose RL-side workarounds — per feedback memory feedback_scope_our_pipeline_not_runelite.md, the target is our Android/Termux/X11/VirGL pipeline.",
       "severity": "P0",
       "discovered": "2026-04-17",
-      "session": 78
-    },
-    {
-      "id": "rl-awt-frame-renders-at-765x503-cached-size",
-      "description": "Termux:X11 canvas fills physical screen after S78 immersive-bars fix, but RL's ContainableFrame is 765x503 because stored profile has runelite.gameSize=765x503. Orthogonal to GLX blocker. Fix: patch $ROOTFS/root/.runelite/profiles2/*.properties at native launch with adaptive gameSize + stretched-mode scalingFactor=100 (Session 79 Section E).",
-      "severity": "P1",
-      "discovered": "2026-04-17",
-      "session": 78
+      "session": 79
     }
   ],
   "resolved_blockers": [
+    {
+      "id": "lwjgl-liblwjgl-glibc-linked-blocks-gpu-plugin",
+      "description": "Session 78 surfaced: lwjgl-3.3.2-natives-linux-arm64.jar's embedded liblwjgl.so is glibc-linked, so RuneLite's GPU plugin fails dlopen under Bionic with (progressively): (a) cannot find libpthread.so.0/libc.so.6/libdl.so.2/ld-linux-aarch64.so.1 (DT_NEEDED glibc sonames); (b) cannot find X from verneed[0] in DT_NEEDED list (DT_VERNEED soname mismatch when symlink shim is tried); (c) cannot locate symbol stderr/snprintf/... (Bionic strict version mismatch against GLIBC_2.17); (d) cannot locate symbol __xstat64 (glibc-only, genuinely absent in Bionic).",
+      "resolved": "2026-04-17",
+      "resolution": "Session 79: patch-lwjgl-bionic.sh + libbionic-compat.c ship in-APK. Three layers: (1) patchelf --replace-needed rewrites all 4 glibc sonames in both DT_NEEDED and DT_VERNEED in one pass (empirically verified both sections update). (2) patchelf --clear-symbol-version on all 83 imported symbols that carried @GLIBC_2.17 — Bionic falls back to name-only lookup against its @@LIBC exports. (3) libbionic-compat.so (compiled on-device by Termux clang from asset-shipped libbionic-compat.c, ~5.8KB) exports the 4 glibc-only symbols as forwarders to Bionic equivalents: __errno_location → __errno; __xstat64(ver, path, buf) → stat(path, buf); __fxstat64 → fstat; __getdelim → getdelim. patchelf --add-needed libbionic-compat.so wires it in. Script is idempotent and runs on every launch. VERIFIED on R52X90378YB 2026-04-17 22:05 — 'Plugin GpuPlugin is now running' + 'Using device: virgl (Mali-G720-Immortalis MC12)' + 'Using driver: 4.3 (Compatibility Profile) Mesa 25.2.8' in runelite-native.log. Zero Error-starting-GPU events. First time GPU plugin has activated on the native Bionic path."
+    },
+    {
+      "id": "termux-mesa-26-glx-handshake-returns-zero-fbconfigs",
+      "description": "S78: Termux Mesa 26.0.5's client-side GLX query returned zero FBConfigs against Termux:X11. glxinfo -B, glxgears -info, and rlawt glXChooseFBConfig all failed identically. Proot-Ubuntu Mesa against same X server succeeded. Theorized to be the GPU plugin blocker.",
+      "resolved": "2026-04-17",
+      "resolution": "Session 79: Turned out NOT to be the GPU plugin blocker. RL's GPU plugin uses rlawt's own fbconfig enumeration (per-db iteration with visualID matching) which DOES find visualID=33 against Termux Mesa successfully. glxinfo's failure was a Termux Mesa 26.0.5 client-lib quirk unrelated to the rendering pipeline. We downgraded to Mesa 25.2.8 as part of investigation (scripts/deploy-mesa25-to-device.sh + docs/build-notes/mesa-25-build-patches.md) but the actual GPU unblock was the LWJGL Bionic compat layer (see lwjgl-liblwjgl-glibc-linked-blocks-gpu-plugin)."
+    },
+    {
+      "id": "rl-awt-frame-renders-at-765x503-cached-size",
+      "description": "S78: RL's ContainableFrame was 765x503 due to stored runelite.gameSize profile — wasted the rest of the canvas after immersive bars fix.",
+      "resolved": "2026-04-17",
+      "resolution": "Session 79 tasks E1+E2: adaptive runelite.gameSize patch at native launch + stretched-mode scalingFactor=100 wired into launch-runelite-native.sh's RL-CONFIG step. Verify full-screen rendering on next session's launch now that GPU plugin activates."
+    },
+    {
+      "id": "hybrid-x11-host-stuck-on-binder-died-screen",
+      "description": "S78: If Termux:X11 binder died after the activity had successfully attached once, HybridX11HostActivity had no escape — user was stuck on the diagnostic black screen with no way back to the RLT main screen to retry.",
+      "resolved": "2026-04-17",
+      "resolution": "Session 79: added handleBinderDeathEscapeHatch() in HybridX11HostActivity.kt. After a prior successful attach, a 3s window of sustained binderAlive=false + lastEvent=binder_died triggers finish(), returning the user to the RLT main screen. Timeout cancels if binder recovers mid-wait. Single activity edit, no new files."
+    },
     {
       "id": "rlawt-native-lib-glibc-linked-blocks-native-termux-jvm",
       "description": "rlawt-1.8.jar shipped glibc-linked librlawt.so, incompatible with Termux Bionic linker.",
