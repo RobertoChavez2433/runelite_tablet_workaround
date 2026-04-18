@@ -35,6 +35,38 @@ On Git-Bash for Windows, `--device /dev/fuse` gets path-mangled into `C:/dev/fus
  fi
 ```
 
+## Patch 3: Downgrade-specific patch adjustments
+
+Termux's mesa recipe carries a patch stack targeting Mesa 26.0.5. Four
+of those patches need attention for Mesa 25.2.8:
+
+- **Delete `packages/mesa/0003-fix-for-anon-file.patch`** — targets
+  `get_or_create_user_temp_dir()` in `src/util/anon_file.c`, a function
+  added in Mesa 26. Mesa 25 returns `ENOENT` when `XDG_RUNTIME_DIR` is
+  unset instead of falling back to a hardcoded `/tmp`, so the patch isn't
+  needed (our launcher sets `XDG_RUNTIME_DIR` via Termux's profile).
+- **Rewrite `packages/mesa/0004-do-not-check-xlocale.patch`** — original
+  hunk context is at meson.build line 1480 (Mesa 26 layout); Mesa 25's
+  list is at line 1383 with no `poll.h`. The committed version here is
+  the 25.2.8-compatible rewrite.
+- **Delete `packages/mesa/0020-unofficial-support-adreno-830.patch`** and
+  **`packages/mesa/0021-unofficial-support-adreno-810-825-829.patch`** —
+  add Adreno A8XX device defs to `freedreno_devices.py`. Surrounding
+  context differs in 25.2.8, and our target device (Samsung Tab S10
+  Ultra, Mali-G720) isn't Adreno, so these are irrelevant.
+
+## Patch 4: Windows-Docker bind-mount perms
+
+`third_party/termux-packages/output/` is bind-mounted from the Windows
+host and lands in the container owned by the host user's uid (e.g.
+`197609`), which the container's `builder` user (uid 1001) can't write
+to. Before the first `.deb` pack step, run once per container lifetime:
+
+```bash
+docker exec -u root termux-package-builder chmod -R 777 \
+  /home/builder/termux-packages/output
+```
+
 ## Rebuild steps
 
 ```bash

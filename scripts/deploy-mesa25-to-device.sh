@@ -28,11 +28,20 @@ fi
 
 echo "Found deb: $MESA_DEB"
 
+# Git-Bash: adb.exe is a Windows binary and can't stat /c/... paths from MSYS.
+# Convert to a native Windows path when running on MINGW/MSYS/CYGWIN.
+UNAME=$(uname)
+if [[ "$UNAME" == MINGW* || "$UNAME" == MSYS* || "$UNAME" == CYGWIN* ]]; then
+    MESA_DEB_WIN=$(cygpath -w "$MESA_DEB")
+else
+    MESA_DEB_WIN="$MESA_DEB"
+fi
+
 # Push to /sdcard and copy into Termux home via run-as (run-as can read /sdcard
 # under its own uid but cannot directly accept adb push into its sandbox).
-MSYS2_ARG_CONV_EXCL='*' adb -s "$SERIAL" push "$MESA_DEB" /sdcard/mesa-rebuild.deb
+MSYS2_ARG_CONV_EXCL='*' adb -s "$SERIAL" push "$MESA_DEB_WIN" /sdcard/mesa-rebuild.deb
 
-adb -s "$SERIAL" shell "run-as com.termux cp /sdcard/mesa-rebuild.deb \$HOME/mesa-rebuild.deb"
+adb -s "$SERIAL" shell "run-as com.termux cp /sdcard/mesa-rebuild.deb /data/data/com.termux/files/home/mesa-rebuild.deb"
 
 # Before install: kill any running RL + X11 so Mesa's files can be overwritten.
 adb -s "$SERIAL" shell "run-as com.termux pkill -f 'net.runelite.client.RuneLite' 2>/dev/null || true"
@@ -46,7 +55,7 @@ sleep 2
 adb -s "$SERIAL" shell "run-as com.termux sh -c '
 export PREFIX=/data/data/com.termux/files/usr
 export PATH=\$PREFIX/bin:\$PATH
-dpkg -i --force-downgrade \$HOME/mesa-rebuild.deb
+dpkg -i --force-downgrade /data/data/com.termux/files/home/mesa-rebuild.deb
 '"
 
 # Verify new version.
