@@ -211,6 +211,24 @@ echo "  rlawt-bionic-jar=$RLAWT_BIONIC_JAR ($(stat -c%s "$RLAWT_BIONIC_JAR" 2>/d
 echo "  rl-repo=$RL_REPO_DIR ($(ls "$RL_REPO_DIR"/*.jar 2>/dev/null | wc -l) jars)" | tee -a "$LOGFILE"
 
 # ===================================================================
+# Patch LWJGL liblwjgl.so for Bionic. The LWJGL native jar in repository2
+# is glibc-linked; Bionic's loader rejects it with either libpthread.so.0
+# not found or a DT_VERNEED/DT_NEEDED mismatch for ld-linux-aarch64.so.1.
+# patch-lwjgl-bionic.sh is idempotent — skips if already patched. RuneLite's
+# auto-updater re-installs the upstream jar on version bump, so we re-run
+# on every launch to keep the GPU plugin working across RL updates.
+# ===================================================================
+PATCH_LWJGL_SCRIPT="$HOME/scripts/patch-lwjgl-bionic.sh"
+if [ -x "$PATCH_LWJGL_SCRIPT" ]; then
+    echo "Running LWJGL Bionic patch..." | tee -a "$LOGFILE"
+    if ! bash "$PATCH_LWJGL_SCRIPT" 2>&1 | tee -a "$LOGFILE"; then
+        echo "WARNING: LWJGL Bionic patch failed — GPU plugin will fail to start" | tee -a "$LOGFILE"
+    fi
+else
+    echo "WARNING: $PATCH_LWJGL_SCRIPT missing or not executable — GPU plugin will fail to start" | tee -a "$LOGFILE"
+fi
+
+# ===================================================================
 # Start PulseAudio (minimal — RL needs an audio endpoint or it logs noisily)
 # ===================================================================
 if command -v pulseaudio >/dev/null 2>&1; then

@@ -24,6 +24,8 @@ class ScriptManager(
             "install-proot.sh", "install-java.sh", "download-runelite.sh",
             "check-markers.sh", "check-x11-socket.sh", "launch-runelite.sh",
             "launch-runelite-native.sh",
+            "patch-lwjgl-bionic.sh",
+            "libbionic-compat.c",
             "update-runelite.sh", "health-check.sh", "shutdown-session.sh",
             "detect-gpu.sh", "setup-gpu.sh", "setup-gpu-mali.sh",
             "monitor-cpu-affinity.sh", "benchmark-pipeline.sh",
