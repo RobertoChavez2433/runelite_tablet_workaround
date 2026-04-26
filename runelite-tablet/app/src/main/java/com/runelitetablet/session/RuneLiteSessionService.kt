@@ -15,11 +15,14 @@ import com.runelitetablet.setup.ScriptManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class RuneLiteSessionService : Service() {
@@ -33,6 +36,8 @@ class RuneLiteSessionService : Service() {
         private const val PREF_SESSION_ACTIVE = "session_active"
         private const val PREF_SESSION_START_TIME = "session_start_time"
         private const val SHUTDOWN_TIMEOUT_MS = 15_000L
+        /** S81 Task 13: how often to unbind+rebind to re-assert the /top-app hoist. */
+        private const val PIN_REFRESH_INTERVAL_MS = 20_000L
 
         private val _sessionState = MutableStateFlow<SessionState>(SessionState.Idle)
         val sessionState: StateFlow<SessionState> = _sessionState.asStateFlow()
@@ -48,6 +53,7 @@ class RuneLiteSessionService : Service() {
     private lateinit var notificationHelper: SessionNotificationHelper
     private lateinit var termuxPin: TermuxProcessPin
     private val presentationBackend = PresentationBackends.stable
+    private var pinRefreshJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -76,6 +82,7 @@ class RuneLiteSessionService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        stopPinRefreshLoop()
         termuxPin.unpin()
         healthMonitor.stopPolling(); serviceScope.cancel()
     }
@@ -93,12 +100,33 @@ class RuneLiteSessionService : Service() {
         // /top-app (CPUs 0-7) instead of /background (CPUs 0-3). Must happen
         // AFTER startForeground() so this process is already PROCESS_STATE_TOP.
         termuxPin.pin()
+        // S81 Task 13: periodic rebind so Android's AMS re-evaluation window can't
+        // demote Termux back to /moderate (observed drift 25s post-launch). Every
+        // 20s we unbind + rebind which re-asserts BIND_IMPORTANT +
+        // BIND_SCHEDULE_LIKE_TOP_APP. Cancelled on session stop / onDestroy.
+        startPinRefreshLoop()
         healthMonitor.startPolling(::handleHealthStateChange, initialDelayMs = 30_000L)
+    }
+
+    private fun startPinRefreshLoop() {
+        pinRefreshJob?.cancel()
+        pinRefreshJob = serviceScope.launch {
+            while (isActive) {
+                delay(PIN_REFRESH_INTERVAL_MS)
+                if (!isActive) break
+                termuxPin.refreshPin()
+            }
+        }
+    }
+
+    private fun stopPinRefreshLoop() {
+        pinRefreshJob?.cancel()
+        pinRefreshJob = null
     }
 
     private fun handleStopSession() {
         AppLog.state("RuneLiteSessionService: ${_sessionState.value} -> Stopped")
-        _sessionState.value = SessionState.Stopped; healthMonitor.stopPolling(); termuxPin.unpin()
+        _sessionState.value = SessionState.Stopped; healthMonitor.stopPolling(); stopPinRefreshLoop(); termuxPin.unpin()
         serviceScope.launch {
             try {
                 if (scriptManager.deployScripts()) {
