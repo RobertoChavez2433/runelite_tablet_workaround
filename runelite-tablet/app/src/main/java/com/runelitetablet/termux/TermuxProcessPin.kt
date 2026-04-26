@@ -95,7 +95,9 @@ class TermuxProcessPin(private val context: Context) {
         }
 
         var flags = Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        // Audit-#1 correction: BIND_INCLUDE_CAPABILITIES is API 31 (S), not Q.
+        // The flag is a silent no-op on Q/R; gating on Q misrepresented coverage.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             flags = flags or Context.BIND_INCLUDE_CAPABILITIES
         }
         // Considered: BIND_SCHEDULE_LIKE_TOP_APP (API 33) — tells AMS to give
