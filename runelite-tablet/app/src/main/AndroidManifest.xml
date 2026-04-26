@@ -71,6 +71,16 @@
             android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
 
+        <!-- Direct-Android-surface host: bypasses LorieView/X11/virgl entirely.
+             rlawt JVM (built with -DRLAWT_DIRECT_SURFACE) connects to this
+             activity's worker over abstract UDS, gets an AHB pool, blits
+             frames straight to this SurfaceView. exported=true for adb
+             validation; switches to the standard launch path once stable. -->
+        <activity
+            android:name=".directsurface.DirectSurfaceHostActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
+
         <service
             android:name=".termux.TermuxResultService"
             android:exported="false" />

@@ -74,7 +74,10 @@ android {
 
     externalNativeBuild {
         cmake {
-            path = file("../../third_party/termux-x11-upstream/app/src/main/cpp/CMakeLists.txt")
+            // Wrapper that pulls in termux-x11 and adds librlawtsurface (the
+            // direct-Android-surface consumer). Single CMake path per AGP
+            // android block.
+            path = file("src/main/cpp/CMakeLists.txt")
         }
     }
 }
