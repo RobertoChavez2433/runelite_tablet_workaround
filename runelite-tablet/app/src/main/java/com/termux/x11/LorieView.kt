@@ -7,6 +7,7 @@ import android.content.SharedPreferences
 import android.graphics.Rect
 import android.graphics.Point
 import android.graphics.drawable.ColorDrawable
+import android.os.Build
 import android.util.AttributeSet
 import android.view.Surface
 import android.view.SurfaceHolder
@@ -51,6 +52,22 @@ class LorieView : SurfaceView {
             val frame = holder.surfaceFrame
             AppLog.surface("created", frame.width(), frame.height(), "BGRA_8888",
                 "holder=$holder requestedFormat=BGRA_8888($BGRA_8888) — format matters for Xlorie legacy drawing path")
+            // DISPLAY per-surface dump: the Display attached to THIS SurfaceView.
+            // Paired with HybridX11HostActivity.onCreate's DISPLAY log — if the two
+            // diverge, the surface is on a different display than the activity
+            // (e.g. secondary/external panel), which would explain mismatched
+            // refresh rates between RLT Choreographer and Xlorie AChoreographer.
+            val disp = display
+            if (disp != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val m = disp.mode
+                AppLog.d(
+                    "DISPLAY",
+                    "LorieView.surfaceCreated: activeMode=id=${m.modeId}:" +
+                        "${m.physicalWidth}x${m.physicalHeight}@${"%.1f".format(m.refreshRate)}Hz " +
+                        "refreshRate=${"%.1f".format(disp.refreshRate)}Hz displayId=${disp.displayId} " +
+                        "frameRateSetOnSurface=no (setFrameRate not yet called — see S81 logging audit)"
+                )
+            }
         }
 
         override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {

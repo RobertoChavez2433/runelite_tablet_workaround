@@ -2,6 +2,7 @@ package com.runelitetablet.presentation.hybrid
 
 import android.content.SharedPreferences
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.content.Intent
@@ -155,6 +156,28 @@ class HybridX11HostActivity : ComponentActivity() {
                 "(densityDpi=${dm.densityDpi}) flags=0x${flags.toString(16)} cutoutMode=$cutoutMode " +
                 "systemBars=hidden(via WindowInsetsControllerCompat)"
         )
+        // DISPLAY capability preflight: dump Android's advertised mode list so we can
+        // tell whether 120Hz is available, which mode is currently active, and what the
+        // panel would switch to under adaptive-refresh. Paired with LorieView's per-
+        // surface DISPLAY log — compare the two to detect Activity-vs-Surface display
+        // divergence (e.g. secondary/external displays).
+        val disp = display
+        if (disp != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val activeMode = disp.mode
+            val modes = disp.supportedModes.joinToString(";") {
+                "id=${it.modeId}:${it.physicalWidth}x${it.physicalHeight}@${"%.1f".format(it.refreshRate)}Hz"
+            }
+            val rates = disp.supportedRefreshRates.joinToString(",") { "%.1f".format(it) }
+            AppLog.d(
+                "DISPLAY",
+                "HybridX11HostActivity.onCreate: activeMode=id=${activeMode.modeId}:" +
+                    "${activeMode.physicalWidth}x${activeMode.physicalHeight}@${"%.1f".format(activeMode.refreshRate)}Hz " +
+                    "refreshRate=${"%.1f".format(disp.refreshRate)}Hz supportedRefreshRates=[$rates] " +
+                    "supportedModes=[$modes] displayId=${disp.displayId} state=${disp.state}"
+            )
+        } else {
+            AppLog.w("DISPLAY", "HybridX11HostActivity.onCreate: display unavailable or pre-API-23 — mode dump skipped")
+        }
         window.decorView.setOnApplyWindowInsetsListener { v, insets ->
             // Log insets AFTER layout — systemBars should be 0/0/0/0 once the immersive
             // controller has fired; if they're non-zero something is overriding us.
