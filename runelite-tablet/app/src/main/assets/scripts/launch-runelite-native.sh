@@ -534,7 +534,19 @@ if [ -d "$ROOTFS_PATH/root/.runelite/profiles2" ] \
         else
             echo 'runelite.clientMaximized=true' >> "$CFG"
         fi
-        echo "RL-CONFIG native: patched $(basename "$CFG") gameSize=${RLT_GAME_SIZE_W}x${RLT_GAME_SIZE_H} resize=KEEP_WINDOW_SIZE stretched=100 keepAspect=true clientMaximized=true" | tee -a "$LOGFILE"
+        # Issue #57: GPU plugin's "UI scaling: Hybrid" only scales the game canvas,
+        # not the surrounding Swing chrome. With -Dsun.java2d.uiScale=2 the JVM
+        # already 2x-scales every AWT/Swing component (sidebar, settings, fonts);
+        # if RL ALSO shader-scales the canvas we end up with a 2x main viewport
+        # plus an effectively-1x sidebar (Swing scaled but canvas double-scaled).
+        # Forcing gpu.uiScalingMode=NONE disables RL's shader scaling so uiScale
+        # alone controls every pixel — uniform across canvas and chrome.
+        if grep -q '^gpu\.uiScalingMode=' "$CFG"; then
+            sed -i 's/^gpu\.uiScalingMode=.*/gpu.uiScalingMode=NONE/' "$CFG"
+        else
+            echo 'gpu.uiScalingMode=NONE' >> "$CFG"
+        fi
+        echo "RL-CONFIG native: patched $(basename "$CFG") gameSize=${RLT_GAME_SIZE_W}x${RLT_GAME_SIZE_H} resize=KEEP_WINDOW_SIZE stretched=100 keepAspect=true clientMaximized=true gpu.uiScalingMode=NONE" | tee -a "$LOGFILE"
         # S82 verification: re-read each key from disk and confirm it matches what
         # we *think* we wrote. Without this, a sed-pattern bug or write-permission
         # failure would silently leave RL on the prior values and we'd re-debug
@@ -553,6 +565,7 @@ if [ -d "$ROOTFS_PATH/root/.runelite/profiles2" ] \
         _expect "stretchedmode.scalingFactor"  "100"
         _expect "stretchedmode.keepAspectRatio" "true"
         _expect "runelite.clientMaximized"     "true"
+        _expect "gpu.uiScalingMode"            "NONE"
         unset -f _expect
     done
 else

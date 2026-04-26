@@ -970,7 +970,10 @@ remove_runelite_setting "gpu.drawDistance"
 remove_runelite_setting "gpu.expandedMapLoadingChunks"
 remove_runelite_setting "gpu.smoothBanding"
 remove_runelite_setting "gpu.antiAliasingMode"
-remove_runelite_setting "gpu.uiScalingMode"
+# Issue #57: force gpu.uiScalingMode=NONE so RL's shader-scaler doesn't compose
+# with the launcher's --scale uiScale and double-up on the canvas while leaving
+# the Swing sidebar at 1x. Setting NONE makes uiScale the single source of truth.
+upsert_runelite_setting "gpu.uiScalingMode" "NONE"
 remove_runelite_setting "gpu.anisotropicFilteringLevel"
 remove_runelite_setting "gpu.removeVertexSnapping"
 echo "Configured RuneLite GPU profile: default (cleared branch-forced GPU profile overrides)" >&2
