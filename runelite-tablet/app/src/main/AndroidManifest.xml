@@ -50,6 +50,21 @@
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
 
+        <!-- S82 task #26 — Surface-AIDL handoff de-risker. Activity hosts a
+             SurfaceView and ships its Surface to SurfaceRendererService over
+             Binder/AIDL. Service runs in `:surfacerenderer` so the Surface
+             really crosses a process boundary. exported=true so we can launch
+             via `adb shell am start -n com.runelitetablet/.probe.surfaceaidl.SurfaceAidlProbeActivity`. -->
+        <activity
+            android:name=".probe.surfaceaidl.SurfaceAidlProbeActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
+
+        <service
+            android:name=".probe.surfaceaidl.SurfaceRendererService"
+            android:process=":surfacerenderer"
+            android:exported="false" />
+
         <activity
             android:name=".presentation.hybrid.HybridX11HostActivity"
             android:exported="true"
