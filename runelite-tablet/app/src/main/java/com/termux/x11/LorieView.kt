@@ -80,6 +80,30 @@ class LorieView : SurfaceView {
                 } catch (e: Throwable) {
                     AppLog.w("DISPLAY", "LorieView.surfaceCreated: setFrameRate threw ${e.message}")
                 }
+                // S82 readback verification: setFrameRate is asynchronous — SurfaceFlinger
+                // chooses the actual rate based on global policy + competing surfaces. The
+                // call returns void on Java; we can't query the requested rate back. What
+                // we CAN do is sample Display.refreshRate at +200ms / +1s / +5s post-set
+                // and log it. If the panel didn't switch to 120Hz, this is where we'd see
+                // it (e.g., stuck at 60Hz under DRR adaptive policy).
+                postDelayed({
+                    val d = display
+                    if (d != null) {
+                        AppLog.d("DISPLAY", "LorieView.surfaceCreated +200ms: display.refreshRate=${"%.2f".format(d.refreshRate)}Hz mode=${d.mode.modeId}@${"%.1f".format(d.mode.refreshRate)}Hz")
+                    }
+                }, 200)
+                postDelayed({
+                    val d = display
+                    if (d != null) {
+                        AppLog.d("DISPLAY", "LorieView.surfaceCreated +1s: display.refreshRate=${"%.2f".format(d.refreshRate)}Hz mode=${d.mode.modeId}@${"%.1f".format(d.mode.refreshRate)}Hz")
+                    }
+                }, 1000)
+                postDelayed({
+                    val d = display
+                    if (d != null) {
+                        AppLog.d("DISPLAY", "LorieView.surfaceCreated +5s: display.refreshRate=${"%.2f".format(d.refreshRate)}Hz mode=${d.mode.modeId}@${"%.1f".format(d.mode.refreshRate)}Hz")
+                    }
+                }, 5000)
             }
             // DISPLAY per-surface dump: the Display attached to THIS SurfaceView.
             // Paired with HybridX11HostActivity.onCreate's DISPLAY log — if the two
