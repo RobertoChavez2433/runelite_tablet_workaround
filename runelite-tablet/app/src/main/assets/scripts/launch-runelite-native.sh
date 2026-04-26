@@ -460,7 +460,7 @@ echo "=== DIAG end ===" | tee -a "$LOGFILE"
 rlt_log_cpuset "virgl-ready" "${VIRGL_PID:-$$}"
 
 # ===================================================================
-# Profile-patching: rewrite runelite.gameSize + enable RESIZE_WINDOW +
+# Profile-patching: rewrite runelite.gameSize + enable KEEP_WINDOW_SIZE resize +
 # enable stretched mode so the AWT Frame fills the Termux:X11 canvas
 # instead of rendering at the last cached "postcard" size (typ 765×503).
 #
@@ -488,9 +488,9 @@ if [ -d "$ROOTFS_PATH/root/.runelite/profiles2" ] \
             printf 'runelite.gameSize=%dx%d\n' "$RLT_GAME_SIZE_W" "$RLT_GAME_SIZE_H" >> "$CFG"
         fi
         if grep -q '^runelite\.automaticResizeType=' "$CFG"; then
-            sed -i 's/^runelite\.automaticResizeType=.*/runelite.automaticResizeType=RESIZE_WINDOW/' "$CFG"
+            sed -i 's/^runelite\.automaticResizeType=.*/runelite.automaticResizeType=KEEP_WINDOW_SIZE/' "$CFG"
         else
-            echo 'runelite.automaticResizeType=RESIZE_WINDOW' >> "$CFG"
+            echo 'runelite.automaticResizeType=KEEP_WINDOW_SIZE' >> "$CFG"
         fi
         if grep -q '^stretchedmode\.scalingFactor=' "$CFG"; then
             sed -i 's/^stretchedmode\.scalingFactor=.*/stretchedmode.scalingFactor=100/' "$CFG"
@@ -502,7 +502,7 @@ if [ -d "$ROOTFS_PATH/root/.runelite/profiles2" ] \
         else
             echo 'stretchedmode.keepAspectRatio=true' >> "$CFG"
         fi
-        echo "RL-CONFIG native: patched $(basename "$CFG") gameSize=${RLT_GAME_SIZE_W}x${RLT_GAME_SIZE_H} resize=RESIZE_WINDOW stretched=100 keepAspect=true" | tee -a "$LOGFILE"
+        echo "RL-CONFIG native: patched $(basename "$CFG") gameSize=${RLT_GAME_SIZE_W}x${RLT_GAME_SIZE_H} resize=KEEP_WINDOW_SIZE stretched=100 keepAspect=true" | tee -a "$LOGFILE"
     done
 else
     if [ -z "${RLT_GAME_SIZE_W:-}" ] || [ -z "${RLT_GAME_SIZE_H:-}" ]; then
@@ -606,12 +606,23 @@ echo "$JAVA_PID" > "$HOME/.rlt-native.pid"
 rlt_log_cpuset "java-started" "$JAVA_PID"
 echo "JVM PID=$JAVA_PID (log $LOGFILE, classload $CLASSLOAD_LOG)" | tee -a "$LOGFILE"
 
-# Pin JVM to big/prime cores (4-7). Same policy as proot path for A/B parity.
-if taskset -p 0xF0 "$JAVA_PID" 2>/dev/null; then
-    echo "AFFINITY: JVM (PID=$JAVA_PID) pinned to big/prime cores" | tee -a "$LOGFILE"
-else
-    echo "AFFINITY: taskset failed for JVM (PID=$JAVA_PID)" | tee -a "$LOGFILE"
-fi
+# Pin JVM and virgl to big/prime cores (4-7). Same policy as proot path for A/B parity.
+# Read back Cpus_allowed_list afterwards: cpuset (e.g. /moderate cpus=0-3) intersects
+# the requested affinity, so a successful taskset call can still leave the process
+# clamped to little cores. The post-call status read is what tells us what actually
+# took effect — see S81 CPUSET SETTLE evidence in pipeline-observability.md.
+rlt_apply_affinity() {
+    local label="$1" pid="$2" mask="${3:-0xF0}"
+    [ -z "$pid" ] && { echo "AFFINITY: $label PID empty — skipped" | tee -a "$LOGFILE"; return; }
+    [ -d "/proc/$pid" ] || { echo "AFFINITY: $label (PID=$pid) gone before taskset" | tee -a "$LOGFILE"; return; }
+    local out
+    out="$(taskset -p "$mask" "$pid" 2>&1 || echo "<taskset returned $?>")"
+    local effective
+    effective="$(grep '^Cpus_allowed_list' "/proc/$pid/status" 2>/dev/null | awk '{print $2}' || echo unreadable)"
+    echo "AFFINITY: $label (PID=$pid) requested=$mask effective_Cpus_allowed_list=$effective taskset=$out" | tee -a "$LOGFILE"
+}
+rlt_apply_affinity "JVM" "$JAVA_PID" 0xF0
+rlt_apply_affinity "VIRGL" "${VIRGL_PID:-}" 0xF0
 
 if [ "${RLT_PERF_SAMPLE:-0}" = "1" ]; then
     echo "PERF: RLT_PERF_SAMPLE=1 — spawning perf-sampler" | tee -a "$LOGFILE"
