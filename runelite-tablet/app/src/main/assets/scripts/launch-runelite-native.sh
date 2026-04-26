@@ -1,4 +1,11 @@
 #!/data/data/com.termux/files/usr/bin/bash
+# Validation gate for the rlawt-on-Surface bring-up. Touch
+# $HOME/.rlt/.use-direct-surface (or run `run-as com.termux touch ...`) to
+# enable on the next launch; remove the file to revert to the GLX path.
+# Cheap stat, no behavior change when absent. Lives at the top of the file
+# so injection survives ScriptManager's deploy/marker logic without an APK
+# rebuild.
+[ -f "$HOME/.rlt/.use-direct-surface" ] && export RLT_DIRECT_SURFACE=1
 # launch-runelite-native.sh — Phase 2.1 native-Termux RuneLite launcher.
 #
 # This is the proot-free path. It bypasses proot-distro entirely, runs the
@@ -122,7 +129,18 @@ RL_PROFILE_DIR="$RL_DOT_DIR/profiles2"
 RL_CLIENT_LOG="$RL_DOT_DIR/logs/client.log"
 # APK-deployed location for the Bionic rlawt jar.
 # Set RLT_RLAWT_BIONIC_JAR to override (e.g. during ad-hoc adb push testing).
-RLAWT_BIONIC_JAR="${RLT_RLAWT_BIONIC_JAR:-$HOME/.rlt/rlawt-1.8-bionic.jar}"
+#
+# RLT_DIRECT_SURFACE=1 swaps to the EGL-on-AHardwareBuffer drop-in JAR which
+# replaces the X11/GLX path with a direct connection to RlawtSurfaceServer
+# in com.runelitetablet (DirectSurfaceHostActivity must be running). Build
+# with `bash scripts/build-rlawt-bionic.sh --direct-surface` and deploy the
+# resulting jar to $HOME/.rlt/rlawt-1.8-direct-surface.jar.
+if [[ "${RLT_DIRECT_SURFACE:-0}" == "1" ]]; then
+    RLAWT_BIONIC_JAR="${RLT_RLAWT_BIONIC_JAR:-$HOME/.rlt/rlawt-1.8-direct-surface.jar}"
+    echo "[direct-surface] using JAR=$RLAWT_BIONIC_JAR" >&2
+else
+    RLAWT_BIONIC_JAR="${RLT_RLAWT_BIONIC_JAR:-$HOME/.rlt/rlawt-1.8-bionic.jar}"
+fi
 
 JAVA_HOME_NATIVE="$PREFIX/lib/jvm/java-21-openjdk"
 JAVA_BIN="$JAVA_HOME_NATIVE/bin/java"
@@ -750,6 +768,41 @@ start_openbox_native
 # Surface the JIT/heap config we just set as a single grep-able line so post-mortem
 # analysis can verify they actually landed in this run vs a stale APK.
 echo "JIT-CONFIG: AlwaysPreTouch=on ReservedCodeCacheSize=256m CICompilerCount=4 UseStringDeduplication=on jit-events-log=$HOME/jit-events.log" | tee -a "$LOGFILE"
+
+# ===================================================================
+# Direct-surface mode env: rlawt JVM connects to DirectSurfaceHostActivity's
+# RlawtSurfaceServer on an abstract socket. Pass the device dims so the
+# producer's PRODUCER_HELLO request matches the SurfaceView's allocation.
+# ===================================================================
+if [[ "${RLT_DIRECT_SURFACE:-0}" == "1" ]]; then
+    echo "=== Direct-surface mode active ===" | tee -a "$LOGFILE"
+    echo "  abstract_name=${RLAWT_SURFACE_NAME:-rlt-rlawt-surface}" | tee -a "$LOGFILE"
+    # Probe device dims via xdpyinfo; fall back to 2960x1848 (Tab S10 Ultra).
+    DS_W=2960; DS_H=1848
+    if command -v xdpyinfo >/dev/null 2>&1; then
+        DS_DIMS="$(DISPLAY=:0 timeout 3 xdpyinfo 2>/dev/null | awk '/dimensions:/ {print $2; exit}' || true)"
+        if [[ "$DS_DIMS" =~ ^([0-9]+)x([0-9]+)$ ]]; then
+            DS_W="${BASH_REMATCH[1]}"; DS_H="${BASH_REMATCH[2]}"
+        fi
+    fi
+    export RLAWT_INITIAL_WIDTH="${DS_W}"
+    export RLAWT_INITIAL_HEIGHT="${DS_H}"
+    export RLAWT_SURFACE_NAME="${RLAWT_SURFACE_NAME:-rlt-rlawt-surface}"
+    # Per-frame CSV side-file for swap_us/gap_us correlation.
+    export RLAWT_PERF_CSV="${LOGDIR:-$HOME/.rlt-logs}/rlawt-direct-surface-frames.csv"
+    mkdir -p "$(dirname "$RLAWT_PERF_CSV")"
+    echo "  RLAWT_INITIAL_WIDTH=$RLAWT_INITIAL_WIDTH RLAWT_INITIAL_HEIGHT=$RLAWT_INITIAL_HEIGHT" | tee -a "$LOGFILE"
+    echo "  RLAWT_PERF_CSV=$RLAWT_PERF_CSV" | tee -a "$LOGFILE"
+
+    # Make sure DirectSurfaceHostActivity is up before we launch RuneLite —
+    # the rlawt JVM connects on PRODUCER_HELLO. Best-effort: am start; if the
+    # activity exits unexpectedly the rlawt connect will fail with a logged
+    # errno=ECONNREFUSED.
+    am start -n "com.runelitetablet/.directsurface.DirectSurfaceHostActivity" \
+        --es "rlt.abstract_name" "$RLAWT_SURFACE_NAME" >>"$LOGFILE" 2>&1 || \
+        echo "[direct-surface] am start FAILED — see $LOGFILE" >&2
+    sleep 0.5
+fi
 
 echo "=== Invoking JVM ===" | tee -a "$LOGFILE"
 echo "  cmd: $JAVA_BIN ${JVM_ARGS[*]} -cp <classpath> $MAIN_CLASS $CLIENT_ARGS" | tee -a "$LOGFILE"
