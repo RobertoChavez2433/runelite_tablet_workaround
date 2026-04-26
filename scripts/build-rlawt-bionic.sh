@@ -28,6 +28,15 @@ cd "$REPO_ROOT"
 : "${ANDROID_ABI:=arm64-v8a}"
 : "${ANDROID_PLATFORM:=android-31}"
 
+# Variant selection. By default we build the GLX/X11 backend that drops into
+# librlawt.so — same as the file we've been shipping since S78. Pass
+# --direct-surface to build the EGL-on-AHardwareBuffer variant intended for
+# the rlawt-on-Surface engineering block (see docs/s82-capture/
+# direct-android-blocker-3-scope.md). The direct-surface build also
+# repackages a complete drop-in JAR with our patched AWTContext.class
+# (ComponentListener + notifyResized + java-side logging).
+VARIANT="default"
+
 if [[ -d "${ANDROID_SDK_CMAKE}" ]]; then
     # Git-Bash needs MSYS-form paths on PATH for command lookups to work.
     _msys_cmake_bin="$(cygpath -u "${ANDROID_SDK_CMAKE}" 2>/dev/null || echo "${ANDROID_SDK_CMAKE}")"
@@ -46,17 +55,32 @@ if [[ ! -f "${ANDROID_NDK_ROOT}/build/cmake/android.toolchain.cmake" ]]; then
     exit 1
 fi
 
-BUILD_DIR="third_party/rlawt-bionic/build-bionic"
+CLEAN=0
+EXTRA_CMAKE_ARGS=()
 
-if [[ "${1:-}" == "--clean" ]]; then
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --clean) CLEAN=1; shift ;;
+        --direct-surface) VARIANT="direct-surface"; shift ;;
+        *) echo "ERROR: unknown arg '$1' (expected --clean and/or --direct-surface)" >&2; exit 1 ;;
+    esac
+done
+
+if [[ "$VARIANT" == "direct-surface" ]]; then
+    BUILD_DIR="third_party/rlawt-bionic/build-direct"
+    EXTRA_CMAKE_ARGS+=(-DRLAWT_DIRECT_SURFACE=ON)
+else
+    BUILD_DIR="third_party/rlawt-bionic/build-bionic"
+fi
+
+if [[ "$CLEAN" == "1" ]]; then
     echo "Cleaning ${BUILD_DIR}..."
     rm -rf "${BUILD_DIR}"
-    shift
 fi
 
 mkdir -p "${BUILD_DIR}"
 
-echo "Configuring rlawt-bionic with NDK at ${ANDROID_NDK_ROOT}..."
+echo "Configuring rlawt-bionic (variant=${VARIANT}) with NDK at ${ANDROID_NDK_ROOT}..."
 cmake \
     -S third_party/rlawt-bionic \
     -B "${BUILD_DIR}" \
@@ -64,6 +88,7 @@ cmake \
     -DANDROID_ABI="${ANDROID_ABI}" \
     -DANDROID_PLATFORM="${ANDROID_PLATFORM}" \
     -DCMAKE_BUILD_TYPE=Release \
+    "${EXTRA_CMAKE_ARGS[@]}" \
     -G "Ninja"
 
 echo ""
@@ -86,4 +111,76 @@ if [[ -x "${READELF}" ]]; then
     echo ""
     echo "=== readelf -d ==="
     "${READELF}" -d "${OUTPUT}" | grep -E "(NEEDED|SONAME|VERNEED)" || true
+fi
+
+# ===================================================================
+# Direct-surface variant: also compile our patched AWTContext.java +
+# repackage a complete drop-in JAR. The launcher reads this JAR when
+# RLT_DIRECT_SURFACE=1.
+# ===================================================================
+if [[ "$VARIANT" == "direct-surface" ]]; then
+    echo ""
+    echo "=== Repackaging direct-surface JAR ==="
+
+    # Locate javac. Try $JAVA_HOME, then Android Studio's bundled JBR.
+    if [[ -n "${JAVA_HOME:-}" && -x "${JAVA_HOME}/bin/javac" ]]; then
+        JAVAC_BIN="${JAVA_HOME}/bin/javac"
+        JAR_BIN="${JAVA_HOME}/bin/jar"
+    elif [[ -x "C:/Program Files/Android/Android Studio/jbr/bin/javac.exe" ]]; then
+        JAVAC_BIN="C:/Program Files/Android/Android Studio/jbr/bin/javac.exe"
+        JAR_BIN="C:/Program Files/Android/Android Studio/jbr/bin/jar.exe"
+    else
+        echo "ERROR: cannot find javac. Set JAVA_HOME to a JDK 11+ install." >&2
+        exit 1
+    fi
+    echo "Using javac: ${JAVAC_BIN}"
+
+    AWTCTX_SRC="third_party/rlawt/AWTContext.java"
+    JAVA_OUT_DIR="${BUILD_DIR}/java-classes"
+    rm -rf "${JAVA_OUT_DIR}"
+    mkdir -p "${JAVA_OUT_DIR}"
+
+    "${JAVAC_BIN}" -source 1.8 -target 1.8 -d "${JAVA_OUT_DIR}" "${AWTCTX_SRC}"
+
+    # Find the upstream JAR to repack. Prefer the existing bionic jar (which
+    # already strips the glibc .so and ships our linux-aarch64 .so location);
+    # fall back to repository2 if you have an unmodified rlawt-1.8.jar lying
+    # around and want to start fresh.
+    BASE_JAR=""
+    if [[ -f "runelite-tablet/app/libs/rlawt-1.8-bionic.jar" ]]; then
+        BASE_JAR="runelite-tablet/app/libs/rlawt-1.8-bionic.jar"
+    fi
+    if [[ -z "$BASE_JAR" ]]; then
+        echo "ERROR: cannot find a base rlawt JAR to repack" >&2
+        exit 1
+    fi
+    echo "Base JAR: ${BASE_JAR} ($(wc -c < "$BASE_JAR") bytes)"
+
+    REPACK_DIR="${BUILD_DIR}/jar-repack"
+    rm -rf "${REPACK_DIR}"
+    mkdir -p "${REPACK_DIR}"
+    (cd "${REPACK_DIR}" && "${JAR_BIN}" xf "${REPO_ROOT}/${BASE_JAR}")
+
+    # Drop our patched AWTContext.class + AWTContext$1.class (the
+    # ComponentAdapter inner class). javac emits both into JAVA_OUT_DIR.
+    mkdir -p "${REPACK_DIR}/net/runelite/rlawt"
+    cp "${JAVA_OUT_DIR}/net/runelite/rlawt/"*.class "${REPACK_DIR}/net/runelite/rlawt/"
+
+    # Replace the linux-aarch64 .so with our direct-surface build.
+    mkdir -p "${REPACK_DIR}/net/runelite/rlawt/linux-aarch64"
+    cp "${OUTPUT}" "${REPACK_DIR}/net/runelite/rlawt/linux-aarch64/librlawt.so"
+
+    OUT_JAR="${BUILD_DIR}/rlawt-1.8-direct-surface.jar"
+    rm -f "${OUT_JAR}"
+    (cd "${REPACK_DIR}" && "${JAR_BIN}" cf "${REPO_ROOT}/${OUT_JAR}" .)
+    echo "Repacked direct-surface JAR: ${OUT_JAR} ($(wc -c < "${OUT_JAR}") bytes)"
+
+    echo ""
+    echo "=== Direct-surface variant ==="
+    echo "  .so        : ${OUTPUT}"
+    echo "  classes    : ${JAVA_OUT_DIR}"
+    echo "  drop-in jar: ${OUT_JAR}"
+    echo ""
+    echo "To deploy: adb push ${OUT_JAR} /sdcard/ ; then adb shell run-as com.termux"
+    echo "  cp /sdcard/$(basename ${OUT_JAR}) \$HOME/.rlt/"
 fi

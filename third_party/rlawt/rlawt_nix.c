@@ -23,7 +23,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifdef __unix__
+#if defined(__unix__) && !defined(RLAWT_DIRECT_SURFACE)
 
 #include "rlawt.h"
 #include <jawt_md.h>

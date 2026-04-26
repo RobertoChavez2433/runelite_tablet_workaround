@@ -36,12 +36,19 @@
 #endif
 
 #ifdef __unix__
-#	include <X11/Xlib.h>
-#	include <GL/glx.h>
 #	include <stddef.h>
 #	include <stdint.h>
 #	include <stdio.h>
 #	include <time.h>
+#	ifndef RLAWT_DIRECT_SURFACE
+#		include <X11/Xlib.h>
+#		include <GL/glx.h>
+#	else
+#		include <EGL/egl.h>
+#		include <EGL/eglext.h>
+#		include <GLES2/gl2.h>
+#		include <android/hardware_buffer.h>
+#	endif
 #endif
 
 #ifdef _WIN32
@@ -81,7 +88,7 @@ typedef struct {
 } IOSurfacePool;
 #endif
 
-#ifdef __unix__
+#if defined(__unix__) && !defined(RLAWT_DIRECT_SURFACE)
 /* GPU-perf telemetry state. All fields Unix-only. Guarded by perf.enabled. */
 typedef unsigned long long rlawt_GLuint64;
 typedef void (*rlawt_PFNGLGENQUERIESPROC)(int /*GLsizei*/ n, unsigned int * /*GLuint**/ ids);
@@ -142,7 +149,7 @@ typedef struct {
 	int offsetY;
 #endif
 
-#ifdef __unix__
+#if defined(__unix__) && !defined(RLAWT_DIRECT_SURFACE)
 	Display *dpy;
 	Drawable drawable;
 	GLXContext context;
@@ -151,6 +158,46 @@ typedef struct {
 	PFNGLXSWAPINTERVALSGIPROC glXSwapIntervalSGI;
 	bool doubleBuffered;
 	RlawtPerfState perf;
+#endif
+
+#ifdef RLAWT_DIRECT_SURFACE
+	/* Direct-Android-surface variant. EGL on AHardwareBuffer-backed EGLImages,
+	 * cross-process to a SurfaceView-owning Android service over AF_UNIX.
+	 * Enabled at compile time only for the android-aarch64 rlawt build. */
+	int sock_fd;                /* AF_UNIX SOCK_SEQPACKET to RlawtSurfaceService */
+
+	EGLDisplay egl_display;
+	EGLContext egl_context;
+	EGLConfig  egl_config;
+	EGLSurface egl_pbuffer;     /* 1x1 pbuffer needed by eglMakeCurrent on some drivers */
+
+	uint32_t pool_size;         /* RLAWT_SURFACE_POOL_MIN..MAX */
+	uint32_t pool_width;
+	uint32_t pool_height;
+	uint32_t pool_format;
+	uint32_t frame_seq;
+	uint32_t current_index;     /* AHB index currently bound for rendering */
+	uint8_t  pool_busy[8];      /* 1 = in flight to consumer, awaiting RELEASE */
+
+	struct AHardwareBuffer *ahbs[8];
+	void *egl_images[8];        /* EGLImageKHR, void* avoids extra header dep */
+	unsigned int color_textures[8];
+	unsigned int fbos[8];
+	unsigned int depth_renderbuffer;
+
+	/* glEGLImageTargetTexture2DOES; loaded once via eglGetProcAddress. */
+	void (*fpEGLImageTargetTex2D)(unsigned int target, void *image);
+
+	/* eglCreateImageKHR / eglDestroyImageKHR (KHR_image_base). Loaded once. */
+	void *(*fpEglCreateImageKHR)(EGLDisplay, EGLContext, EGLenum, EGLClientBuffer, const EGLint *);
+	EGLBoolean (*fpEglDestroyImageKHR)(EGLDisplay, void *);
+
+	/* eglGetNativeClientBufferANDROID. Loaded once. */
+	EGLClientBuffer (*fpEglGetNativeClientBufferANDROID)(const struct AHardwareBuffer *);
+
+	bool csv_enabled;
+	FILE *csv_fp;
+	struct timespec last_post_swap_ts;
 #endif
 
 #ifdef _WIN32

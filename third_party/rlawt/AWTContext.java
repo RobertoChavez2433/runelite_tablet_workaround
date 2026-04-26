@@ -27,6 +27,9 @@ package net.runelite.rlawt;
 import java.awt.Component;
 import java.awt.Insets;
 import java.awt.Window;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.ComponentListener;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Native;
@@ -40,6 +43,9 @@ public final class AWTContext
 
 	@Native
 	private long instance;
+
+	private Component component;
+	private ComponentListener resizeListener;
 
 	public synchronized static void loadNatives()
 	{
@@ -100,13 +106,25 @@ public final class AWTContext
 
 	private static native long create0(Component component);
 
+	private static void log(String msg)
+	{
+		System.err.println("[rlawt-java] " + msg);
+		System.err.flush();
+	}
+
 	public AWTContext(Component component)
 	{
+		this.component = component;
+		log("AWTContext ctor component=" + component
+			+ " thread=" + Thread.currentThread().getName()
+			+ " size=" + (component != null ? (component.getWidth() + "x" + component.getHeight()) : "null"));
 		this.instance = create0(component);
 		if (instance == 0)
 		{
+			log("AWTContext ctor: create0 returned 0 — throwing NPE");
 			throw new NullPointerException();
 		}
+		log("AWTContext ctor: create0 returned instance=0x" + Long.toHexString(instance));
 
 		// JAWT on osx does not set our bounds when rlawt creates the CALayer
 		// so we have to calculate it's offset from the superlayer until it is first
@@ -127,9 +145,60 @@ public final class AWTContext
 			y += c.getY();
 		}
 		configureInsets(x, y);
+
+		// Direct-Android-surface backend: forward AWT canvas resize events to
+		// the native side so the AHB pool gets re-allocated at the new size.
+		// On glibc/X11, notifyResized is a no-op stub at the native level
+		// (X server handles ConfigureNotify), but registering the listener
+		// universally keeps the Java path identical across platforms.
+		this.resizeListener = new ComponentAdapter()
+		{
+			@Override
+			public void componentResized(ComponentEvent e)
+			{
+				if (instance == 0)
+				{
+					log("componentResized after destroy — ignoring");
+					return;
+				}
+				int w = e.getComponent().getWidth();
+				int h = e.getComponent().getHeight();
+				log("componentResized w=" + w + " h=" + h
+					+ " thread=" + Thread.currentThread().getName());
+				if (w > 0 && h > 0)
+				{
+					try
+					{
+						notifyResized(w, h);
+					}
+					catch (Throwable t)
+					{
+						log("notifyResized threw " + t);
+					}
+				}
+			}
+		};
+		component.addComponentListener(this.resizeListener);
+		log("AWTContext ctor: component listener registered");
 	}
 
-	public native void destroy();
+	public void destroy()
+	{
+		log("destroy() instance=0x" + Long.toHexString(instance)
+			+ " thread=" + Thread.currentThread().getName());
+		if (this.component != null && this.resizeListener != null)
+		{
+			this.component.removeComponentListener(this.resizeListener);
+			this.resizeListener = null;
+			this.component = null;
+		}
+		destroy0();
+		log("destroy() done");
+	}
+
+	private native void destroy0();
+
+	private native void notifyResized(int width, int height);
 
 	private native void configureInsets(int x, int y);
 

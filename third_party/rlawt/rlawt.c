@@ -92,7 +92,7 @@ free_ctx:
 	return 0;
 }
 
-JNIEXPORT void JNICALL Java_net_runelite_rlawt_AWTContext_destroy(JNIEnv *env, jobject self) {
+JNIEXPORT void JNICALL Java_net_runelite_rlawt_AWTContext_destroy0(JNIEnv *env, jobject self) {
 	AWTContext *ctx = rlawtGetContext(env, self);
 	if (!ctx) {
 		return;
@@ -146,7 +146,11 @@ JNIEXPORT jlong JNICALL Java_net_runelite_rlawt_AWTContext_getGLContext(JNIEnv *
 		return 0;
 	}
 
+#ifdef RLAWT_DIRECT_SURFACE
+	return (jlong) ctx->egl_context;
+#else
 	return (jlong) ctx->context;
+#endif
 }
 
 JNIEXPORT jlong JNICALL Java_net_runelite_rlawt_AWTContext_getCGLShareGroup(JNIEnv *env, jobject self) {
@@ -169,8 +173,10 @@ JNIEXPORT jlong JNICALL Java_net_runelite_rlawt_AWTContext_getGLXDisplay(JNIEnv 
 		return 0;
 	}
 
-#ifdef __unix__
+#if defined(__unix__) && !defined(RLAWT_DIRECT_SURFACE)
 	return (jlong) ctx->dpy;
+#elif defined(RLAWT_DIRECT_SURFACE)
+	return (jlong) ctx->egl_display;
 #else
 	rlawtThrow(env, "not supported");
 	return 0;
@@ -191,7 +197,7 @@ JNIEXPORT jlong JNICALL Java_net_runelite_rlawt_AWTContext_getWGLHDC(JNIEnv *env
 #endif
 }
 
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(RLAWT_DIRECT_SURFACE)
 JNIEXPORT jint JNICALL Java_net_runelite_rlawt_AWTContext_getFramebuffer(JNIEnv *env, jobject self, jboolean front) {
 	AWTContext *ctx = rlawtGetContext(env, self);
 	if (!ctx || !rlawtContextState(env, ctx, true)) {

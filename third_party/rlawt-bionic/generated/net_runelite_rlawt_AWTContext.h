@@ -17,10 +17,10 @@ JNIEXPORT jlong JNICALL Java_net_runelite_rlawt_AWTContext_create0
 
 /*
  * Class:     net_runelite_rlawt_AWTContext
- * Method:    destroy
+ * Method:    destroy0
  * Signature: ()V
  */
-JNIEXPORT void JNICALL Java_net_runelite_rlawt_AWTContext_destroy
+JNIEXPORT void JNICALL Java_net_runelite_rlawt_AWTContext_destroy0
   (JNIEnv *, jobject);
 
 /*
@@ -126,6 +126,14 @@ JNIEXPORT jlong JNICALL Java_net_runelite_rlawt_AWTContext_getGLXDisplay
  */
 JNIEXPORT jlong JNICALL Java_net_runelite_rlawt_AWTContext_getWGLHDC
   (JNIEnv *, jobject);
+
+/*
+ * Class:     net_runelite_rlawt_AWTContext
+ * Method:    notifyResized
+ * Signature: (II)V
+ */
+JNIEXPORT void JNICALL Java_net_runelite_rlawt_AWTContext_notifyResized
+  (JNIEnv *, jobject, jint, jint);
 
 #ifdef __cplusplus
 }
