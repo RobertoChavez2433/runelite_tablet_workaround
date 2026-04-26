@@ -189,6 +189,16 @@ class LaunchCoordinator(
                 "RLT_PERF_SAMPLE=1 RLAWT_PERF=1 RLAWT_PERF_CSV=\$HOME/rlawt-perframe.csv " +
                 "exec \"$scriptPath\"$envFileArg"
             logger?.state("launchInternal: dispatching native-path command scriptPath=$scriptPath envFile=$envFilePath uiScale=$uiScale gameSize=${gameW}x${gameH} backend=${presentationBackend.id}", correlationId = correlationId)
+            // S82 telemetry surface — log every artifact the new launcher will produce, so a single
+            // logcat grep ("TELEMETRY-ARTIFACT") gives the on-device paths without re-reading the script.
+            // Paths are relative to Termux $HOME = /data/data/com.termux/files/home unless overridden.
+            val termuxHome = "/data/data/com.termux/files/home"
+            logger?.state("TELEMETRY-ARTIFACT: launcher-log=$termuxHome/runelite-native.log", correlationId = correlationId)
+            logger?.state("TELEMETRY-ARTIFACT: rlawt-perframe-csv=$termuxHome/rlawt-perframe.csv", correlationId = correlationId)
+            logger?.state("TELEMETRY-ARTIFACT: affinity-timeline-csv=$termuxHome/affinity-timeline.csv", correlationId = correlationId)
+            logger?.state("TELEMETRY-ARTIFACT: thread-cpu-csv=$termuxHome/thread-cpu.csv", correlationId = correlationId)
+            logger?.state("TELEMETRY-ARTIFACT: x11-window-state-log=$termuxHome/x11-window-state.log", correlationId = correlationId)
+            logger?.state("TELEMETRY-ARTIFACT: rlawt-summary-verdict=tail-of-runelite-native.log (RLAWT-SUMMARY:)", correlationId = correlationId)
             commandRunner.launchBackground(commandPath = bashPath, arguments = arrayOf("-c", cmdLine))
         } else {
             val arguments = if (envFilePath != null) arrayOf(envFilePath) else null

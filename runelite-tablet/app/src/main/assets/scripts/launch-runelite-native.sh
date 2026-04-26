@@ -141,8 +141,12 @@ export TERMUX_X11_FORCE_FLIP=1
 VIRGL_PID=""
 X11_PID=""
 JAVA_PID=""
+OPENBOX_PID=""
 PERF_SAMPLER_PID=""
 CPUSET_SETTLE_PID=""
+AFFINITY_TIMELINE_PID=""
+THREAD_CPU_SAMPLER_PID=""
+X11_WINDOW_PROBE_PID=""
 
 # ===================================================================
 # Cleanup
@@ -186,15 +190,33 @@ cleanup_previous() {
 cleanup_on_exit() {
     echo "" | tee -a "$LOGFILE"
     echo "=== Native launch exit $(date) ===" | tee -a "$LOGFILE"
+    # Emit the rlawt CSV summary BEFORE we kill samplers so the verdict line
+    # lands in $LOGFILE next to the affinity-timeline / thread-cpu CSVs the
+    # caller is about to pull.
+    if declare -F summarize_rlawt_swap_gap >/dev/null 2>&1; then
+        summarize_rlawt_swap_gap
+    fi
+    [ -n "${AFFINITY_TIMELINE_PID:-}" ] && kill "$AFFINITY_TIMELINE_PID" 2>/dev/null || true
+    [ -n "${THREAD_CPU_SAMPLER_PID:-}" ] && kill "$THREAD_CPU_SAMPLER_PID" 2>/dev/null || true
+    [ -n "${X11_WINDOW_PROBE_PID:-}" ] && kill "$X11_WINDOW_PROBE_PID" 2>/dev/null || true
     [ -n "${PERF_SAMPLER_PID:-}" ] && kill "$PERF_SAMPLER_PID" 2>/dev/null || true
     [ -n "${CPUSET_SETTLE_PID:-}" ] && kill "$CPUSET_SETTLE_PID" 2>/dev/null || true
     [ -n "${JAVA_PID:-}" ] && kill "$JAVA_PID" 2>/dev/null || true
+    [ -n "${OPENBOX_PID:-}" ] && kill "$OPENBOX_PID" 2>/dev/null || true
     [ -n "${VIRGL_PID:-}" ] && kill "$VIRGL_PID" 2>/dev/null || true
     [ -n "${X11_PID:-}" ] && kill "$X11_PID" 2>/dev/null || true
     pkill -f 'net.runelite.client.RuneLite' 2>/dev/null || true
+    pkill -f '^openbox' 2>/dev/null || true
     pkill -f 'virgl_test_server' 2>/dev/null || true
     stop_termux_x11
     rm -f "$HOME/.rlt-native.pid" 2>/dev/null || true
+    # Tear down the session-alive sentinel so the next health-check poll flips
+    # SessionHealthMonitor to Stopped cleanly (the same contract launch-runelite.sh
+    # honors at line 695/1160 / shutdown-session.sh:128).
+    if [ -f "$PREFIX/tmp/.rlt-session-alive" ]; then
+        rm -f "$PREFIX/tmp/.rlt-session-alive" 2>/dev/null || true
+        echo "SESSION-SENTINEL: removed $PREFIX/tmp/.rlt-session-alive on cleanup" | tee -a "$LOGFILE"
+    fi
     release_launch_lock
     echo "Native launch cleanup complete" | tee -a "$LOGFILE"
 }
@@ -513,6 +535,25 @@ if [ -d "$ROOTFS_PATH/root/.runelite/profiles2" ] \
             echo 'runelite.clientMaximized=true' >> "$CFG"
         fi
         echo "RL-CONFIG native: patched $(basename "$CFG") gameSize=${RLT_GAME_SIZE_W}x${RLT_GAME_SIZE_H} resize=KEEP_WINDOW_SIZE stretched=100 keepAspect=true clientMaximized=true" | tee -a "$LOGFILE"
+        # S82 verification: re-read each key from disk and confirm it matches what
+        # we *think* we wrote. Without this, a sed-pattern bug or write-permission
+        # failure would silently leave RL on the prior values and we'd re-debug
+        # the symptom instead of the cause. Each VERIFY line is grep-friendly.
+        _expect() {
+            local key="$1" expected="$2" actual
+            actual="$(grep -E "^${key}=" "$CFG" 2>/dev/null | tail -1 | cut -d= -f2-)"
+            if [ "$actual" = "$expected" ]; then
+                echo "VERIFY native: $(basename "$CFG") ${key}=${actual} EXPECTED=${expected} MATCH=Y" | tee -a "$LOGFILE"
+            else
+                echo "VERIFY-FAIL native: $(basename "$CFG") ${key}=${actual} EXPECTED=${expected} MATCH=N" | tee -a "$LOGFILE"
+            fi
+        }
+        _expect "runelite.gameSize"            "${RLT_GAME_SIZE_W}x${RLT_GAME_SIZE_H}"
+        _expect "runelite.automaticResizeType" "KEEP_WINDOW_SIZE"
+        _expect "stretchedmode.scalingFactor"  "100"
+        _expect "stretchedmode.keepAspectRatio" "true"
+        _expect "runelite.clientMaximized"     "true"
+        unset -f _expect
     done
 else
     if [ -z "${RLT_GAME_SIZE_W:-}" ] || [ -z "${RLT_GAME_SIZE_H:-}" ]; then
@@ -592,6 +633,31 @@ JVM_ARGS=(
     -Xmx2g
     -XX:+UseG1GC
     -XX:MaxGCPauseMillis=50
+    # S82 in-game telemetry caught a 1.74-second gap_us stall on rlawt frame=600
+    # right as the world loaded; thread-cpu.csv showed C2 CompilerThread spiking
+    # to 195-296 jiffies/s during that same window. The user perceived it as
+    # "noticeably worse" perf. These four additions remove the most common
+    # JIT/heap stall sources without forcing a slow eager full compile (-Xcomp
+    # would add minutes to startup on Cortex-A520 small cores).
+    #
+    # +AlwaysPreTouch: writes a zero to every heap page at JVM init so the
+    #   first allocation in a hot path doesn't take a soft-page-fault detour.
+    #   Cost: ~100-300ms additional startup time for our 2GB heap on a512 cores.
+    -XX:+AlwaysPreTouch
+    # ReservedCodeCacheSize: explicit cap big enough that C2 doesn't evict
+    #   compiled hot methods mid-game and have to recompile (which manifests
+    #   as the 200-300 jiffies/s spikes we saw). JDK 21 default is ~240MB,
+    #   we raise to 256MB and turn on segmented cache flushing so cold methods
+    #   leave room for hot ones.
+    -XX:ReservedCodeCacheSize=256m
+    # CICompilerCount=4: default JIT thread count on this device may default to
+    #   2 (depends on cgroup-visible CPU count). With 8 cores available and a
+    #   plentiful JIT workload at startup, 4 lets C1+C2 run in parallel. No
+    #   harm if the machine can't provision them — they idle.
+    -XX:CICompilerCount=4
+    # UseStringDeduplication: small free memory win, reduces young-gen pressure
+    #   on the high-string-churn AWT/Swing code paths.
+    -XX:+UseStringDeduplication
     "-Duser.home=$ROOTFS_PATH/root"
     # Java2D HiDPI scale — equivalent of the proot launcher's RuneLite-launcher `--scale`
     # flag but applied at the JVM level since we invoke the client main class directly.
@@ -599,6 +665,13 @@ JVM_ARGS=(
     # hardcode a specific scale here.
     "-Dsun.java2d.uiScale=$UI_SCALE"
     "-Xlog:class+load=info:file=$CLASSLOAD_LOG:time,uptime,level,tags:filecount=2,filesize=5M"
+    # JIT-event log so we can correlate compile bursts with rlawt gap_us spikes
+    # in post-mortem analysis. Compile events go to a separate file (jit-events.log)
+    # because they're too chatty to interleave with class+load on the same channel.
+    # Tag is `jit` in OpenJDK 21+ logging — `jit+compilation*` was tried first but
+    # silently produced no events (run 3 confirmed empty file). The canonical tag
+    # set is `jit+compilation` literal (no glob), per JEP 158 / -Xlog:help.
+    "-Xlog:jit+compilation=info:file=$HOME/jit-events.log:time,uptime,level,tags:filecount=2,filesize=5M"
 )
 # Forward Jagex credentials from the env-file (if any) as system properties —
 # RuneLite's auth layer reads these when sessionId / characterId are present,
@@ -606,6 +679,64 @@ JVM_ARGS=(
 [ -n "${JX_SESSION_ID:-}" ]   && JVM_ARGS+=("-DJX_SESSION_ID=$JX_SESSION_ID")
 [ -n "${JX_CHARACTER_ID:-}" ] && JVM_ARGS+=("-DJX_CHARACTER_ID=$JX_CHARACTER_ID")
 [ -n "${JX_DISPLAY_NAME:-}" ] && JVM_ARGS+=("-DJX_DISPLAY_NAME=$JX_DISPLAY_NAME")
+
+# ===================================================================
+# Window manager — start openbox BEFORE the JVM
+# ===================================================================
+# S82 evidence (docs/s82-capture/run2-x11-window-state.log) — when the native
+# path runs without a WM, RL's setExtendedState(MAXIMIZED_BOTH) call
+# (driven by runelite.clientMaximized=true in the profile) is silently
+# dropped because there's no EWMH window manager listening for
+# _NET_WM_STATE_MAXIMIZED_HORZ / VERT atoms. Result: ContainableFrame is
+# shown at default 1238x932 instead of filling the X root, leaving black
+# bands on either side of the game.
+#
+# The proot path solves this by starting openbox inside the Ubuntu rootfs
+# with rc.xml `<maximized>yes</maximized>` (launch-runelite.sh:888-905).
+# Termux ships openbox 3.6.1 natively (`pkg install openbox`), so we mirror
+# that contract here for the native path.
+start_openbox_native() {
+    local ob_bin
+    ob_bin="$(command -v openbox)"
+    if [ -z "$ob_bin" ]; then
+        echo "OPENBOX-WARN: openbox binary not found on PATH — Frame will not maximize" | tee -a "$LOGFILE"
+        return 0  # non-fatal — RL still runs, just not maximized
+    fi
+    # Same `<decor>no</decor>` + `<maximized>yes</maximized>` rules the proot
+    # launcher uses. Termux openbox honors $HOME/.config/openbox/rc.xml.
+    local ob_cfg_dir="$HOME/.config/openbox"
+    local ob_cfg="$ob_cfg_dir/rc.xml"
+    mkdir -p "$ob_cfg_dir"
+    cat > "$ob_cfg" <<'OBCFG'
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_config xmlns="http://openbox.org/3.4/rc"
+    xmlns:xi="http://www.w3.org/2001/XInclude">
+  <applications>
+    <application class="*" groupclass="*">
+      <decor>no</decor>
+      <maximized>yes</maximized>
+    </application>
+  </applications>
+</openbox_config>
+OBCFG
+    echo "OPENBOX: rc.xml written -> $ob_cfg ($(wc -c < "$ob_cfg") bytes)" | tee -a "$LOGFILE"
+    DISPLAY=:0 "$ob_bin" --sm-disable >>"$LOGFILE" 2>&1 &
+    OPENBOX_PID=$!
+    # Probe once after a short delay so cleanup_on_exit has a real PID to kill
+    # if openbox died on startup (e.g. couldn't connect to :0).
+    sleep 0.3
+    if kill -0 "$OPENBOX_PID" 2>/dev/null; then
+        echo "OPENBOX: started PID=$OPENBOX_PID DISPLAY=:0 cfg=$ob_cfg" | tee -a "$LOGFILE"
+    else
+        echo "OPENBOX-FAIL: launched but exited immediately (see tail of $LOGFILE for stderr)" | tee -a "$LOGFILE"
+        OPENBOX_PID=""
+    fi
+}
+start_openbox_native
+
+# Surface the JIT/heap config we just set as a single grep-able line so post-mortem
+# analysis can verify they actually landed in this run vs a stale APK.
+echo "JIT-CONFIG: AlwaysPreTouch=on ReservedCodeCacheSize=256m CICompilerCount=4 UseStringDeduplication=on jit-events-log=$HOME/jit-events.log" | tee -a "$LOGFILE"
 
 echo "=== Invoking JVM ===" | tee -a "$LOGFILE"
 echo "  cmd: $JAVA_BIN ${JVM_ARGS[*]} -cp <classpath> $MAIN_CLASS $CLIENT_ARGS" | tee -a "$LOGFILE"
@@ -615,6 +746,15 @@ JAVA_PID=$!
 echo "$JAVA_PID" > "$HOME/.rlt-native.pid"
 rlt_log_cpuset "java-started" "$JAVA_PID"
 echo "JVM PID=$JAVA_PID (log $LOGFILE, classload $CLASSLOAD_LOG)" | tee -a "$LOGFILE"
+
+# CRITICAL: SessionHealthMonitor.checkHealth polls $PREFIX/tmp/.rlt-session-alive
+# every 5s after a 30s initial delay. If this sentinel is missing, three Stopped
+# readings (15s) flip session state to Stopped and the HybridX11 activity finishes,
+# kicking the user back to the RLT MainActivity even though the JVM is fine. The
+# proot path (launch-runelite.sh) creates this; the native path was missing it
+# since inception, so every native launch was flagging Stopped on first poll.
+touch "$PREFIX/tmp/.rlt-session-alive"
+echo "SESSION-SENTINEL: created $PREFIX/tmp/.rlt-session-alive (session-alive ack for SessionHealthMonitor)" | tee -a "$LOGFILE"
 
 # Pin JVM and virgl to big/prime cores (4-7). Same policy as proot path for A/B parity.
 # Read back Cpus_allowed_list afterwards: cpuset (e.g. /moderate cpus=0-3) intersects
@@ -629,10 +769,318 @@ rlt_apply_affinity() {
     out="$(taskset -p "$mask" "$pid" 2>&1 || echo "<taskset returned $?>")"
     local effective
     effective="$(grep '^Cpus_allowed_list' "/proc/$pid/status" 2>/dev/null | awk '{print $2}' || echo unreadable)"
-    echo "AFFINITY: $label (PID=$pid) requested=$mask effective_Cpus_allowed_list=$effective taskset=$out" | tee -a "$LOGFILE"
+    # S82 escalation: previously we logged the line and moved on, masking failures.
+    # Detect failure by either an explicit error in `out` OR effective list that
+    # doesn't include any of the requested big-core slots, then dump cgroup +
+    # cpuset.cpus content so we know *why* the kernel refused — usually because
+    # the process's cpuset (e.g. /moderate) restricts cpus_allowed to 0-3 and
+    # the requested 0xF0 mask intersects to empty.
+    case "$out" in
+        *"failed"*|*"Invalid argument"*|*"Operation not permitted"*|*"<taskset returned"*)
+            local cgroup cpuset cpuset_file cpus_content
+            cgroup="$(cat /proc/$pid/cgroup 2>/dev/null | tr '\n' ';' || echo unreadable)"
+            cpuset="$(cat /proc/$pid/cpuset 2>/dev/null || echo unreadable)"
+            cpuset_file="/dev/cpuset${cpuset}/cpuset.cpus"
+            cpus_content="$(cat "$cpuset_file" 2>/dev/null || echo unreadable)"
+            echo "AFFINITY-FAIL: $label (PID=$pid) requested=$mask effective_Cpus_allowed_list=$effective taskset=$out" | tee -a "$LOGFILE"
+            echo "AFFINITY-FAIL:   /proc/$pid/cpuset=$cpuset cpus_allowed_in_cpuset=$cpus_content cgroup=$cgroup" | tee -a "$LOGFILE"
+            ;;
+        *)
+            echo "AFFINITY: $label (PID=$pid) requested=$mask effective_Cpus_allowed_list=$effective taskset=$out" | tee -a "$LOGFILE"
+            ;;
+    esac
 }
 rlt_apply_affinity "JVM" "$JAVA_PID" 0xF0
 rlt_apply_affinity "VIRGL" "${VIRGL_PID:-}" 0xF0
+
+# ===================================================================
+# S82 verification telemetry
+#
+# Three samplers + one one-shot probe write to dedicated CSVs. We keep
+# them as simple shell loops over /proc rather than a dedicated tool so
+# the data is always captured even if a tooling dep (xprop, top -H,
+# etc.) is missing.
+#
+# Files (all under $HOME, easy to pull via run-as):
+#   affinity-timeline.csv  — 1Hz for first 60s, 10s after, until JVM dies
+#   thread-cpu.csv         — top-N JVM threads by CPU% every 5s
+#   x11-window-state.log   — one-shot xprop dump of RuneLite frame at T+10s
+#
+# All three exit cleanly when /proc/$JAVA_PID disappears.
+# ===================================================================
+AFFINITY_TIMELINE_CSV="$HOME/affinity-timeline.csv"
+THREAD_CPU_CSV="$HOME/thread-cpu.csv"
+X11_WINDOW_STATE_LOG="$HOME/x11-window-state.log"
+AFFINITY_TIMELINE_PID=""
+THREAD_CPU_SAMPLER_PID=""
+X11_WINDOW_PROBE_PID=""
+
+# Find JVM thread tids by /proc/$pid/task/*/comm name. Returns first match
+# or empty. Re-evaluated every sample because tids shift across launches.
+_find_tid_by_comm() {
+    local pattern="$1" t comm tid
+    for t in /proc/$JAVA_PID/task/*; do
+        [ -d "$t" ] || continue
+        comm=$(cat "$t/comm" 2>/dev/null || echo)
+        case "$comm" in
+            $pattern)
+                tid="${t##*/}"
+                echo "$tid"
+                return 0
+                ;;
+        esac
+    done
+    return 1
+}
+
+_cpus_allowed_for_pid() {
+    local pid="$1"
+    [ -d "/proc/$pid" ] || { echo "gone"; return; }
+    grep '^Cpus_allowed_list' "/proc/$pid/status" 2>/dev/null | awk '{print $2}' || echo "unreadable"
+}
+
+_cpus_allowed_for_tid() {
+    local tid="$1"
+    [ -z "$tid" ] && { echo "no-tid"; return; }
+    [ -d "/proc/$JAVA_PID/task/$tid" ] || { echo "gone"; return; }
+    grep '^Cpus_allowed_list' "/proc/$JAVA_PID/task/$tid/status" 2>/dev/null | awk '{print $2}' || echo "unreadable"
+}
+
+start_affinity_timeline() {
+    : > "$AFFINITY_TIMELINE_CSV"
+    echo "ts,jvm_cpus,virgl_cpus,client_tid,client_cpus,awt_tid,awt_cpus" >> "$AFFINITY_TIMELINE_CSV"
+    (
+        local i ts jvm_cpus virgl_cpus client_tid client_cpus awt_tid awt_cpus
+        # First 60 samples at 1Hz catches the AMS demotion window; then 10s
+        # cadence to keep the file size sane on long sessions.
+        for i in $(seq 1 60); do
+            [ ! -d "/proc/$JAVA_PID" ] && exit 0
+            ts=$(date +%s)
+            jvm_cpus=$(_cpus_allowed_for_pid "$JAVA_PID")
+            virgl_cpus=$(_cpus_allowed_for_pid "${VIRGL_PID:-0}")
+            client_tid=$(_find_tid_by_comm "Client" || true)
+            client_cpus=$(_cpus_allowed_for_tid "${client_tid:-}")
+            awt_tid=$(_find_tid_by_comm "AWT-EventQueue*" || true)
+            awt_cpus=$(_cpus_allowed_for_tid "${awt_tid:-}")
+            echo "$ts,$jvm_cpus,$virgl_cpus,${client_tid:-},$client_cpus,${awt_tid:-},$awt_cpus" >> "$AFFINITY_TIMELINE_CSV"
+            sleep 1
+        done
+        while [ -d "/proc/$JAVA_PID" ]; do
+            ts=$(date +%s)
+            jvm_cpus=$(_cpus_allowed_for_pid "$JAVA_PID")
+            virgl_cpus=$(_cpus_allowed_for_pid "${VIRGL_PID:-0}")
+            client_tid=$(_find_tid_by_comm "Client" || true)
+            client_cpus=$(_cpus_allowed_for_tid "${client_tid:-}")
+            awt_tid=$(_find_tid_by_comm "AWT-EventQueue*" || true)
+            awt_cpus=$(_cpus_allowed_for_tid "${awt_tid:-}")
+            echo "$ts,$jvm_cpus,$virgl_cpus,${client_tid:-},$client_cpus,${awt_tid:-},$awt_cpus" >> "$AFFINITY_TIMELINE_CSV"
+            sleep 10
+        done
+    ) &
+    AFFINITY_TIMELINE_PID=$!
+    echo "TELEMETRY: affinity-timeline sampler PID=$AFFINITY_TIMELINE_PID csv=$AFFINITY_TIMELINE_CSV" | tee -a "$LOGFILE"
+}
+
+# Per-thread CPU% via `top -H`. Termux ships busybox top by default, which
+# does NOT support -H. We probe `procps top` first; if absent we fall back
+# to a /proc/$pid/task/*/stat parser that computes utime+stime delta. Both
+# paths produce the same CSV so analysis doesn't care.
+start_thread_cpu_sampler() {
+    : > "$THREAD_CPU_CSV"
+    echo "ts,tid,comm,cpu_pct" >> "$THREAD_CPU_CSV"
+    local raw_log="$HOME/thread-cpu-raw.log"
+    : > "$raw_log"
+    local has_proc_top=""
+    # `top -b -H -n 1 -p $JAVA_PID` works on procps. Detect by trying once
+    # with a 2s timeout so a hang doesn't block JVM stderr. S82 found that
+    # busybox top on Termux does NOT support -H even though `timeout 2 top`
+    # exits 0 — the previous detection was a false positive. We now also
+    # require a non-empty stdout AND that the output contains "PID" header
+    # text before declaring procps-top usable.
+    local probe_out
+    probe_out="$(timeout 2 top -b -H -n 1 -p "$JAVA_PID" 2>&1 || true)"
+    if [ -n "$probe_out" ] && echo "$probe_out" | grep -q '^[[:space:]]*PID'; then
+        has_proc_top=1
+    fi
+    {
+        echo "=== thread-cpu sampler probe @ $(date +%s) ==="
+        echo "has_proc_top=${has_proc_top:-0}"
+        echo "--- probe stdout (first 30 lines) ---"
+        echo "$probe_out" | head -30
+        echo "--- probe end ---"
+    } >> "$raw_log"
+    (
+        local ts t tid comm utime1 stime1 utime2 stime2 cpu_jiffies line
+        local pass=0
+        # /proc-based fallback samples utime+stime over a 1s window per pass.
+        # Bash 4 associative arrays — required (-A is not portable to dash).
+        while [ -d "/proc/$JAVA_PID" ]; do
+            ts=$(date +%s)
+            pass=$((pass + 1))
+            if [ -n "$has_proc_top" ]; then
+                # Dump raw `top` output every 6th pass (~30s) so we can audit
+                # the column layout if the awk filter ever rejects everything.
+                if [ $((pass % 6)) -eq 1 ]; then
+                    echo "--- top -b -H -n 1 -p $JAVA_PID @ ts=$ts ---" >> "$raw_log"
+                    top -b -H -n 1 -p "$JAVA_PID" 2>&1 | head -25 >> "$raw_log"
+                fi
+                # awk: skip until "PID" header row, then take rows whose first
+                # field is a number. Column 9 = %CPU on procps top; column 12 = COMMAND.
+                # Some procps builds put COMMAND at $NF rather than $12 (depends on
+                # locale + width); use $NF as fallback.
+                local rows_added
+                rows_added=$(top -b -H -n 1 -p "$JAVA_PID" 2>/dev/null \
+                    | awk -v ts="$ts" '
+                        /^[[:space:]]*PID/ { in_h=1; next }
+                        in_h && $1 ~ /^[0-9]+$/ {
+                            tid=$1; cpu=$9; comm=($12 ~ /[A-Za-z]/ ? $12 : $NF)
+                            printf "%s,%s,%s,%s\n", ts, tid, comm, cpu
+                            n++
+                        }
+                        END { print "ROWS=" n+0 > "/dev/stderr" }
+                    ' 2>>"$raw_log" \
+                    | sort -t, -k4 -nr \
+                    | head -12 \
+                    | tee -a "$THREAD_CPU_CSV" \
+                    | wc -l)
+                # Log a one-liner per pass so we can see "did this pass write rows".
+                echo "THREAD-CPU pass=$pass ts=$ts mode=procps-top rows=$rows_added" >> "$raw_log"
+            else
+                # /proc fallback. Snapshot now, sleep 1s, snapshot again.
+                # The previous version mis-piped the inner-loop append (used `>>` inside
+                # the loop AND piped the empty `done` stdout to sort), so neither path
+                # wrote rows. Now: emit to stdout inside the loop, pipe to sort/head/tee.
+                declare -A start_jiffies
+                for t in /proc/$JAVA_PID/task/*; do
+                    [ -d "$t" ] || continue
+                    tid="${t##*/}"
+                    line=$(cat "$t/stat" 2>/dev/null) || continue
+                    utime1=$(echo "$line" | awk '{print $14}')
+                    stime1=$(echo "$line" | awk '{print $15}')
+                    start_jiffies[$tid]=$((utime1 + stime1))
+                done
+                sleep 1
+                local rows_added=0
+                for t in /proc/$JAVA_PID/task/*; do
+                    [ -d "$t" ] || continue
+                    tid="${t##*/}"
+                    [ -z "${start_jiffies[$tid]:-}" ] && continue
+                    line=$(cat "$t/stat" 2>/dev/null) || continue
+                    utime2=$(echo "$line" | awk '{print $14}')
+                    stime2=$(echo "$line" | awk '{print $15}')
+                    comm=$(cat "$t/comm" 2>/dev/null || echo '?')
+                    cpu_jiffies=$(( utime2 + stime2 - ${start_jiffies[$tid]} ))
+                    [ "$cpu_jiffies" -gt 0 ] || continue
+                    echo "$ts,$tid,$comm,$cpu_jiffies"
+                    rows_added=$((rows_added + 1))
+                done | sort -t, -k4 -nr | head -12 >> "$THREAD_CPU_CSV"
+                echo "THREAD-CPU pass=$pass ts=$ts mode=proc-fallback raw_rows=$rows_added" >> "$raw_log"
+            fi
+            sleep 4
+        done
+    ) &
+    THREAD_CPU_SAMPLER_PID=$!
+    echo "TELEMETRY: thread-cpu sampler PID=$THREAD_CPU_SAMPLER_PID has_proc_top=${has_proc_top:-0} csv=$THREAD_CPU_CSV raw=$raw_log" | tee -a "$LOGFILE"
+}
+
+# One-shot X11 window state probe. xprop/xwininfo aren't in Termux's default
+# install; pkg-install on demand if missing. Probe runs at T+10s so RL has
+# time to call setExtendedState(MAXIMIZED_BOTH) post-frame.show.
+ensure_x11_utils() {
+    if command -v xprop >/dev/null 2>&1 && command -v xwininfo >/dev/null 2>&1; then
+        echo "TELEMETRY: xprop/xwininfo already on PATH — skip pkg install" | tee -a "$LOGFILE"
+        return 0
+    fi
+    # Termux package names differ from Debian: xorg-xprop / xorg-xwininfo, NOT x11-utils.
+    # The previous attempt logged "Unable to locate package x11-utils" — see s82-capture/runelite-native.log:1279.
+    echo "TELEMETRY: xprop/xwininfo missing — pkg install xorg-xprop xorg-xwininfo" | tee -a "$LOGFILE"
+    timeout 90 pkg install -y xorg-xprop xorg-xwininfo >>"$LOGFILE" 2>&1 || {
+        echo "TELEMETRY: xorg-xprop/xorg-xwininfo install failed (offline?) — window-state probe will skip" | tee -a "$LOGFILE"
+        return 1
+    }
+    if command -v xprop >/dev/null 2>&1 && command -v xwininfo >/dev/null 2>&1; then
+        echo "TELEMETRY: pkg install OK — xprop=$(command -v xprop) xwininfo=$(command -v xwininfo)" | tee -a "$LOGFILE"
+        return 0
+    fi
+    echo "TELEMETRY: pkg install reported success but xprop/xwininfo still missing" | tee -a "$LOGFILE"
+    return 1
+}
+
+probe_x11_window_state() {
+    : > "$X11_WINDOW_STATE_LOG"
+    (
+        sleep 10
+        [ ! -d "/proc/$JAVA_PID" ] && exit 0
+        if ! ensure_x11_utils; then
+            echo "x11-utils unavailable — skipped" >> "$X11_WINDOW_STATE_LOG"
+            exit 0
+        fi
+        {
+            echo "=== X11 window-state probe ts=$(date +%s) ==="
+            echo "--- xwininfo -root -tree ---"
+            DISPLAY=:0 timeout 5 xwininfo -root -tree 2>&1 | head -60
+            echo "--- xprop -name RuneLite ---"
+            DISPLAY=:0 timeout 5 xprop -name "RuneLite" 2>&1 \
+                | grep -E '_NET_WM_STATE|_NET_FRAME_EXTENTS|WM_NORMAL_HINTS|WM_NAME|geometry' \
+                || echo "(no RuneLite-named window — fallback below)"
+            echo "--- xwininfo -name RuneLite ---"
+            DISPLAY=:0 timeout 5 xwininfo -name "RuneLite" 2>&1 | head -30
+            # Also dump root window props and the most-recent X11 client list
+            # since RL might title the window differently.
+            echo "--- xprop -root _NET_CLIENT_LIST ---"
+            DISPLAY=:0 timeout 5 xprop -root _NET_CLIENT_LIST 2>&1
+            echo "=== probe end ==="
+        } >> "$X11_WINDOW_STATE_LOG" 2>&1
+    ) &
+    X11_WINDOW_PROBE_PID=$!
+    echo "TELEMETRY: x11-window probe PID=$X11_WINDOW_PROBE_PID log=$X11_WINDOW_STATE_LOG (fires at T+10s)" | tee -a "$LOGFILE"
+}
+
+# rlawt CSV summary — runs at exit. Computes mean swap_us, mean gap_us, ratio,
+# and a fps estimate. The ratio is the discriminator we discussed:
+#   swap_us >> gap_us  → IPC-bound (swap blocks waiting for vtest ack)
+#   swap_us ≈ gap_us   → CPU-bound (frame work dominates, swap is fast)
+summarize_rlawt_swap_gap() {
+    local csv="$HOME/rlawt-perframe.csv"
+    [ -f "$csv" ] || { echo "RLAWT-SUMMARY: csv missing at $csv" | tee -a "$LOGFILE"; return; }
+    local rows
+    rows=$(wc -l < "$csv" 2>/dev/null || echo 0)
+    [ "$rows" -lt 100 ] && { echo "RLAWT-SUMMARY: only $rows rows — too few to summarize" | tee -a "$LOGFILE"; return; }
+    # Header is the first commented line (e.g., `# rlawt per-frame CSV ...`),
+    # then a column header. Skip both. Last 1000 rows are the steady-state.
+    tail -1000 "$csv" \
+        | awk -F, '
+            NR==1 { next }  # skip column header if present
+            $1 !~ /^[0-9]+$/ { next }
+            {
+                swap_sum += $3
+                gap_sum  += $4
+                n++
+                if ($3 > swap_max) swap_max = $3
+                if ($4 > gap_max)  gap_max  = $4
+            }
+            END {
+                if (n == 0) { print "RLAWT-SUMMARY: no numeric rows in tail"; exit }
+                swap_mean = swap_sum / n
+                gap_mean  = gap_sum  / n
+                cycle = swap_mean + gap_mean
+                fps = (cycle > 0) ? 1000000.0 / cycle : 0
+                ratio = (gap_mean > 0) ? swap_mean / gap_mean : -1
+                printf "RLAWT-SUMMARY: n=%d swap_us mean=%.0f max=%.0f gap_us mean=%.0f max=%.0f ratio=%.2f cycle_us=%.0f fps_estimate=%.2f\n", \
+                    n, swap_mean, swap_max, gap_mean, gap_max, ratio, cycle, fps
+                if (ratio > 4.0) {
+                    print "RLAWT-SUMMARY: verdict=IPC-bound (swap_us dominates — virgl/Mesa flush is the bottleneck)"
+                } else if (ratio < 1.5) {
+                    print "RLAWT-SUMMARY: verdict=CPU-bound (gap_us comparable to swap_us — render work caps frame rate)"
+                } else {
+                    print "RLAWT-SUMMARY: verdict=mixed (swap and gap balanced — bottleneck unclear, look at thread-cpu.csv)"
+                }
+            }' | tee -a "$LOGFILE"
+}
+
+start_affinity_timeline
+start_thread_cpu_sampler
+probe_x11_window_state
 
 if [ "${RLT_PERF_SAMPLE:-0}" = "1" ]; then
     echo "PERF: RLT_PERF_SAMPLE=1 — spawning perf-sampler" | tee -a "$LOGFILE"
