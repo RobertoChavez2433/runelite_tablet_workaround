@@ -177,7 +177,17 @@ class LaunchCoordinator(
             val uiScale = computeUiScale()
             val (gameW, gameH) = computeGameSize(uiScale)
             logger?.state("launchInternal: computed UI scale=$uiScale gameSize=${gameW}x${gameH} from displayMetrics ${context.resources.displayMetrics.widthPixels}x${context.resources.displayMetrics.heightPixels}", correlationId = correlationId)
-            val cmdLine = "RLT_NATIVE_TERMUX=1 RLT_UI_SCALE=$uiScale RLT_GAME_SIZE_W=$gameW RLT_GAME_SIZE_H=$gameH exec \"$scriptPath\"$envFileArg"
+            // S81 probes-OFF A/B: drop RLAWT_PERF_FINISH / _XSYNC / _GPU_TIMER. Keep
+            // RLAWT_PERF=1 so rlawt still emits the per-window swap_us + gap_us + glerr
+            // summary (negligible overhead, just two clock_gettime per swap) and keep
+            // RLT_PERF_SAMPLE=1 so the /proc per-thread sampler runs.
+            // RLAWT_PERF_CSV: S81 audit — opens $HOME/rlawt-perframe.csv for raw
+            // per-frame row dump. Two clock_gettimes + one fprintf per swap, line-
+            // buffered; negligible overhead. Enables end-to-end frame alignment
+            // between rlawt, XloriePerf, and SurfaceFlinger --latency.
+            val cmdLine = "RLT_NATIVE_TERMUX=1 RLT_UI_SCALE=$uiScale RLT_GAME_SIZE_W=$gameW RLT_GAME_SIZE_H=$gameH " +
+                "RLT_PERF_SAMPLE=1 RLAWT_PERF=1 RLAWT_PERF_CSV=\$HOME/rlawt-perframe.csv " +
+                "exec \"$scriptPath\"$envFileArg"
             logger?.state("launchInternal: dispatching native-path command scriptPath=$scriptPath envFile=$envFilePath uiScale=$uiScale gameSize=${gameW}x${gameH} backend=${presentationBackend.id}", correlationId = correlationId)
             commandRunner.launchBackground(commandPath = bashPath, arguments = arrayOf("-c", cmdLine))
         } else {
