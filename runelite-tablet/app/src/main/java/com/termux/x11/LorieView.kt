@@ -52,6 +52,20 @@ class LorieView : SurfaceView {
             val frame = holder.surfaceFrame
             AppLog.surface("created", frame.width(), frame.height(), "BGRA_8888",
                 "holder=$holder requestedFormat=BGRA_8888($BGRA_8888) — format matters for Xlorie legacy drawing path")
+            // S81 audit follow-up: tell SurfaceFlinger we want 120Hz so adaptive-refresh
+            // doesn't DRR the panel down under low-content periods. Hint only — SF still
+            // chooses based on global policy, but the hint flips the default from
+            // FRAME_RATE_COMPATIBILITY_DEFAULT-without-set (which the panel may interpret
+            // as "anything is fine, drop to 60/30 to save power") to a specific request.
+            val surf = holder.surface
+            if (surf != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                try {
+                    surf.setFrameRate(120f, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+                    AppLog.d("DISPLAY", "LorieView.surfaceCreated: setFrameRate(120, DEFAULT) hint posted")
+                } catch (e: Throwable) {
+                    AppLog.w("DISPLAY", "LorieView.surfaceCreated: setFrameRate threw ${e.message}")
+                }
+            }
             // DISPLAY per-surface dump: the Display attached to THIS SurfaceView.
             // Paired with HybridX11HostActivity.onCreate's DISPLAY log — if the two
             // diverge, the surface is on a different display than the activity
@@ -60,12 +74,13 @@ class LorieView : SurfaceView {
             val disp = display
             if (disp != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 val m = disp.mode
+                val frameRateHint = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) "120Hz_DEFAULT" else "n/a(<API30)"
                 AppLog.d(
                     "DISPLAY",
                     "LorieView.surfaceCreated: activeMode=id=${m.modeId}:" +
                         "${m.physicalWidth}x${m.physicalHeight}@${"%.1f".format(m.refreshRate)}Hz " +
                         "refreshRate=${"%.1f".format(disp.refreshRate)}Hz displayId=${disp.displayId} " +
-                        "frameRateSetOnSurface=no (setFrameRate not yet called — see S81 logging audit)"
+                        "frameRateSetOnSurface=$frameRateHint"
                 )
             }
         }
