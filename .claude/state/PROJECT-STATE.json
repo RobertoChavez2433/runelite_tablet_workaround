@@ -3,14 +3,14 @@
     "app_name": "Runelite for Tablet",
     "app_version": "0.1.0",
     "description": "Android installer app that runs the real RuneLite client on Samsung Tab S10 Ultra via Termux + proot-distro",
-    "last_updated": "2026-04-17T22:10:00Z",
-    "session_notes": "Session 79: LWJGL Bionic-compat unblock landed. GPU plugin activates for first time on native path — virgl/Mali-G720/Mesa 25.2.8 confirmed in runelite-native.log (Plugin GpuPlugin is now running + Using device: virgl (Mali-G720-Immortalis MC12) + Using driver: 4.3 (Compatibility Profile) Mesa 25.2.8). Fix is a three-layer compat script shipped in-APK: (1) patchelf --replace-needed rewrites glibc sonames in DT_NEEDED AND DT_VERNEED in one call (empirically verified — both sections updated); (2) bulk patchelf --clear-symbol-version on all 83 GLIBC_2.17-versioned imported symbols so Bionic does name-only lookup; (3) libbionic-compat.c on-device-compiled shim supplies the 4 glibc-only symbols Bionic truly lacks (__errno_location, __xstat64, __fxstat64, __getdelim). Also landed: HybridX11HostActivity binder_died 3s escape hatch, rlawt RLAWT_LOG instrumentation, Mesa 25.2.8 rebuild (Patch 3 + Patch 4 in build notes, deploy script Git-Bash path fix), scripts/glx-fbconfig-probe.c diagnostic tool. **New issue open for S80**: FPS regressed with GPU on vs software baseline — quantification + refinement next. Memory: project_gpu_enabled_fps_regression.md."
+    "last_updated": "2026-04-18T03:30:00Z",
+    "session_notes": "Session 80: Shipped full per-phase GPU telemetry stack end-to-end in one rebuild cycle. rlawt A1-A8 (rlawt_nix.c + rlawt.h) — per-swap timing, inter-swap gap, XSync probe, lagged GPU timer-query ring, glFinish probe, window-summary p50/p95/max, capability probe block, env-gated fast-disabled path. Side-cars: perf-sampler.sh (/proc/$PID/task/* thread snapshots + Mali sysfs GPU-busy) + fps-log-tail.sh (FIFO-fd-persistent tail of client.log for FpsPlugin line extraction). Launcher wired with PID traps + GPU-busy DIAG probe. LaunchCoordinator.kt:180 late-edit added all five perf env flags to cmdLine. APK rebuilt 22:58, installed R52X90378YB. First-run readings at Varrock East Bank (GPU on, Uncapped, probes ON): FpsPlugin=31, gap_us mean≈18500 (54 FPS swap ceiling), swap_us≈15200, finish_us≈8000 (GPU busy 8ms after swap — GPU-bound), xsync_us≈250 (X IPC trivial), glerr=0, mkcur=0. Client thread cpus=0-3 (little cores, NOT /top-app — TermuxProcessPin not engaging on native path), Client ctxt-switch rate 1100/s vs S77 proot 3945/s (~4× reduction from native path). GL_ARB_timer_query UNAVAILABLE on virgl Mesa 25.2.8 (ext=0 ver=4.3) — finish_us is our only GPU-cost proxy on this driver. Filed 3 defects as issues #55 (stale-lock PID reuse), #56 (RESIZE_WINDOW invalid enum), #57 (GPU Hybrid + uiScale=2 sidebar scaling). Next: S81 probes-OFF A/B + re-engage big-core affinity on native path."
   },
   "current_phase": {
-    "phase_name": "120 FPS Presentation — Option B native-Termux JVM FULLY OPERATIONAL with GPU plugin. Next: close GPU-mode FPS regression.",
-    "phase_status": "native_termux_path_gpu_active_perf_regression_open",
+    "phase_name": "120 FPS Presentation — Option B native-Termux JVM with GPU plugin active + full per-phase telemetry landed (S80). Next: close GPU-mode FPS gap via probes-off A/B + big-core pinning re-test on native path.",
+    "phase_status": "gpu_telemetry_landed_bottleneck_triangulated",
     "phase_started": "2026-04-16",
-    "progress_percentage": 90
+    "progress_percentage": 93
   },
   "release_cycle": {
     "last_release": null,
@@ -20,11 +20,12 @@
   },
   "active_blockers": [
     {
-      "id": "gpu-mode-fps-regression-vs-software-baseline",
-      "description": "S79 unblocked GPU plugin on native path (virgl/Mali-G720/Mesa 25.2.8 confirmed running). But FPS regressed vs software-render baseline once GPU mode is on. Magnitude unquantified — no per-phase telemetry (draw/swap/VirGL submit/GPU) exists yet. S80 entry point: seed extensive perf logging on both launch-runelite-native.sh DIAG and rlawt RLAWT_LOG hooks, capture 60s FpsPlugin A/B at Varrock East Bank (task D3 / issue #17 — now unblocked), investigate likely culprits (VirGL IPC overhead, compat-shim indirection, Mesa 25.2.8 vs 26.0.5 deltas, cpuset drift). Do NOT propose RL-side workarounds — per feedback memory feedback_scope_our_pipeline_not_runelite.md, the target is our Android/Termux/X11/VirGL pipeline.",
-      "severity": "P0",
+      "id": "gpu-mode-fps-gap-partially-quantified",
+      "description": "S80 telemetry landed. FpsPlugin 31 FPS at Varrock East Bank with probes ON (Uncapped, GPU on). rlawt gap_us=18500us = 54 FPS swap cadence; finish_us=8ms (GPU busy half the 60Hz budget — GPU-bound); xsync_us=250us (X IPC trivial); Client thread cpus=0-3 (little cores, not /top-app). Native path delivered ~4× reduction in Client ctxt-switch rate vs S77 proot-era. Two open vectors: (1) probe-overhead (~44% of frame time is glFinish+XSync diagnostic barriers) — need probes-OFF A/B to get clean GPU-on FPS reading; (2) big-core affinity — TermuxProcessPin from S75/S76 apparently isn't engaging on the native-Termux launch path, leaving JVM on /background or /moderate cpuset. GL_ARB_timer_query unavailable on virgl Mesa 25.2.8 so GPU-side per-stage breakdowns not possible without driver upgrade. S81 plan: probes-OFF first (edit LaunchCoordinator.kt:180 to drop FINISH/XSYNC/GPU_TIMER, rebuild, re-measure), then big-core re-engagement.",
+      "severity": "P1",
       "discovered": "2026-04-17",
-      "session": 79
+      "updated": "2026-04-18",
+      "session": 80
     }
   ],
   "resolved_blockers": [
@@ -115,6 +116,11 @@
   ],
   "brainstorm_backlog": [],
   "completed_phases": [
+    {
+      "phase_name": "S80: Per-phase GPU telemetry stack",
+      "completed": "2026-04-18",
+      "notes": "Shipped in one rebuild cycle. rlawt A1-A8 in-process (rlawt_nix.c + rlawt.h: per-swap timing, inter-swap gap, XSync probe, lagged GPU timer-query ring, glFinish probe, window-summary p50/p95/max, capability probe, env-gated fast path). Side-cars: perf-sampler.sh (/proc/$PID/task/* thread snapshots + Mali sysfs GPU-busy) + fps-log-tail.sh (FIFO-fd-persistent tail of client.log). Launcher wired with PID traps + GPU-busy DIAG probe. LaunchCoordinator.kt:180 cmdLine now exports RLT_PERF_SAMPLE=1 RLAWT_PERF=1 RLAWT_PERF_FINISH=1 RLAWT_PERF_GPU_TIMER=1 RLAWT_PERF_XSYNC=1. Scripts/configs/jars all auto-deployed via ScriptManager. First-run data collected on R52X90378YB at Varrock East Bank — three telemetry logs captured in $HOME/. Bottleneck triangulated: GPU-bound (finish_us=8ms) + JVM on little cores (cpus=0-3). GL_ARB_timer_query unavailable on virgl Mesa 25.2.8 limits GPU-side breakdowns."
+    },
     {
       "phase_name": "Task 21: rlawt Bionic Rebuild",
       "completed": "2026-04-17",
