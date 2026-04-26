@@ -84,11 +84,23 @@ acquire_launch_lock() {
         return 0
     fi
     if [ -f "$LAUNCH_LOCK_PID_FILE" ]; then
-        local existing_pid
+        local existing_pid existing_cmdline
         existing_pid="$(cat "$LAUNCH_LOCK_PID_FILE" 2>/dev/null || true)"
+        # Issue #55: `kill -0 $pid` alone false-positives under Android PID recycling
+        # (S80: virgl_test_server_android reused a stale launcher PID and blocked
+        # every re-launch). Verify /proc/$pid/cmdline actually names *this* script
+        # before treating the lock as live.
         if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
-            echo "Another native RuneLite launch is already in progress (PID $existing_pid)" | tee -a "$LOGFILE"
-            exit 0
+            existing_cmdline="$(tr '\0' ' ' < "/proc/$existing_pid/cmdline" 2>/dev/null || true)"
+            case "$existing_cmdline" in
+                *launch-runelite-native*)
+                    echo "Another native RuneLite launch is already in progress (PID $existing_pid cmdline=$existing_cmdline)" | tee -a "$LOGFILE"
+                    exit 0
+                    ;;
+                *)
+                    echo "Stale native-launch lock: PID $existing_pid was recycled (cmdline='$existing_cmdline') — reclaiming lock" | tee -a "$LOGFILE"
+                    ;;
+            esac
         fi
     fi
     rm -rf "$LAUNCH_LOCK_DIR" 2>/dev/null || true
@@ -129,6 +141,8 @@ export TERMUX_X11_FORCE_FLIP=1
 VIRGL_PID=""
 X11_PID=""
 JAVA_PID=""
+PERF_SAMPLER_PID=""
+CPUSET_SETTLE_PID=""
 
 # ===================================================================
 # Cleanup
@@ -172,6 +186,8 @@ cleanup_previous() {
 cleanup_on_exit() {
     echo "" | tee -a "$LOGFILE"
     echo "=== Native launch exit $(date) ===" | tee -a "$LOGFILE"
+    [ -n "${PERF_SAMPLER_PID:-}" ] && kill "$PERF_SAMPLER_PID" 2>/dev/null || true
+    [ -n "${CPUSET_SETTLE_PID:-}" ] && kill "$CPUSET_SETTLE_PID" 2>/dev/null || true
     [ -n "${JAVA_PID:-}" ] && kill "$JAVA_PID" 2>/dev/null || true
     [ -n "${VIRGL_PID:-}" ] && kill "$VIRGL_PID" 2>/dev/null || true
     [ -n "${X11_PID:-}" ] && kill "$X11_PID" 2>/dev/null || true
@@ -383,6 +399,31 @@ if [ -S "$PREFIX/tmp/.virgl_test" ]; then
 else
     echo "  socket missing — virgl not running, RL will see software Mesa only" | tee -a "$LOGFILE"
 fi
+echo "[DIAG] Mali/GPU busy counter probe:" | tee -a "$LOGFILE"
+GPU_BUSY_PATH=""
+for candidate in \
+    /sys/class/misc/mali0/device/utilization \
+    /sys/kernel/gpu/gpu_busy \
+    /sys/class/kgsl/kgsl-3d0/gpubusy \
+    /sys/class/devfreq/gpufreq/load \
+    /sys/devices/platform/mali/utilization
+do
+    if [ -r "$candidate" ]; then
+        val=$(head -1 "$candidate" 2>/dev/null || echo "?")
+        echo "  readable: $candidate = $val" | tee -a "$LOGFILE"
+        if [ -z "$GPU_BUSY_PATH" ]; then
+            GPU_BUSY_PATH="$candidate"
+        fi
+    else
+        echo "  not readable: $candidate" | tee -a "$LOGFILE"
+    fi
+done
+if [ -n "$GPU_BUSY_PATH" ]; then
+    echo "  selected GPU busy path: $GPU_BUSY_PATH" | tee -a "$LOGFILE"
+else
+    echo "  no GPU busy counter readable; sampler will skip GPU metric" | tee -a "$LOGFILE"
+fi
+export GPU_BUSY_PATH
 echo "[DIAG] Mesa env that rlawt/GL will see:" | tee -a "$LOGFILE"
 for v in GALLIUM_DRIVER VTEST_SOCKET_NAME MESA_GL_VERSION_OVERRIDE MESA_GLSL_VERSION_OVERRIDE MESA_EXTENSION_OVERRIDE MESA_NO_ERROR LD_LIBRARY_PATH DISPLAY; do
     eval "val=\${$v:-<unset>}"
@@ -571,6 +612,72 @@ if taskset -p 0xF0 "$JAVA_PID" 2>/dev/null; then
 else
     echo "AFFINITY: taskset failed for JVM (PID=$JAVA_PID)" | tee -a "$LOGFILE"
 fi
+
+if [ "${RLT_PERF_SAMPLE:-0}" = "1" ]; then
+    echo "PERF: RLT_PERF_SAMPLE=1 — spawning perf-sampler" | tee -a "$LOGFILE"
+    # fps-log-tail.sh was removed in the S81 audit: it matched `fps=` in client.log
+    # but the RuneLite FpsPlugin overlay value is never written to the log (it's a
+    # pixel overlay on the game canvas). rlawt [rlawt-perf] + XloriePerf give us
+    # producer and consumer FPS via real signals; we rely on those instead.
+    PERF_SAMPLER_LOG="$HOME/runelite-native-perf.log"
+    : > "$PERF_SAMPLER_LOG"
+    "$HOME/scripts/perf-sampler.sh" "$JAVA_PID" "${VIRGL_PID:-}" 1 "$PERF_SAMPLER_LOG" "${GPU_BUSY_PATH:-}" >/dev/null 2>&1 &
+    PERF_SAMPLER_PID=$!
+    echo "PERF: sampler PID=$PERF_SAMPLER_PID log=$PERF_SAMPLER_LOG" | tee -a "$LOGFILE"
+else
+    echo "PERF: RLT_PERF_SAMPLE unset or !=1 — no sampler spawned" | tee -a "$LOGFILE"
+fi
+
+# ===================================================================
+# Cpuset "settle" snapshots — entry-time CPUSET lines already emitted
+# above capture what AMS grants on process creation. Android re-nices
+# Termux within ~25s (S81 obs: JVM /top-app → /moderate, Client cpus=0-7
+# → 0-3). Fire at 30/60/120/300s so we see both the first demotion AND
+# whether the S81 periodic rebind holds long-term.
+# ===================================================================
+(
+    _emit_cpuset_snapshot() {
+        local T="$1"
+        [ ! -d "/proc/$JAVA_PID" ] && return 0
+        {
+            printf '=== CPUSET SETTLE (T=%ss) ts=%s ===\n' "$T" "$(date +%s)"
+            printf 'JVM     pid=%s cpuset=%s Cpus_allowed_list=%s\n' \
+                "$JAVA_PID" \
+                "$(cat /proc/$JAVA_PID/cpuset 2>/dev/null || echo unreadable)" \
+                "$(grep '^Cpus_allowed_list' /proc/$JAVA_PID/status 2>/dev/null | awk '{print $2}' || echo unreadable)"
+            if [ -n "${VIRGL_PID:-}" ] && [ -d "/proc/$VIRGL_PID" ]; then
+                printf 'VIRGL   pid=%s cpuset=%s Cpus_allowed_list=%s\n' \
+                    "$VIRGL_PID" \
+                    "$(cat /proc/$VIRGL_PID/cpuset 2>/dev/null || echo unreadable)" \
+                    "$(grep '^Cpus_allowed_list' /proc/$VIRGL_PID/status 2>/dev/null | awk '{print $2}' || echo unreadable)"
+            fi
+            # Find the RL Client thread + AWT-EventQueue-0 under the JVM tgid.
+            # These are the threads whose /moderate demotion caps RL FPS.
+            for t in /proc/$JAVA_PID/task/*; do
+                [ -d "$t" ] || continue
+                _comm=$(cat "$t/comm" 2>/dev/null || echo '?')
+                case "$_comm" in
+                    Client|AWT-EventQueue*|gles-renderer)
+                        _tid="${t##*/}"
+                        printf 'THREAD  tid=%s comm=%s cpuset=%s Cpus_allowed_list=%s\n' \
+                            "$_tid" "$_comm" \
+                            "$(cat /proc/$JAVA_PID/task/$_tid/cpuset 2>/dev/null || echo unreadable)" \
+                            "$(grep '^Cpus_allowed_list' /proc/$JAVA_PID/task/$_tid/status 2>/dev/null | awk '{print $2}' || echo unreadable)"
+                        ;;
+                esac
+            done
+            printf '=== CPUSET SETTLE (T=%ss) end ===\n' "$T"
+        } >> "$LOGFILE" 2>&1
+    }
+
+    # 30s catches first AMS re-evaluation. 60/120 check rebind-loop stickiness.
+    # 300s is the long-haul. `sleep` increments are deltas from the prior wait.
+    sleep 30;  _emit_cpuset_snapshot 30
+    sleep 30;  _emit_cpuset_snapshot 60
+    sleep 60;  _emit_cpuset_snapshot 120
+    sleep 180; _emit_cpuset_snapshot 300
+) &
+CPUSET_SETTLE_PID=$!
 
 wait "$JAVA_PID"
 JAVA_EXIT=$?

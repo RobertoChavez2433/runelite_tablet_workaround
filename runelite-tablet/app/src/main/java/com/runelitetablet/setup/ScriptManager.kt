@@ -26,6 +26,7 @@ class ScriptManager(
             "launch-runelite-native.sh",
             "patch-lwjgl-bionic.sh",
             "libbionic-compat.c",
+            "perf-sampler.sh",
             "update-runelite.sh", "health-check.sh", "shutdown-session.sh",
             "detect-gpu.sh", "setup-gpu.sh", "setup-gpu-mali.sh",
             "monitor-cpu-affinity.sh", "benchmark-pipeline.sh",
