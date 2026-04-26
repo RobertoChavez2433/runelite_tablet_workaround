@@ -57,11 +57,26 @@ class LorieView : SurfaceView {
             // chooses based on global policy, but the hint flips the default from
             // FRAME_RATE_COMPATIBILITY_DEFAULT-without-set (which the panel may interpret
             // as "anything is fine, drop to 60/30 to save power") to a specific request.
+            // Audit-#1 follow-up: the 2-arg setFrameRate(rate, compatibility) defaults
+            // to CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS, which lets the panel silently
+            // ignore our 120Hz request when the 60→120 transition isn't seamless.
+            // CHANGE_FRAME_RATE_ALWAYS commits to the rate switch unconditionally —
+            // the right call when 120 FPS is the explicit goal. Strategy arg added
+            // in API 31 (S); fall back to 2-arg form on R.
             val surf = holder.surface
-            if (surf != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (surf != null) {
                 try {
-                    surf.setFrameRate(120f, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
-                    AppLog.d("DISPLAY", "LorieView.surfaceCreated: setFrameRate(120, DEFAULT) hint posted")
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        surf.setFrameRate(
+                            120f,
+                            Surface.FRAME_RATE_COMPATIBILITY_DEFAULT,
+                            Surface.CHANGE_FRAME_RATE_ALWAYS
+                        )
+                        AppLog.d("DISPLAY", "LorieView.surfaceCreated: setFrameRate(120, DEFAULT, ALWAYS) hint posted")
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        surf.setFrameRate(120f, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+                        AppLog.d("DISPLAY", "LorieView.surfaceCreated: setFrameRate(120, DEFAULT) hint posted (pre-S, no strategy arg)")
+                    }
                 } catch (e: Throwable) {
                     AppLog.w("DISPLAY", "LorieView.surfaceCreated: setFrameRate threw ${e.message}")
                 }
