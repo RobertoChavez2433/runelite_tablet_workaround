@@ -16,6 +16,7 @@
 #include <GLES2/gl2ext.h>
 #include <android/native_window_jni.h>
 #include <android/log.h>
+#include <media/NdkImageReader.h>
 #include <dlfcn.h>
 #include <sys/mman.h>
 #include <time.h>
@@ -307,19 +308,24 @@ const EGLint ctxattribs[] = {
         EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE
 };
 
-int rendererInitThread(JavaVM *vm) {
-    JNIEnv* env;
+static void onImageAvailable(void* context, AImageReader* reader) {
+    (void) context;
+    AImage* image = NULL;
+    if (AImageReader_acquireLatestImage(reader, &image) == AMEDIA_OK && image)
+        AImage_delete(image);
+}
+
+int rendererInitThread(void) {
     EGLint major, minor;
     EGLint numConfigs;
     EGLint *const alphaAttrib = &configAttribs[11];
+    AImageReader* reader = NULL; // We will use this ImageReader each time surface is destroyed, zero reasons to clean it up
 
     pthread_setname_np(pthread_self(), "LorieRendererThread");
 
     xorg_list_init(&addedBuffers);
     xorg_list_init(&buffers);
     xorg_list_init(&removedBuffers);
-
-    (*vm)->AttachCurrentThread(vm, &env, NULL);
 
     egl_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     if (egl_display == EGL_NO_DISPLAY)
@@ -343,20 +349,31 @@ int rendererInitThread(JavaVM *vm) {
     // Weird devices without proper EGL_KHR_surfaceless_context support
     // We can not use pbuffer-based surfaces because it will require searching for configs supporting it
     // and I am not sure all devices have configs supporting both pbuffers and regular surfaces simultaneously
-    jclass surfaceTextureClass = (*env)->FindClass(env, "android/graphics/SurfaceTexture");
-    jclass surfaceClass = (*env)->FindClass(env, "android/view/Surface");
+    //
+    // Upstream eed4085a (2026-04-26): replaced the SurfaceTexture+Surface JNI dance
+    // (which required AttachCurrentThread on the renderer thread purely to construct
+    // a Java SurfaceTexture) with a pure-NDK AImageReader. The native consumer
+    // listener is a no-op: we only need a valid ANativeWindow to bind a default EGL
+    // surface against; the listener immediately deletes any image to keep the queue
+    // drained.
+    if (AImageReader_new(1, 1, AIMAGE_FORMAT_RGBA_8888, 2, &reader) != AMEDIA_OK) {
+        log("Failed to initialise ImageReader");
+        return 1;
+    }
 
-    jmethodID surfaceTextureConstructor = (*env)->GetMethodID(env, surfaceTextureClass, "<init>", "(Z)V");
-    jmethodID surfaceConstructor = (*env)->GetMethodID(env, surfaceClass, "<init>", "(Landroid/graphics/SurfaceTexture;)V");
+    if (AImageReader_setImageListener(reader, &(AImageReader_ImageListener) { .context = NULL, .onImageAvailable = onImageAvailable }) != AMEDIA_OK) {
+        log("Failed to set ImageReader listener");
+        AImageReader_delete(reader);
+        return 1;
+    }
 
-    jobject surfaceTextureObject = (*env)->NewObject(env, surfaceTextureClass, surfaceTextureConstructor, true);
-    jobject surfaceObject = (*env)->NewObject(env, surfaceClass, surfaceConstructor, surfaceTextureObject);
+    if (AImageReader_getWindow(reader, &defaultWin) != AMEDIA_OK) {
+        log("Failed to obtain ImageReader native window");
+        AImageReader_delete(reader);
+        return 1;
+    }
 
-    // We will use this surfacetexture each time surface is destroyed, zero reasons to clean it up
-    (*env)->NewGlobalRef(env, surfaceTextureObject);
-    (*env)->NewGlobalRef(env, surfaceObject);
-
-    win = defaultWin = ANativeWindow_fromSurface(env, surfaceObject);
+    win = defaultWin;
     ANativeWindow_acquire(defaultWin);
 
     sfc = defaultSfc = eglCreateWindowSurface(egl_display, cfg, win, NULL);
@@ -395,13 +412,11 @@ int rendererInitThread(JavaVM *vm) {
 }
 
 void rendererInit(JNIEnv* env) {
+    (void) env;
     pthread_t t;
-    JavaVM *vm;
 
     if (ctx)
         return;
-
-    (*env)->GetJavaVM(env, &vm);
 
     pthreadCondVarProxyInit();
 
@@ -410,7 +425,7 @@ void rendererInit(JNIEnv* env) {
     pthread_cond_init(&stateChangeFinishCond, NULL);
     pthread_spin_init(&bufferLock, false);
 
-    pthread_create(&t, NULL, (void*(*)(void*)) rendererInitThread, vm);
+    pthread_create(&t, NULL, (void*(*)(void*)) rendererInitThread, NULL);
 }
 
 void rendererTestCapabilities(int* legacy_drawing, uint8_t* flip) {
@@ -789,9 +804,13 @@ void rendererRedrawLocked(bool* waitingForBuffers) {
     drawCursor((float) (LorieBuffer_getWidth(buffer)), (float) (LorieBuffer_getHeight(buffer)));
     glFlush();
 
-    // Wait until root window drawing is finished before giving control back to X server
+    // Wait until root window drawing is finished before giving control back to X server.
+    // Upstream fix d69385b9 (2026-04-20): pass EGL_SYNC_FLUSH_COMMANDS_BIT_KHR so any
+    // pending GL commands (including the fence itself) are flushed before waiting —
+    // without this, eglClientWaitSyncKHR can hang indefinitely when the fence was
+    // created after glClear() with no explicit flush in between.
     fenceStartNs = rendererNowNs();
-    eglClientWaitSyncKHR(egl_display, fence, 0, EGL_FOREVER);
+    eglClientWaitSyncKHR(egl_display, fence, EGL_SYNC_FLUSH_COMMANDS_BIT_KHR, EGL_FOREVER);
     fenceNs = rendererNowNs() - fenceStartNs;
     eglDestroySyncKHR(egl_display, fence);
     // Phase 2B: Removed waitForNextFrame=true — was capping FPS by forcing 2-vsync wait.
