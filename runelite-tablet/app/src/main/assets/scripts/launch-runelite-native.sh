@@ -502,7 +502,17 @@ if [ -d "$ROOTFS_PATH/root/.runelite/profiles2" ] \
         else
             echo 'stretchedmode.keepAspectRatio=true' >> "$CFG"
         fi
-        echo "RL-CONFIG native: patched $(basename "$CFG") gameSize=${RLT_GAME_SIZE_W}x${RLT_GAME_SIZE_H} resize=KEEP_WINDOW_SIZE stretched=100 keepAspect=true" | tee -a "$LOGFILE"
+        # S82: maximize the AWT Frame on launch so RL fills the X11 device width
+        # instead of centering at gameSize+chrome. Verified upstream — ClientUI
+        # reads `runelite.clientMaximized` and calls setExtendedState(MAXIMIZED_BOTH)
+        # at startup. Without this, S82 captured Frame=1238×924 in a 1480×924 device
+        # leaving 121×2 java2D pixels of band on each side.
+        if grep -q '^runelite\.clientMaximized=' "$CFG"; then
+            sed -i 's/^runelite\.clientMaximized=.*/runelite.clientMaximized=true/' "$CFG"
+        else
+            echo 'runelite.clientMaximized=true' >> "$CFG"
+        fi
+        echo "RL-CONFIG native: patched $(basename "$CFG") gameSize=${RLT_GAME_SIZE_W}x${RLT_GAME_SIZE_H} resize=KEEP_WINDOW_SIZE stretched=100 keepAspect=true clientMaximized=true" | tee -a "$LOGFILE"
     done
 else
     if [ -z "${RLT_GAME_SIZE_W:-}" ] || [ -z "${RLT_GAME_SIZE_H:-}" ]; then
