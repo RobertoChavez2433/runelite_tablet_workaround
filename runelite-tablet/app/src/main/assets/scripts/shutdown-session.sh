@@ -113,10 +113,14 @@ if [ -n "$ACTIVE_SESSION_DIR" ]; then
 fi
 stop_termux_x11
 
-# 7. Launcher shell
+# 7. Launcher shell — kill by PID file when proot path tracked it, then
+# fall back to pattern match so the native launcher (no PID file) is also
+# reaped. Killing the launcher shell triggers its trap cleanup_on_exit which
+# cascades to any children we missed by name above.
 if [ -n "$ACTIVE_SESSION_DIR" ]; then
     stop_pid_from_file "launcher shell" "$ACTIVE_SESSION_DIR/launcher.pid"
 fi
+pkill -f 'launch-runelite' 2>/dev/null || true
 
 # 6. Termux:X11 Android app
 am broadcast -a com.termux.x11.ACTION_STOP --user 0 2>/dev/null || true

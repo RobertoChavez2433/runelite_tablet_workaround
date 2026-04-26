@@ -78,9 +78,35 @@ class RuneLiteSessionService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-    override fun onTaskRemoved(rootIntent: Intent?) { super.onTaskRemoved(rootIntent) }
 
+    /**
+     * User swiped RLT from recents. Reaper-fire the orphan teardown via Termux's
+     * separate-process RUN_COMMAND_SERVICE (non-blocking) before letting Android
+     * tear us down. Without this, the launcher shell + JVM + virgl + Xlorie are
+     * left running under Termux's UID after the task disappears.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        AppLog.state("RuneLiteSessionService.onTaskRemoved: user swiped task — firing orphan teardown")
+        super.onTaskRemoved(rootIntent)
+        fireOrphanKill("onTaskRemoved")
+        _sessionState.value = SessionState.Stopped
+        healthMonitor.stopPolling()
+        stopPinRefreshLoop()
+        termuxPin.unpin()
+        clearSessionState()
+        stopSelf()
+    }
+
+    /**
+     * Last-ditch teardown for paths that bypass handleStopSession / onTaskRemoved
+     * (Android low-mem kill, Settings → Force Stop, system reboot). serviceScope
+     * is cancelled at the bottom so we can't await — but the kill is dispatched
+     * to Termux's RunCommandService (separate process) which keeps executing
+     * after we exit.
+     */
     override fun onDestroy() {
+        AppLog.state("RuneLiteSessionService.onDestroy: state=${_sessionState.value} — firing orphan teardown")
+        fireOrphanKill("onDestroy")
         super.onDestroy()
         stopPinRefreshLoop()
         termuxPin.unpin()
@@ -189,20 +215,44 @@ class RuneLiteSessionService : Service() {
         try {
             commandRunner.execute(
                 commandPath = "${CommandRunner.TERMUX_BIN_PATH}/bash",
-                arguments = arrayOf("-c", """
-                    pkill -f 'net.runelite.client.RuneLite' 2>/dev/null || true
-                    pkill -f 'RuneLite.jar' 2>/dev/null || true
-                    pkill -f 'openbox' 2>/dev/null || true
-                    pkill -f 'proot-distro' 2>/dev/null || true
-                    pkill -f 'proot --' 2>/dev/null || true
-                    pulseaudio --kill 2>/dev/null || true
-                    pkill -f 'virgl_test_server' 2>/dev/null || true
-                    pkill -f 'termux-x11' 2>/dev/null || true
-                    rm -f "${'$'}HOME/.rlt-session.pid" "${'$'}PREFIX/tmp/.rlt-session-alive" "${'$'}HOME/.rlt-launch-env.sh" 2>/dev/null || true
-                """.trimIndent()),
+                arguments = arrayOf("-c", ORPHAN_KILL_BASH),
                 background = true, timeoutMs = 10_000L
             )
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { AppLog.e("SESSION", "aggressiveShutdown: ${e.message}", e) }
     }
+
+    /**
+     * Fire-and-forget variant for onTaskRemoved / onDestroy where serviceScope
+     * is about to be cancelled and we can't await. Dispatches to Termux's
+     * separate RUN_COMMAND_SERVICE process; the kill executes to completion
+     * regardless of our process state.
+     */
+    private fun fireOrphanKill(label: String) {
+        val ok = commandRunner.launchBackground(
+            commandPath = "${CommandRunner.TERMUX_BIN_PATH}/bash",
+            arguments = arrayOf("-c", ORPHAN_KILL_BASH)
+        )
+        AppLog.state("RuneLiteSessionService.fireOrphanKill[$label]: launchBackground=$ok")
+    }
 }
+
+/**
+ * Shared kill-list used by both the awaited graceful path (aggressiveShutdown)
+ * and the fire-and-forget orphan-reaper path (fireOrphanKill). Killing the
+ * launcher shell itself (`launch-runelite`) is critical — its EXIT trap then
+ * fires, which cascades to any children we don't pkill by name above.
+ */
+private val ORPHAN_KILL_BASH = """
+    pkill -f 'net.runelite.client.RuneLite' 2>/dev/null || true
+    pkill -f 'RuneLite.jar' 2>/dev/null || true
+    pkill -f 'openbox' 2>/dev/null || true
+    pkill -f 'launch-runelite' 2>/dev/null || true
+    pkill -f 'proot-distro' 2>/dev/null || true
+    pkill -f 'proot --' 2>/dev/null || true
+    pulseaudio --kill 2>/dev/null || true
+    pkill -f 'virgl_test_server' 2>/dev/null || true
+    pkill -f 'termux-x11' 2>/dev/null || true
+    am broadcast -a com.termux.x11.ACTION_STOP --user 0 2>/dev/null || true
+    rm -f "${'$'}HOME/.rlt-session.pid" "${'$'}PREFIX/tmp/.rlt-session-alive" "${'$'}HOME/.rlt-launch-env.sh" 2>/dev/null || true
+""".trimIndent()
