@@ -38,6 +38,10 @@
 #ifdef __unix__
 #	include <X11/Xlib.h>
 #	include <GL/glx.h>
+#	include <stddef.h>
+#	include <stdint.h>
+#	include <stdio.h>
+#	include <time.h>
 #endif
 
 #ifdef _WIN32
@@ -77,6 +81,53 @@ typedef struct {
 } IOSurfacePool;
 #endif
 
+#ifdef __unix__
+/* GPU-perf telemetry state. All fields Unix-only. Guarded by perf.enabled. */
+typedef unsigned long long rlawt_GLuint64;
+typedef void (*rlawt_PFNGLGENQUERIESPROC)(int /*GLsizei*/ n, unsigned int * /*GLuint**/ ids);
+typedef void (*rlawt_PFNGLDELETEQUERIESPROC)(int /*GLsizei*/ n, const unsigned int * /*GLuint**/ ids);
+typedef void (*rlawt_PFNGLBEGINQUERYPROC)(unsigned int /*GLenum*/ target, unsigned int /*GLuint*/ id);
+typedef void (*rlawt_PFNGLENDQUERYPROC)(unsigned int /*GLenum*/ target);
+typedef void (*rlawt_PFNGLGETQUERYOBJECTUI64VPROC)(unsigned int /*GLuint*/ id, unsigned int /*GLenum*/ pname, rlawt_GLuint64 *params);
+
+#define RLAWT_PERF_MAX_WINDOW 10000
+
+typedef struct {
+	bool enabled;            /* RLAWT_PERF master gate */
+	bool finish_enabled;     /* RLAWT_PERF_FINISH sub-flag */
+	bool xsync_enabled;      /* RLAWT_PERF_XSYNC sub-flag */
+	bool gpu_timer_enabled;  /* RLAWT_PERF_GPU_TIMER sub-flag (intent) */
+	bool gpu_timer_available;/* actual availability after extension probe */
+
+	size_t window;           /* samples per window; clamped to 1..RLAWT_PERF_MAX_WINDOW */
+	size_t frame_idx;        /* monotonically increasing */
+	struct timespec last_post_swap_ts; /* zero-initialized; zero means "no prior frame" */
+
+	uint64_t *swap_samples;  /* window-sized; allocated once at createGLContext */
+	uint64_t *gap_samples;
+	uint64_t *xsync_samples;
+	uint64_t *finish_samples;
+	uint64_t *gpu_samples;   /* microseconds from GL timer query; 0 => invalid */
+	size_t    gpu_valid_count; /* per-window count of valid GPU samples */
+
+	unsigned int *gpu_queries; /* GL query object IDs, window-sized ring */
+	bool gpu_queries_allocated;
+
+	unsigned int mkcur_count_window;
+
+	/* GL timer query function pointers */
+	rlawt_PFNGLGENQUERIESPROC           fpGenQueries;
+	rlawt_PFNGLDELETEQUERIESPROC        fpDeleteQueries;
+	rlawt_PFNGLBEGINQUERYPROC           fpBeginQuery;
+	rlawt_PFNGLENDQUERYPROC             fpEndQuery;
+	rlawt_PFNGLGETQUERYOBJECTUI64VPROC  fpGetQueryObjectui64v;
+
+	/* S81 audit: optional per-frame CSV dump, gated by RLAWT_PERF_CSV=<path>.
+	 * Writes one line per swapBuffers. Independent of the window summary. */
+	FILE *csv_fp;
+} RlawtPerfState;
+#endif
+
 typedef struct {
 	JAWT awt;
 	JAWT_DrawingSurface *ds;
@@ -99,6 +150,7 @@ typedef struct {
 	bool glxSwapControlTear;
 	PFNGLXSWAPINTERVALSGIPROC glXSwapIntervalSGI;
 	bool doubleBuffered;
+	RlawtPerfState perf;
 #endif
 
 #ifdef _WIN32
